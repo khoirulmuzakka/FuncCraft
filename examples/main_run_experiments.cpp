@@ -66,12 +66,12 @@ std::vector<std::pair<double, double>> bounds_from_domain(const FuncCraft::Domai
 }
 
 std::vector<std::vector<double>> initial_guesses(const FuncCraft::ComposedFunction& f) {
-    std::vector<double> center(static_cast<std::size_t>(f.dimension()), 0.0);
+    std::vector<double> guess(static_cast<std::size_t>(f.dimension()), 0.0);
     for (int i = 0; i < f.dimension(); ++i) {
         const auto idx = static_cast<std::size_t>(i);
-        center[idx] = 0.5 * (f.domain().lower[idx] + f.domain().upper[idx]);
+        guess[idx] = f.domain().lower[idx] + 0.63 * (f.domain().upper[idx] - f.domain().lower[idx]);
     }
-    return {center};
+    return {guess};
 }
 
 std::vector<double> evaluate_funcraft_batch(
@@ -86,6 +86,18 @@ std::vector<double> evaluate_funcraft_batch(
 
 std::vector<double> zero_point(int dimension) {
     return std::vector<double>(static_cast<std::size_t>(dimension), 0.0);
+}
+
+std::vector<double> random_point_in_domain(
+    const FuncCraft::Domain& domain,
+    unsigned long long seed) {
+    std::mt19937_64 rng(FuncCraft::detail::mix_seed(seed));
+    std::vector<double> point(static_cast<std::size_t>(domain.dimension()), 0.0);
+    for (int i = 0; i < domain.dimension(); ++i) {
+        std::uniform_real_distribution<double> dist(domain.lower[static_cast<std::size_t>(i)], domain.upper[static_cast<std::size_t>(i)]);
+        point[static_cast<std::size_t>(i)] = dist(rng);
+    }
+    return point;
 }
 
 std::string sanitize(std::string value) {
@@ -179,7 +191,7 @@ FuncCraft::ComposedFunction make_single_basic_function(
     const std::string& family) {
     const int dimension = domain.dimension();
     std::mt19937_64 rng(FuncCraft::detail::mix_seed(seed));
-    const auto x_star = zero_point(dimension);
+    const auto x_star = random_point_in_domain(domain, seed ^ 0xabcddcbaull);
 
     FuncCraft::FunctionBuilder builder(dimension);
     builder.domain(domain)
@@ -225,11 +237,13 @@ std::vector<std::vector<FuncCraft::BasicFunctionId>> fixed_composition_base_sets
 std::vector<std::vector<double>> fixed_deceptive_centers(
     int components,
     int dimension,
+    const std::vector<double>& x_star,
     unsigned long long seed) {
     std::vector<std::vector<double>> centers(static_cast<std::size_t>(components), zero_point(dimension));
+    centers.front() = x_star;
     std::mt19937_64 rng(FuncCraft::detail::mix_seed(seed ^ 0x66778899ull));
     std::uniform_real_distribution<double> dist(-60.0, 60.0);
-    for (int i = 1; i < components; ++i) {
+    for (int i = 2; i < components; ++i) {
         for (double& value : centers[static_cast<std::size_t>(i)]) {
             value = dist(rng);
         }
@@ -249,8 +263,8 @@ std::vector<FuncCraft::ComposedFunction> make_composition_functions(
 
     for (std::size_t idx = 0; idx < base_sets.size(); ++idx) {
         const auto& bases = base_sets[idx];
-        const auto x_star = zero_point(dimension);
-        const auto centers = fixed_deceptive_centers(components, dimension, seed + static_cast<unsigned long long>(idx + 1));
+        const auto x_star = random_point_in_domain(domain, seed + 50021ull * static_cast<unsigned long long>(idx + 1));
+        const auto centers = fixed_deceptive_centers(components, dimension, x_star, seed + static_cast<unsigned long long>(idx + 1));
 
         FuncCraft::FunctionBuilder builder(dimension);
         builder.domain(domain)
@@ -263,10 +277,16 @@ std::vector<FuncCraft::ComposedFunction> make_composition_functions(
 
         for (int i = 0; i < components; ++i) {
             std::mt19937_64 rng(FuncCraft::detail::mix_seed(seed + 1009ull * static_cast<unsigned long long>(idx + 1) + static_cast<unsigned long long>(i)));
+            // CPM classes use the same minimizer for every component.  Only the
+            // DPM class uses separate prescribed component centers, with one
+            // deceptive local basin fixed at the origin.
+            const auto& component_center = c == FuncCraft::CompositionClass::DeceptivePointSoftmax
+                ? centers[static_cast<std::size_t>(i)]
+                : x_star;
             builder.add_component(
                 bases[static_cast<std::size_t>(i)],
                 dimension,
-                std::make_shared<FuncCraft::RotationTransform>(FuncCraft::detail::random_rotation_matrix(rng, dimension), x_star),
+                std::make_shared<FuncCraft::RotationTransform>(FuncCraft::detail::random_rotation_matrix(rng, dimension), component_center),
                 std::make_shared<FuncCraft::IdentityValueTransform>());
         }
 
