@@ -1,40 +1,67 @@
 #ifndef FUNCCRAFT_CORE_H
 #define FUNCCRAFT_CORE_H
 
+/**
+ * @file core.h
+ * @brief Core benchmark metadata types and shared enumerations.
+ *
+ * This header defines the basic domain container, the classification enums
+ * used to describe generated benchmark functions, and the metadata record
+ * stored alongside composed functions.
+ */
+
 #include "basicf.h"
 
 #include <map>
-#include <memory>
 #include <string>
 #include <vector>
 
 namespace FuncCraft {
 
 enum class CompositionClass {
+    /// No composition, a single transformed component.
     None,
+    /// Weighted sum of components evaluated at a common point.
     CommonPointWeightedSum,
+    /// Power mean aggregation of components evaluated at a common point.
     CommonPointPowerMean,
+    /// Level-well aggregation of components evaluated at a common point.
     CommonPointLevelWell,
+    /// Deceptive softmax selection over multiple component centers.
     DeceptivePointSoftmax,
 };
 
 enum class ValueTransformClass {
+    /// No value transform.
     None,
+    /// Cosine-based zeroing transform.
     CosineZero,
+    /// Oscillatory transform.
     Oscillatory,
+    /// Power-law transform.
     Power,
+    /// Mixed value transforms across components.
     Mixed,
 };
 
 enum class CoordinateTransformClass {
+    /// No coordinate transform.
     None,
+    /// Rotation transform.
     Rotation,
+    /// Subspace/block transform.
     Block,
+    /// Affine transform.
     Affine,
+    /// Nonlinear fold transform.
     NonlinearFold,
+    /// Mixed coordinate transforms across components.
     Mixed,
 };
 
+/**
+ * @brief Axis-aligned rectangular domain for benchmark inputs.
+ */
 struct Domain {
     std::vector<double> lower;
     std::vector<double> upper;
@@ -44,6 +71,9 @@ struct Domain {
     bool contains(const std::vector<double>& x) const;
 };
 
+/**
+ * @brief Classification summary for a composed benchmark function.
+ */
 struct FunctionClass {
     CompositionClass composition = CompositionClass::None;
     ValueTransformClass value_transform = ValueTransformClass::None;
@@ -51,6 +81,9 @@ struct FunctionClass {
     std::vector<BasicFunctionId> base_functions;
 };
 
+/**
+ * @brief Metadata attached to each generated benchmark function.
+ */
 struct FunctionMetadata {
     FunctionClass function_class;
     int dimension = 0;
@@ -61,36 +94,22 @@ struct FunctionMetadata {
     std::map<std::string, std::string> parameters;
 };
 
+/**
+ * @brief Render a composition class as a short label.
+ */
 std::string to_string(CompositionClass cls);
+/**
+ * @brief Render a value transform class as a short label.
+ */
 std::string to_string(ValueTransformClass cls);
+/**
+ * @brief Render a coordinate transform class as a short label.
+ */
 std::string to_string(CoordinateTransformClass cls);
+/**
+ * @brief Build a compact label describing a complete function class.
+ */
 std::string class_label(const FunctionClass& cls);
-
-class BaseFunction {
-public:
-    virtual ~BaseFunction() = default;
-    virtual double evaluate(const std::vector<double>& x) const = 0;
-    virtual int dimension() const = 0;
-    virtual std::vector<double> minimizer() const = 0;
-    virtual double minimum_value() const = 0;
-    virtual std::string name() const = 0;
-};
-
-class BasicFunction final : public BaseFunction {
-public:
-    BasicFunction(BasicFunctionId id, int dimension, bool shift_to_zero = true);
-
-    double evaluate(const std::vector<double>& x) const override;
-    int dimension() const override;
-    std::vector<double> minimizer() const override;
-    double minimum_value() const override;
-    std::string name() const override;
-    BasicFunctionId id() const;
-
-private:
-    BasicF function_;
-    bool shift_to_zero_ = true;
-};
 
 } // namespace FuncCraft
 

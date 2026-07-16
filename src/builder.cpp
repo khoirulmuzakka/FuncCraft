@@ -70,7 +70,7 @@ FunctionBuilder& FunctionBuilder::add_component(
     require(coordinate_transform->output_dimension() == component_dimension, "component transform output dimension mismatch");
 
     Component component;
-    component.base = std::make_shared<BasicFunction>(id, component_dimension);
+    component.base = std::make_shared<BasicF>(id, component_dimension);
     component.coordinate_transform = std::move(coordinate_transform);
     component.value_transform = std::move(value_transform);
     components_.push_back(std::move(component));

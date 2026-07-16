@@ -149,11 +149,11 @@ ComposedFunction::ComposedFunction(
         require(static_cast<bool>(component.coordinate_transform), "component coordinate transform is null");
         require(static_cast<bool>(component.value_transform), "component value transform is null");
         require(component.coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
-        require(component.coordinate_transform->output_dimension() == component.base->dimension(), "component transform output dimension mismatch");
+        require(component.coordinate_transform->output_dimension() == component.base->dimension, "component transform output dimension mismatch");
     }
 }
 
-double ComposedFunction::evaluate(const std::vector<double>& x) const {
+double ComposedFunction::evaluate_single(const std::vector<double>& x) const {
     require_dimension(x, domain_.dimension(), "composed function input");
     return metadata_.known_global_value + composition_->apply(x, component_values(x));
 }
@@ -164,10 +164,19 @@ std::vector<double> ComposedFunction::component_values(const std::vector<double>
     z.reserve(components_.size());
     for (const auto& component : components_) {
         const std::vector<double> y = component.coordinate_transform->apply(x);
-        const double u = component.base->evaluate(y);
+        const double u = (*component.base)(std::vector<std::vector<double>>{y}).front();
         z.push_back(component.value_transform->apply(u));
     }
     return z;
+}
+
+std::vector<double> ComposedFunction::operator()(const std::vector<std::vector<double>>& X) const {
+    std::vector<double> values;
+    values.reserve(X.size());
+    for (const auto& x : X) {
+        values.push_back(evaluate_single(x));
+    }
+    return values;
 }
 
 const FunctionMetadata& ComposedFunction::metadata() const {

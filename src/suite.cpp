@@ -432,8 +432,8 @@ const ComposedFunction& BenchmarkSuite::function(int index) const {
     return functions_[static_cast<std::size_t>(index)];
 }
 
-double BenchmarkSuite::evaluate(int index, const std::vector<double>& x) const {
-    return function(index).evaluate(x);
+std::vector<double> BenchmarkSuite::operator()(int index, const std::vector<std::vector<double>>& X) const {
+    return function(index)(X);
 }
 
 const BenchmarkSuiteOptions& BenchmarkSuite::options() const {

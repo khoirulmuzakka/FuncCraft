@@ -646,24 +646,13 @@ double BasicF::evaluate_impl(const double* x) const {
     }
 }
 
-double BasicF::evaluate_point(const double* x) const {
-    return evaluate_impl(x);
-}
-
-void BasicF::evaluate_batch_raw(const double* xs, std::size_t count, double* out) const {
-    const std::size_t stride = static_cast<std::size_t>(dimension);
-    for (std::size_t i = 0; i < count; ++i) {
-        out[i] = evaluate_impl(xs + i * stride);
-    }
-}
-
 std::vector<double> BasicF::operator()(const std::vector<std::vector<double>>& X) const {
     std::vector<double> values(X.size(), 0.0);
     for (std::size_t i = 0; i < X.size(); ++i) {
         if (static_cast<int>(X[i].size()) != dimension) {
             throw std::invalid_argument(name + " candidate dimension mismatch");
         }
-        values[i] = evaluate_point(X[i].data());
+        values[i] = evaluate_impl(X[i].data());
     }
     return values;
 }

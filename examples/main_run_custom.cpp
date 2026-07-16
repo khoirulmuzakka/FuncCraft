@@ -35,7 +35,6 @@ RunConfig parse_cli(int argc, char* argv[]) {
 }
 
 std::vector<std::vector<double>> initial_guesses(const FuncCraft::ComposedFunction& f) {
-    const auto& x_star = f.metadata().known_global_minimizer;
     std::vector<double> center(static_cast<std::size_t>(f.dimension()), 0.0);
     for (int i = 0; i < f.dimension(); ++i) {
         const auto idx = static_cast<std::size_t>(i);
@@ -61,12 +60,7 @@ std::vector<double> evaluate_funcraft_batch(
         throw std::invalid_argument("FuncCraft function pointer must not be null");
     }
 
-    std::vector<double> values;
-    values.reserve(xs.size());
-    for (const auto& x : xs) {
-        values.push_back(function->evaluate(x));
-    }
-    return values;
+    return (*function)(xs);
 }
 
 std::string trim_label(std::string label, std::size_t width) {
@@ -143,7 +137,7 @@ int main(int argc, char* argv[]) {
                 settings);
 
             const minion::MinionResult result = minimizer.optimize();
-            const double optimum_value = function.evaluate(metadata.known_global_minimizer);
+            const double optimum_value = function(std::vector<std::vector<double>>{metadata.known_global_minimizer}).front();
             const double gap = result.fun - metadata.known_global_value;
 
             total_gap += gap;

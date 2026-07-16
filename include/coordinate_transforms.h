@@ -1,6 +1,14 @@
 #ifndef FUNCCRAFT_COORDINATE_TRANSFORMS_H
 #define FUNCCRAFT_COORDINATE_TRANSFORMS_H
 
+/**
+ * @file coordinate_transforms.h
+ * @brief Coordinate transforms used to remap benchmark input vectors.
+ *
+ * These transforms reshape or reparameterize the input before it reaches the
+ * primitive base function.
+ */
+
 #include "core.h"
 
 #include <vector>
@@ -10,12 +18,27 @@ namespace FuncCraft {
 class CoordinateTransform {
 public:
     virtual ~CoordinateTransform() = default;
+    /**
+     * @brief Apply the transform to one input vector.
+     */
     virtual std::vector<double> apply(const std::vector<double>& x) const = 0;
+    /**
+     * @brief Return the expected input dimension.
+     */
     virtual int input_dimension() const = 0;
+    /**
+     * @brief Return the produced output dimension.
+     */
     virtual int output_dimension() const = 0;
+    /**
+     * @brief Return the transform family used by this object.
+     */
     virtual CoordinateTransformClass transform_class() const = 0;
 };
 
+/**
+ * @brief Identity transform that forwards its input unchanged.
+ */
 class IdentityTransform final : public CoordinateTransform {
 public:
     explicit IdentityTransform(int dimension);
@@ -28,6 +51,9 @@ private:
     int dimension_ = 0;
 };
 
+/**
+ * @brief Selects a subspace of the input vector and optionally recenters it.
+ */
 class SubspaceTransform final : public CoordinateTransform {
 public:
     SubspaceTransform(int input_dimension, std::vector<int> indices);
@@ -44,6 +70,9 @@ private:
     std::vector<double> center_;
 };
 
+/**
+ * @brief Applies a rotation matrix around an optional center point.
+ */
 class RotationTransform final : public CoordinateTransform {
 public:
     explicit RotationTransform(std::vector<std::vector<double>> matrix);
@@ -58,6 +87,9 @@ private:
     std::vector<double> center_;
 };
 
+/**
+ * @brief Applies a full affine mapping from the input space to the output space.
+ */
 class AffineTransform final : public CoordinateTransform {
 public:
     AffineTransform(int input_dimension, std::vector<std::vector<double>> matrix, std::vector<double> offset);
@@ -79,6 +111,9 @@ private:
     std::vector<double> center_;
 };
 
+/**
+ * @brief Folds one coordinate into a nonlinear variant while keeping dimension.
+ */
 class FoldTransform final : public CoordinateTransform {
 public:
     FoldTransform(int dimension, int folded_coordinate = 0);

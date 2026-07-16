@@ -93,38 +93,4 @@ std::string class_label(const FunctionClass& cls) {
     return out.str();
 }
 
-BasicFunction::BasicFunction(BasicFunctionId id, int dimension, bool shift_to_zero)
-    : function_(id, dimension),
-      shift_to_zero_(shift_to_zero) {}
-
-double BasicFunction::evaluate(const std::vector<double>& x) const {
-    require_dimension(x, function_.dimension, function_.name);
-    const double value = function_.evaluate_point(x.data());
-    const double shifted = shift_to_zero_ ? value - function_.f_opt : value;
-    if (shift_to_zero_ && std::fabs(shifted) <= 1.0e-12) {
-        return 0.0;
-    }
-    return shifted;
-}
-
-int BasicFunction::dimension() const {
-    return function_.dimension;
-}
-
-std::vector<double> BasicFunction::minimizer() const {
-    return function_.x_opt;
-}
-
-double BasicFunction::minimum_value() const {
-    return shift_to_zero_ ? 0.0 : function_.f_opt;
-}
-
-std::string BasicFunction::name() const {
-    return function_.name;
-}
-
-BasicFunctionId BasicFunction::id() const {
-    return function_.id();
-}
-
 } // namespace FuncCraft

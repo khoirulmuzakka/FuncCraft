@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < suite.size(); ++i) {
             const auto& function = suite.function(i);
             const auto& metadata = function.metadata();
-            const double value = function.evaluate(metadata.known_global_minimizer);
+            const double value = function(std::vector<std::vector<double>>{metadata.known_global_minimizer}).front();
             const double error = std::fabs(value - metadata.known_global_value);
             const bool ok = std::isfinite(value) && error <= config.tolerance;
 
