@@ -32,6 +32,7 @@ struct Config {
     int threads = 128;
     unsigned long long seed = 1;
     std::string algo = "ARRDE";
+    double assigned_fmin = 100.0;
     double lower_bound = -100.0;
     double upper_bound = 100.0;
 };
@@ -184,8 +185,9 @@ FuncCraft::ComposedFunction make_single_basic_function(
     builder.domain(domain)
         .seed(seed)
         .known_global_minimizer(x_star)
-        .known_global_value(0.0)
+        .known_global_value(100.0)
         .parameter("suite_family", family)
+        .parameter("assigned_fmin", "100.0")
         .add_component(id, dimension, make_coordinate_transform(t, dimension, x_star, rng), make_experiment_value_transform(p))
         .composition(std::make_shared<FuncCraft::SingleComponentComposition>());
     return builder.build();
@@ -254,8 +256,9 @@ std::vector<FuncCraft::ComposedFunction> make_composition_functions(
         builder.domain(domain)
             .seed(seed + static_cast<unsigned long long>(idx + 1))
             .known_global_minimizer(x_star)
-            .known_global_value(0.0)
+            .known_global_value(100.0)
             .parameter("suite_family", "composition-m5")
+            .parameter("assigned_fmin", "100.0")
             .parameter("components", std::to_string(components));
 
         for (int i = 0; i < components; ++i) {

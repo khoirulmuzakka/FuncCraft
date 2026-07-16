@@ -34,7 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("result_dir", nargs="?", default="results", help="Directory containing result txt files.")
     parser.add_argument("--out", default=None, help="Output CSV path. Defaults to result_dir/summary.csv.")
     parser.add_argument("--tol", type=float, default=1.0e-8, help="Solved tolerance for f_best - f_star.")
-    parser.add_argument("--fstar", type=float, default=0.0, help="Known optimum value used for all generated files.")
+    parser.add_argument("--fstar", type=float, default=100.0, help="Known optimum value used for all generated files.")
     return parser.parse_args()
 
 
