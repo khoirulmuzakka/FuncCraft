@@ -21,7 +21,7 @@ examples/*.txt
 examples/*.csv
 examples/.DS_Store
 .DS_Store
-minionpy/lib
+pyfunccraft/lib
 minionpy.egg-info
 examples/test.py
 _skbuild
@@ -52,7 +52,17 @@ docs/source/_templates/*.tmp
 eigen
 eigen.zip
 cec2011/*
-minionpy/*.so
-minionpy/*.pyd
+pyfunccraft//*.so
+pyfunccraft//*.pyd
 
+docs/*.pdf 
+docs/*.bbl 
+docs/*.blg
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.synctex.gz
+docs/*.fdb_latexmk 
+docs/figures/
 

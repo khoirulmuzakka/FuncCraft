@@ -8,6 +8,7 @@ include(FetchContent)
 
 option(FUNCCRAFT_BUILD_EXAMPLES "Build FuncCraft C++ examples" ON)
 option(FUNCCRAFT_LINK_MINION "Build examples that use the Minion optimizer" ON)
+option(FUNCCRAFT_BUILD_PYTHON "Build FuncCraft Python bindings" ON)
 
 set(FUNCCRAFT_OUTPUT_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 set(FUNCCRAFT_OUTPUT_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
@@ -115,4 +116,33 @@ if(FUNCCRAFT_BUILD_EXAMPLES)
     if(FUNCCRAFT_LINK_MINION)
         funccraft_add_example(run_custom examples/main_run_custom.cpp minion)
     endif()
+endif()
+
+if(FUNCCRAFT_BUILD_PYTHON)
+    find_package(pybind11 CONFIG QUIET)
+    if(NOT pybind11_FOUND)
+        FetchContent_Declare(
+            pybind11
+            GIT_REPOSITORY https://github.com/pybind/pybind11.git
+            GIT_TAG v2.13.6
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(pybind11)
+    endif()
+
+    pybind11_add_module(_funccraft src/bindings.cpp)
+    target_link_libraries(_funccraft PRIVATE funccraft)
+    set_target_properties(_funccraft PROPERTIES
+        OUTPUT_NAME "_funccraft"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_CURRENT_SOURCE_DIR}/pyfunccraft"
+    )
 endif()
