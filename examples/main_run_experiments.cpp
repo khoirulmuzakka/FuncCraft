@@ -141,7 +141,8 @@ std::shared_ptr<FuncCraft::CoordinateTransform> make_coordinate_transform(
 }
 
 std::shared_ptr<FuncCraft::ValueTransform> make_experiment_value_transform(
-    FuncCraft::ValueTransformClass cls) {
+    FuncCraft::ValueTransformClass cls,
+    double power_exponent = 2.0) {
     using namespace FuncCraft;
     switch (cls) {
     case ValueTransformClass::None:
@@ -151,7 +152,7 @@ std::shared_ptr<FuncCraft::ValueTransform> make_experiment_value_transform(
     case ValueTransformClass::Oscillatory:
         return std::make_shared<OscillatoryValueTransform>(0.40, 0.03);
     case ValueTransformClass::Power:
-        return std::make_shared<PowerValueTransform>(1.0, 2.0);
+        return std::make_shared<PowerValueTransform>(1.0, power_exponent);
     default:
         throw std::invalid_argument("unsupported value treatment");
     }
@@ -186,6 +187,7 @@ FuncCraft::ComposedFunction make_single_basic_function(
     FuncCraft::BasicFunctionId id,
     FuncCraft::CoordinateTransformClass t,
     FuncCraft::ValueTransformClass p,
+    double power_exponent,
     const FuncCraft::Domain& domain,
     unsigned long long seed,
     const std::string& family) {
@@ -200,7 +202,8 @@ FuncCraft::ComposedFunction make_single_basic_function(
         .known_global_value(100.0)
         .parameter("suite_family", family)
         .parameter("assigned_fmin", "100.0")
-        .add_component(id, dimension, make_coordinate_transform(t, dimension, x_star, rng), make_experiment_value_transform(p))
+        .parameter("power_exponent", std::to_string(power_exponent))
+        .add_component(id, dimension, make_coordinate_transform(t, dimension, x_star, rng), make_experiment_value_transform(p, power_exponent))
         .composition(std::make_shared<FuncCraft::SingleComponentComposition>());
     return builder.build();
 }
@@ -316,6 +319,7 @@ std::vector<Treatment> build_treatments(const Config& config) {
                 basic_ids[i],
                 t,
                 FuncCraft::ValueTransformClass::None,
+                2.0,
                 domain,
                 config.seed + static_cast<unsigned long long>(i + 1),
                 "coordinate"));
@@ -323,21 +327,28 @@ std::vector<Treatment> build_treatments(const Config& config) {
         treatments.push_back(std::move(treatment));
     }
 
-    const std::vector<FuncCraft::ValueTransformClass> value_classes = {
-        FuncCraft::ValueTransformClass::None,
-        FuncCraft::ValueTransformClass::CosineZero,
-        FuncCraft::ValueTransformClass::Oscillatory,
-        FuncCraft::ValueTransformClass::Power,
+    struct ValueTreatment {
+        FuncCraft::ValueTransformClass cls;
+        double power_exponent;
+        std::string label;
     };
-    for (auto p : value_classes) {
+    const std::vector<ValueTreatment> value_treatments = {
+        {FuncCraft::ValueTransformClass::None, 2.0, "NONE"},
+        {FuncCraft::ValueTransformClass::CosineZero, 2.0, "COSZERO"},
+        {FuncCraft::ValueTransformClass::Oscillatory, 2.0, "OSC"},
+        {FuncCraft::ValueTransformClass::Power, 0.1, "POWER_P01"},
+        {FuncCraft::ValueTransformClass::Power, 10.0, "POWER_P10"},
+    };
+    for (const auto& value_treatment : value_treatments) {
         Treatment treatment;
         treatment.experiment = "value";
-        treatment.label = FuncCraft::to_string(p);
+        treatment.label = value_treatment.label;
         for (std::size_t i = 0; i < basic_ids.size(); ++i) {
             treatment.functions.push_back(make_single_basic_function(
                 basic_ids[i],
                 FuncCraft::CoordinateTransformClass::Rotation,
-                p,
+                value_treatment.cls,
+                value_treatment.power_exponent,
                 domain,
                 config.seed + 10000ull + static_cast<unsigned long long>(i + 1),
                 "value"));
