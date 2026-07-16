@@ -52,8 +52,8 @@ docs/source/_templates/*.tmp
 eigen
 eigen.zip
 cec2011/*
-pyfunccraft//*.so
-pyfunccraft//*.pyd
+pyfunccraft/*.so
+pyfunccraft/*.pyd
 
 docs/*.pdf 
 docs/*.bbl 

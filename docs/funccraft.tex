@@ -1661,9 +1661,19 @@ belong to \(\theta\). For example, two instances with the same
 rotations or different level-well frequencies are in the same class, but they
 are different benchmark instances.
 
+\subsection{Numerical Experiment Design}
 
-\subsection{API}
-\subsection{Figures}
+The classification also gives a simple way to organize numerical experiments.
+In this work, we generate benchmark instances with different choices of
+coordinate transformations \(T_i\), value transformations \(\phi_i\), and
+composition functions \(\psi\), and use optimization algorithms to minimize the
+resulting functions. For example, an algorithm such as ARRDE is run on
+instances that share the same base functions but differ in whether rotations,
+affine maps, oscillatory value transformations, or deceptive compositions are
+applied. The results are then compared across classes to see which construction
+choices make the optimization problem easier or harder for the algorithm.
+
+
 
 
 \section{Conclusion}

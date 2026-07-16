@@ -115,6 +115,7 @@ if(FUNCCRAFT_BUILD_EXAMPLES)
     funccraft_add_example(check_basicf_optima examples/main_check_basicf_optima.cpp)
     if(FUNCCRAFT_LINK_MINION)
         funccraft_add_example(run_custom examples/main_run_custom.cpp minion)
+        funccraft_add_example(run_experiments examples/main_run_experiments.cpp minion)
     endif()
 endif()
 

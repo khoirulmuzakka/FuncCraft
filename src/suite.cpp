@@ -349,7 +349,7 @@ BenchmarkSuite::BenchmarkSuite(BenchmarkSuiteOptions options)
     }
 
     const auto unimodal = unimodalF_list();
-    for (BasicFunctionId id : unimodal) {
+    for (BasicFunctionId id : all_bases) {
         std::mt19937_64 cos_point_rng(mix_seed(options_.seed + static_cast<unsigned long long>(slot + 1) + 0x2345ull));
         const auto cos_x_star = random_point_in_domain(cos_point_rng, suite_domain);
         functions_.push_back(make_single_unimodal_transform(
