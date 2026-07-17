@@ -8,6 +8,7 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{enumitem}
+\usepackage{longtable}
 
 
 \geometry{margin=1in}
@@ -629,6 +630,7 @@ which prescribed points are global minimizers, local minimizers, or neither.
 
 
 \section{Analysis of Benchmark Construction Ingredients}
+\label{sec:anaylsis of benchmark construction}
 
 The previous section established the mathematical infrastructure needed to
 construct functions with known global optima. This section turns to the design
@@ -1143,7 +1145,7 @@ Proposition~\ref{thm:prescribed-point-construction}. The only additional
 choice is to make \(\psi\) vanish at the zero component-value vector.
 
 \begin{proposition}[Common-minimizer specialization]
-	\label{cor:common-vanishing-construction}
+	\label{prop:common-vanishing-construction}
 	Assume that the value transformations follow
 	Proposition~\ref{prop:minimum-preserving-value-transformations}, and choose
 	a prescribed point \(x^\star\in\Omega\). If the coordinate transformations
@@ -1554,8 +1556,7 @@ prescribed deceptive local minima, while the switching functions may introduce
 further landscape structure.
 
 
-\section{Code Implementation}
-\subsection{Classification of Functions}
+\section{Classification of Functions}
 
 The framework can generate a very large number of benchmark functions because a
 function is determined not only by the selected base functions, but also by the
@@ -1576,21 +1577,21 @@ are different benchmark instances. The class label is therefore coarse enough
 for benchmark-suite organization and result tables, while the instance metadata
 is detailed enough for exact reproducibility.
 
-The classification follows the same ingredients used to generate the function.
-In \textsc{FuncCraft}, the base-function library contains \(N=28\) functions,
-formed from the base functions used in CEC2014, CEC2017, and BBOB2009. A
+
+
+The classification follows the same ingredients used to generate the function. A
 generated benchmark instance is specified by a structural class and an instance
 record,
 \[
-	\left(\mathcal{C},\mathcal{P},\mathcal{T},\mathcal{G};\theta\right).
+\left(\mathcal{C},\mathcal{P},\mathcal{T},\mathcal{G};\theta\right).
 \]
 Here,
 \[
 \begin{array}{ll}
-\mathcal{C} & \text{composition-function class},\\
-\mathcal{P} & \text{value-transformation class},\\
-\mathcal{T} & \text{coordinate-transformation class},\\
-\mathcal{G} & \text{selected base functions}.
+	\mathcal{C} & \text{composition-function class},\\
+	\mathcal{P} & \text{value-transformation class},\\
+	\mathcal{T} & \text{coordinate-transformation class},\\
+	\mathcal{G} & \text{selected base functions}.
 \end{array}
 \]
 The parameter record \(\theta\) stores the instance-specific choices, such as
@@ -1598,6 +1599,24 @@ dimension, number of components, random seed, rotations, shifts, weights,
 prescribed points, and construction parameters. Thus the structural tuple is used
 for grouping benchmark functions, while \(\theta\) is used for exact
 reconstruction.
+
+
+
+\section{Numerical Experiment}
+The construction results above allow many valid choices of the composition,
+value transformation, and coordinate transformation classes
+\((\mathcal{C},\mathcal{P},\mathcal{T})\). Rather than testing all
+possible combinations, we use a small controlled experiment to illustrate how
+these construction choices affect the difficulty seen by an optimizer. The
+experiment uses transformation and composition mechanisms introduced in
+Section~\ref{sec:anaylsis of benchmark construction}, so every generated
+instance still follows the minimum-preservation conditions established earlier.
+The experiment is organized by the structural labels in
+Table~\ref{tab:classification-dictionary}: the table gives the general
+dictionary used to describe generated functions, while the numerical experiment
+below fixes concrete parameter choices for each treatment. This separation is
+important because the label identifies the construction mechanism, whereas the
+parameter record \(\theta\) determines the particular benchmark instance that an optimization algorithm minimizes.
 
 \begin{table}[t]
 	\centering
@@ -1654,24 +1673,182 @@ reconstruction.
 \end{table}
 
 The labels in Table~\ref{tab:classification-dictionary} describe structural
-choices only. Numerical values such as \(\alpha\), \(\epsilon\), \(p\), softmax
+choices only; numerical values such as \(\alpha\), \(\epsilon\), \(p\), softmax
 sharpness, rotations, affine matrices, subspace indices, and component weights
-belong to \(\theta\). For example, two instances with the same
-\((\mathcal{C},\mathcal{P},\mathcal{T},\mathcal{G})\) but different random
-rotations or different level-well frequencies are in the same class, but they
-are different benchmark instances.
+belong to \(\theta\). We therefore keep the label fixed when comparing the same
+mechanism, and vary \(\theta\) only to generate reproducible instances. 
 
-\subsection{Numerical Experiment Design}
+We use adaptive restart-refine differential evolution (ARRDE)\cite{muzakka2026robustdifferentialevolutionnonlinear} as the
+test optimizer. ARRDE is chosen because it has been evaluated in a study using
+CEC benchmark collections from CEC2011, CEC2017, CEC2019, CEC2020, and CEC2022.
+That study compared ARRDE against state-of-the-art algorithms and reported that
+ARRDE ranked first over the benchmark functions used in the comparison. The
+purpose here is not to retune ARRDE, but to use a strong fixed optimizer to show
+how the different construction mechanisms change the observed difficulty of the
+generated functions.
 
-The classification also gives a simple way to organize numerical experiments.
-In this work, we generate benchmark instances with different choices of
-coordinate transformations \(T_i\), value transformations \(\phi_i\), and
-composition functions \(\psi\), and use optimization algorithms to minimize the
-resulting functions. For example, an algorithm such as ARRDE is run on
-instances that share the same base functions but differ in whether rotations,
-affine maps, oscillatory value transformations, or deceptive compositions are
-applied. The results are then compared across classes to see which construction
-choices make the optimization problem easier or harder for the algorithm.
+All generated instances are shifted so that the target minimum value is
+\(f^\star=100\). Each instance is run 21 times in dimension \(D=10\), using
+evaluation budgets \(100D\), \(1000D\), \(3000D\), and \(10000D\). Performance
+is measured by the fraction of solved problems and by the transformed relative error
+\[
+	e_T=\frac{r}{1+r},
+	\qquad
+	r=\frac{\Delta}{f^\star},
+	\qquad
+	\Delta=|f_{\mathrm{best}}-f^\star|.
+\]
+This transformation behaves like the ordinary relative error when the error is
+small, but remains bounded by one for very large errors. A problem is counted
+as solved if at least half of the 21 runs achieve relative objective error
+\(r<10^{-6}\). The solved fraction is then the fraction of benchmark instances
+in a treatment that satisfy this condition. The experiment is split into three
+controlled parts.
+
+\begin{enumerate}
+	\item \textbf{Effect of coordinate transformation \(T_i\).} We start with the 28 base functions and
+		apply no value transformation and no composition. Only the coordinate
+		transformation is changed. The treatment \texttt{NONE} uses
+		\(T_i(x)=x\). The treatment \texttt{ROT} uses
+		\(T_i(x)=R_i(x-x^\star)\), where \(R_i\) is a random orthogonal
+		matrix and \(x^\star\) is a prescribed minimizer sampled uniformly
+		from the domain. The treatment \texttt{AFF} uses
+		\(T_i(x)=A_i(x-x^\star)\), where \(A_i\) is generated from a random
+		orthogonal matrix with row scales increasing geometrically from
+		\(1\) to \(10^2\). Thus this block tests the effect of axis
+		alignment, rotation, and affine ill-conditioning.
+	\item \textbf{Effect of \(\phi_i\).} We again use the 28 base functions,
+		but now fix the coordinate transformation to \texttt{ROT}. Only the
+		value transformation is changed. The treatment \texttt{NONE} uses
+		\(\phi(u)=u\). The treatment \texttt{COSZERO} uses
+		\(\phi(u)=1-\cos(0.10u)\). The treatment \texttt{OSC} uses
+		\(\phi(u)=u(1+0.40\sin(0.03u))\). The power treatment is split into
+		two extreme cases: \texttt{POWER\_P01} uses \(\phi(u)=u^{0.1}\),
+		which gives a sharp near-minimum shape, while \texttt{POWER\_P10}
+		uses \(\phi(u)=u^{10}\), which gives a very flat near-minimum
+		shape.
+	\item \textbf{Effect of \(\psi\).} We generate 30 composition instances.
+		Each instance is formed by randomly selecting \(m=5\) base functions.
+		For a fixed instance, the selected base functions, rotations,
+		dimension, and value transformation are kept unchanged, and only the
+		composition rule is varied. The treatment \texttt{CPM-SUM} uses
+		\(\psi(z)=\sum_i z_i\). The treatment \texttt{CPM-PMEAN} uses the
+		power mean with exponent \(p=2\). The treatment \texttt{CPM-LWELL}
+		uses \(s(1+0.40\sin(0.03s))\), where \(s=\sum_i z_i\). The treatment
+		\texttt{DPM-SOFTMAX} uses softmax weights with sharpness \(0.03\),
+		local selection radius \(1\), and offsets \(b_i=10i\) for
+		\(i=0,\ldots,m-1\). For the common-point minimizer classes, all
+		components share the same randomly selected minimizer. For
+		\texttt{DPM-SOFTMAX}, the global minimizer is randomly selected from
+		the domain, while one deceptive local basin is placed at the origin.
+\end{enumerate}
+
+
+
+\begin{figure}[t]
+	\centering
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{figures/experiment_coord_tre.pdf}
+	\end{minipage}
+	\hfill
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{figures/experiment_coord_solved_fraction.pdf}
+	\end{minipage}
+	\caption{Effect of the coordinate transformation \(T_i\) on ARRDE
+		performance. Left: average transformed relative error. Right: fraction of
+		solved problems.}
+	\label{fig:experiment-coordinate}
+\end{figure}
+
+
+\begin{figure}[t]
+	\centering
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{figures/experiment_value_tre.pdf}
+	\end{minipage}
+	\hfill
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{figures/experiment_value_solved_fraction.pdf}
+	\end{minipage}
+	\caption{Effect of the value transformation \(\phi_i\) on ARRDE
+		performance. Left: average transformed relative error. Right: fraction of
+		solved problems.}
+	\label{fig:experiment-value}
+\end{figure}
+
+\begin{figure}[t]
+	\centering
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{figures/experiment_composition_tre.pdf}
+	\end{minipage}
+	\hfill
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{figures/experiment_composition_solved_fraction.pdf}
+	\end{minipage}
+	\caption{Effect of the composition function \(\psi\) on ARRDE performance.
+		Left: average transformed relative error. Right: fraction of solved
+		problems.}
+	\label{fig:experiment-composition}
+\end{figure}
+
+
+Figure~\ref{fig:experiment-coordinate} shows the effect of the coordinate
+transformation \(T_i\) on ARRDE. Both metrics give the same qualitative
+ordering: \texttt{NONE} is the easiest treatment, \texttt{ROT} is harder, and
+\texttt{AFF} is hardest. This behavior is consistent with the intended role of
+the coordinate transformation. The untransformed case preserves the original
+axis structure of the base functions. The rotation treatment removes this axis
+alignment and makes separable functions nonseparable from the optimizer's point
+of view. The affine treatment further changes the scaling of different
+directions, so the optimizer must handle both nonseparability and
+ill-conditioning. The gap between \texttt{ROT} and \texttt{AFF} becomes smaller
+at larger budgets, but \texttt{AFF} remains the more difficult treatment overall.
+
+Figure~\ref{fig:experiment-value} shows that value transformations can change
+the interpretation of objective-value success. The \texttt{COSZERO} treatment
+appears much easier than the rotated untransformed case. This is expected from
+the form \(\phi(u)=1-\cos(0.10u)\), which introduces repeated zero and
+near-zero value levels. Consequently, ARRDE can obtain objective values close to
+\(f^\star\) without necessarily locating the original prescribed minimizer. The
+two power transformations show a different contrast. The \texttt{POWER\_P01}
+case gives small transformed relative errors but a low fraction of solved
+problems, because \(u^{0.1}\) compresses large objective values but creates a
+sharp near-minimum shape. In contrast, \texttt{POWER\_P10} has larger
+transformed relative error but a higher solved fraction at larger budgets,
+because \(u^{10}\) makes the basin very flat near the minimum while strongly
+penalizing points that remain away from it. The \texttt{OSC} treatment is
+consistently harder than \texttt{NONE}: it has larger errors and solves fewer
+problems at the same budgets, showing that oscillatory value reshaping can
+degrade the optimizer's progress.
+
+Figure~\ref{fig:experiment-composition} compares the composition rules. Among
+the common-point minimizer constructions, \texttt{CPM-SUM} is the easiest
+baseline. The power mean and level-well variants are harder, with
+\texttt{CPM-LWELL} producing the largest transformed relative errors among the
+common-point compositions. The deceptive softmax treatment behaves differently:
+its transformed relative error is not always the largest, but its solved
+fraction is the lowest at the larger budgets. This indicates that
+\texttt{DPM-SOFTMAX} often allows ARRDE to find good objective values while
+still failing to reach the global basin reliably. Thus the deceptive
+composition exposes a failure mode that is not captured by average error alone.
+
+These observations suggest practical choices for constructing difficult
+benchmark instances. For coordinate transformations, \texttt{ROT} and
+\texttt{AFF} are useful when testing sensitivity to nonseparability and
+conditioning, with \texttt{AFF} generally being harder. For value
+transformations, \texttt{OSC} and the extreme power transformations are more
+informative stress tests than \texttt{COSZERO}, because \texttt{COSZERO} can
+create repeated near-optimal value levels. For composition functions,
+\texttt{DPM-SOFTMAX} is useful when the goal is to test deception and basin
+selection, while \texttt{CPM-LWELL} is useful when the goal is to increase
+common-minimizer difficulty without moving the global minimizer away from the
+shared component minimizer.
 
 
 
@@ -1704,11 +1881,30 @@ functions, and parameter record. This makes large benchmark collections easier
 to organize, reproduce, and analyze.
 
 The proposed \textsc{FuncCraft} implementation is intended to make this
-construction practical in C++ and Python. Large-scale empirical evaluation of
-optimization algorithms on generated benchmark collections is left for future
-work. Such studies can use the classification scheme developed here to assess
-algorithm robustness across controlled families of landscape mechanisms rather
-than only across a small fixed set of manually designed functions.
+construction practical in C++ and Python. The numerical experiment with ARRDE
+illustrates how the classification scheme can be used to assess algorithm
+robustness across controlled families of landscape mechanisms rather than only
+across a small fixed set of manually designed functions.
+
+
+
+
+\section*{Acknowledgment}
+The authors acknowledge financial support from the German
+Federal Ministry of Education and Research (BMBF) under
+Grant No. 13XP0445 (For-Analytik). K.F.M., S.M., and M.F.
+are supported by this grant.
+
+
+The authors acknowledge the use of artificial intelligence
+tools (ChatGPT, OpenAI) for language refinement and clarity
+improvement during manuscript preparation. All technical
+content, experiments, and conclusions were developed and
+verified by the authors.
+
+
+\bibliographystyle{plain}
+\bibliography{ref}
 
 
 
@@ -1719,17 +1915,141 @@ than only across a small fixed set of manually designed functions.
 
 
 
-
-
-
-
-
-\bibliography{}
 
 \appendix
 
+\section{Base Function Library}
+\label{app:base-functions}
 
+Table~\ref{tab:base-function-library} lists the 28 primitive base functions used
+by \textsc{FuncCraft}. The formulas are written in the canonical coordinates
+used by the implementation, with \(x=(x_1,\ldots,x_d)\). Some CEC-derived
+functions include internal scaling constants; these are included when they are
+part of the implemented primitive.
 
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{longtable}{@{}p{0.20\textwidth}p{0.45\textwidth}p{0.27\textwidth}@{}}
+	\caption{Base functions used in the \textsc{FuncCraft} library.}
+	\label{tab:base-function-library}\\
+	\hline
+	Name & Implemented form & Properties \\
+	\hline
+	\endfirsthead
+	\hline
+	Name & Implemented form & Properties \\
+	\hline
+	\endhead
+	\hline
+	\endfoot
+	\texttt{Sphere} &
+	\(\sum_i x_i^2\) &
+	Unimodal, separable, convex. \\
+	\texttt{SumDifferentPowers} &
+	\(\sum_i |x_i|^{i}\) &
+	Unimodal, separable, heterogeneous coordinate exponents. \\
+	\texttt{Ellipsoidal} &
+	\(\sum_i 10^{6(i-1)/(d-1)}x_i^2\) &
+	Unimodal, separable, ill-conditioned. \\
+	\texttt{BuecheRastrigin} &
+	\(10d+\sum_i (y_i^2-10\cos(2\pi y_i))\), where
+	\(y_i=10x_i\) for positive odd-indexed coordinates and \(y_i=x_i\)
+	otherwise &
+	Multimodal, separable, asymmetric, highly periodic. \\
+	\texttt{LinearSlope} &
+	\(\sum_i 100^{(i-1)/(d-1)}|x_i|\) &
+	Unimodal, separable, nonsmooth at the optimum. \\
+	\texttt{AttractiveSector} &
+	\(\left(\sum_i s_i^2x_i^2\right)^{0.9}\), with
+	\(s_i=100\) if \(x_i>0\) and \(s_i=1\) otherwise &
+	Unimodal, anisotropic; becomes nonseparable under rotation. \\
+	\texttt{StepEllipsoidal} &
+	\(\sum_i 10^{6(i-1)/(d-1)}y_i^2\), with rounded step variables \(y_i\) &
+	Unimodal, nonsmooth, ill-conditioned. \\
+	\texttt{StepRastrigin} &
+	\(\sum_i (z_i^2-10\cos(2\pi z_i)+10)\), with
+	\(z_i=5.12y_i/100\) and stepped \(y_i\) &
+	Multimodal, separable, discontinuous. \\
+	\texttt{BentCigar} &
+	\(x_1^2+10^6\sum_{i=2}^d x_i^2\) &
+	Unimodal, ill-conditioned. \\
+	\texttt{Discus} &
+	\(10^6x_1^2+\sum_{i=2}^d x_i^2\) &
+	Unimodal, ill-conditioned. \\
+	\texttt{Rosenbrock} &
+	\(\sum_{i=1}^{d-1}\left[100(y_i^2-y_{i+1})^2+(y_i-1)^2\right]\),
+	\(y_i=2.048x_i/100+1\) &
+	Unimodal, nonseparable, narrow curved valley. \\
+	\texttt{Ackley} &
+	\(-20\exp\!\left(-0.2\sqrt{d^{-1}\sum_i x_i^2}\right)
+	-\exp\!\left(d^{-1}\sum_i\cos(2\pi x_i)\right)+20+e\) &
+	Multimodal, nonseparable, many local minima. \\
+	\texttt{Rastrigin} &
+	\(\sum_i (z_i^2-10\cos(2\pi z_i)+10)\), \(z_i=5.12x_i/100\) &
+	Multimodal, separable, highly periodic. \\
+	\texttt{Griewank} &
+	\(1+\sum_i x_i^2/4000-\prod_i\cos(x_i/\sqrt{i})\) &
+	Multimodal, nonseparable, oscillatory product term. \\
+	\texttt{Schwefel} &
+	\(418.982887d-\sum_i z_i\sin(\sqrt{|z_i|})\), with
+	\(z_i=10x_i+420.968746\) and boundary corrections &
+	Multimodal, separable, deceptive, rugged. \\
+	\texttt{SharpRidge} &
+	\(x_1^2+100\sqrt{\sum_{i=2}^d x_i^2}\) &
+	Unimodal, nonseparable, ridge-shaped valley. \\
+	\texttt{DifferentPowers} &
+	\(\sqrt{\sum_i |x_i|^{2+4(i-1)/(d-1)}}\) &
+	Unimodal, separable, heterogeneous coordinate exponents. \\
+	\texttt{Weierstrass} &
+	\(\sum_i\sum_{k=0}^{20}0.5^k\cos(2\pi3^k(x_i+0.5))
+	-d\sum_{k=0}^{20}0.5^k\cos(2\pi3^k0.5)\) &
+	Multimodal, fractal ruggedness; nonseparable under rotation. \\
+	\texttt{SchafferF7} &
+	\(\left((d-1)^{-1}\sum_{i=1}^{d-1}\sqrt{s_i}
+	(1+\sin^2(50s_i^{0.2}))\right)^2\),
+	\(s_i=\sqrt{x_i^2+x_{i+1}^2}\) &
+	Multimodal, nonseparable, pairwise radial coupling. \\
+	\texttt{SchafferF7Cond10} &
+	Same as \texttt{SchafferF7}, with coordinate scales based on condition
+	\(10\) &
+	Multimodal, nonseparable, condition 10. \\
+	\texttt{SchafferF7Cond1000} &
+	Same as \texttt{SchafferF7}, with coordinate scales based on condition
+	\(1000\) &
+	Multimodal, nonseparable, condition 1000. \\
+	\texttt{GriewankRosenbrock} &
+	\(\sum_i\left(z_i^2/4000-\cos z_i+1\right)\), where
+	\(z_i=100(y_i^2-y_{i+1})^2+(y_i-1)^2\) and \(y_i=0.05x_i+1\) &
+	Multimodal, nonseparable, funnel-like composition. \\
+	\texttt{Gallagher101} &
+	\(\min_{j=1,\ldots,101} w_j\|x-c_j\|^2\), with deterministic peak
+	centers and weights &
+	Multimodal, nonseparable, many local optima. \\
+	\texttt{Gallagher21} &
+	\(\min_{j=1,\ldots,21} w_j\|x-c_j\|^2\), with deterministic peak
+	centers and weights &
+	Multimodal, nonseparable, few dominant peaks. \\
+	\texttt{Katsuura} &
+	\(\frac{10}{d^2}\left[\prod_i(1+i a_i)^{10/d^{1.2}}-1\right]\),
+	where \(a_i=\sum_{j=1}^{32}|2^jx_i-\mathrm{round}(2^jx_i)|/2^j\) &
+	Multimodal, nonseparable, highly rugged. \\
+	\texttt{LunacekBiRastrigin} &
+	\(\min\{\sum_i(z_i-\mu_1)^2,\ d+s\sum_i(z_i-\mu_2)^2\}
+	+10\sum_i(1-\cos(2\pi z_i))\), with \(z_i=0.2x_i+\mu_1\) &
+	Multimodal, deceptive, double-funnel landscape. \\
+	\texttt{Zakharov} &
+	\(\sum_i x_i^2+\left(\sum_i 0.5ix_i\right)^2
+	+\left(\sum_i 0.5ix_i\right)^4\) &
+	Unimodal, nonseparable, polynomial coupling. \\
+	\texttt{Levy} &
+	\(\sin^2(\pi w_1)+\sum_{i=1}^{d-1}(w_i-1)^2
+	(1+10\sin^2(\pi w_i+1))+(w_d-1)^2(1+\sin^2(2\pi w_d))\),
+	\(w_i=1+x_i/4\) &
+	Multimodal, nonseparable, periodic structure. \\
+\end{longtable}
+\endgroup
 
 
 
