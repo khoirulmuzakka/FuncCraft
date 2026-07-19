@@ -7,6 +7,8 @@
  *
  * These transforms reshape the output of a base function before composition.
  * Every value transform must preserve the origin: `f(0) == 0`.
+ * The runtime checks are tolerance-based so tiny floating-point roundoff near
+ * zero does not fail a valid benchmark evaluation.
  */
 
 #include "function_spec.h"
@@ -20,9 +22,9 @@ public:
     /**
  * @brief Transform one scalar function value.
  *
- * The base class rejects negative inputs, rejects negative transformed
- * outputs, and enforces the origin-preserving rule by checking
- * `raw_apply(0.0) == 0.0` up to numerical error.
+ * The base class rejects materially negative inputs, rejects materially
+ * negative transformed outputs, and enforces the origin-preserving rule by
+ * checking `raw_apply(0.0) == 0.0` up to numerical error.
  */
     double apply(double u) const;
     /**

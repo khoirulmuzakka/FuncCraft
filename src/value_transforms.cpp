@@ -1,17 +1,43 @@
 #include "value_transforms.h"
 #include "support.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace FuncCraft {
 using namespace detail;
 
+namespace {
+constexpr double kValueTransformTolerance = 1.0e-12;
+
+double clamp_nonnegative(double value) {
+    if (value < 0.0 && value >= -kValueTransformTolerance) {
+        return 0.0;
+    }
+    return value;
+}
+
+std::string describe_scalar(double value) {
+    if (std::isnan(value)) {
+        return "nan";
+    }
+    if (std::isinf(value)) {
+        return value > 0.0 ? "inf" : "-inf";
+    }
+    char buffer[64];
+    std::snprintf(buffer, sizeof(buffer), "%.17g", value);
+    return buffer;
+}
+} // namespace
+
 double ValueTransform::apply(double u) const {
-    require(u >= 0.0, "value transform input must be nonnegative");
+    u = clamp_nonnegative(u);
+    require(u >= 0.0, "value transform input must be nonnegative (u=" + describe_scalar(u) + ")");
     const double at_origin = raw_apply(0.0);
     require(std::abs(at_origin) <= 1.0e-12, "value transform must satisfy f(0) = 0");
-    const double value = raw_apply(u);
-    require(value >= 0.0, "value transform output must be nonnegative");
+    const double value = clamp_nonnegative(raw_apply(u));
+    require(value >= 0.0, "value transform output must be nonnegative (f(u)=" + describe_scalar(value) + ")");
     return value;
 }
 
@@ -38,7 +64,8 @@ PowerValueTransform::PowerValueTransform(double alpha, double p)
 }
 
 double PowerValueTransform::raw_apply(double u) const {
-    require(u >= 0.0, "value transform input must be nonnegative");
+    require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
+    u = std::max(0.0, u);
     return alpha_ * std::pow(u, p_);
 }
 
@@ -61,7 +88,8 @@ OscillatoryValueTransform::OscillatoryValueTransform(double epsilon, double alph
 }
 
 double OscillatoryValueTransform::raw_apply(double u) const {
-    require(u >= 0.0, "value transform input must be nonnegative");
+    require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
+    u = std::max(0.0, u);
     return u * (1.0 + epsilon_ * std::sin(alpha_ * u));
 }
 
@@ -82,7 +110,8 @@ CosineZeroValueTransform::CosineZeroValueTransform(double alpha)
 }
 
 double CosineZeroValueTransform::raw_apply(double u) const {
-    require(u >= 0.0, "value transform input must be nonnegative");
+    require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
+    u = std::max(0.0, u);
     return 1.0 - std::cos(alpha_ * u);
 }
 

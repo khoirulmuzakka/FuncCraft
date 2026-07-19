@@ -542,6 +542,18 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         const ChoiceSpec& comp_choice = choose_weighted(composition_choices, rng);
         const int max_components = std::min<int>(6, static_cast<int>(composition_pool.size()));
         const int component_count = max_components == 2 ? 2 : uniform_int(rng, 2, max_components);
+        std::vector<ChoiceSpec> coord_choices_for_function = coord_choices;
+        if (component_count > dimension_) {
+            coord_choices_for_function.erase(
+                std::remove_if(
+                    coord_choices_for_function.begin(),
+                    coord_choices_for_function.end(),
+                    [](const ChoiceSpec& choice) {
+                        return choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation";
+                    }),
+                coord_choices_for_function.end());
+        }
+        require(!coord_choices_for_function.empty(), "suite spec leaves no valid coordinate transforms for this dimension and component count");
 
         FunctionBlueprint blueprint;
         blueprint.composed = true;
@@ -550,7 +562,7 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         blueprint.coord_transform_choices.reserve(static_cast<std::size_t>(component_count));
         blueprint.value_transform_choices.reserve(static_cast<std::size_t>(component_count));
         for (int i = 0; i < component_count; ++i) {
-            blueprint.coord_transform_choices.push_back(choose_weighted(coord_choices, rng));
+            blueprint.coord_transform_choices.push_back(choose_weighted(coord_choices_for_function, rng));
             blueprint.value_transform_choices.push_back(choose_weighted(value_choices, rng));
         }
         blueprint.composition_choice = comp_choice;

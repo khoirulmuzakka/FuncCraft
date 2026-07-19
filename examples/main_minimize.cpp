@@ -127,55 +127,63 @@ int main(int argc, char* argv[]) {
         const int function_count = std::min(config.num_functions, suite.size());
         int failed = 0;
         for (int i = 0; i < function_count; ++i) {
-            const auto function = suite.function(i);
-            const auto& spec = function.spec();
-            const auto fields = split_class_label(spec.function_class_label);
-            const auto bounds = function.domain();
-            std::vector<std::pair<double, double>> minion_bounds;
-            minion_bounds.reserve(static_cast<std::size_t>(bounds.dimension()));
-            for (int d = 0; d < bounds.dimension(); ++d) {
-                minion_bounds.emplace_back(bounds.lower[static_cast<std::size_t>(d)], bounds.upper[static_cast<std::size_t>(d)]);
-            }
-            std::mt19937_64 rng(static_cast<std::uint64_t>(config.seed) ^ (0x9E3779B97F4A7C15ULL + static_cast<std::uint64_t>(i + 1)));
-            std::vector<double> x0(static_cast<std::size_t>(bounds.dimension()), 0.0);
-            for (int d = 0; d < bounds.dimension(); ++d) {
-                const double lo = bounds.lower[static_cast<std::size_t>(d)];
-                const double hi = bounds.upper[static_cast<std::size_t>(d)];
-                const double t = std::generate_canonical<double, 53>(rng);
-                x0[static_cast<std::size_t>(d)] = lo + (hi - lo) * t;
-            }
-            auto objective = [&function](const std::vector<std::vector<double>>& X, void*) {
-                return function(X);
-            };
+            try {
+                const auto function = suite.function(i);
+                const auto& spec = function.spec();
+                const auto fields = split_class_label(spec.function_class_label);
+                const auto bounds = function.domain();
+                std::vector<std::pair<double, double>> minion_bounds;
+                minion_bounds.reserve(static_cast<std::size_t>(bounds.dimension()));
+                for (int d = 0; d < bounds.dimension(); ++d) {
+                    minion_bounds.emplace_back(bounds.lower[static_cast<std::size_t>(d)], bounds.upper[static_cast<std::size_t>(d)]);
+                }
+                std::mt19937_64 rng(static_cast<std::uint64_t>(config.seed) ^ (0x9E3779B97F4A7C15ULL + static_cast<std::uint64_t>(i + 1)));
+                std::vector<double> x0(static_cast<std::size_t>(bounds.dimension()), 0.0);
+                for (int d = 0; d < bounds.dimension(); ++d) {
+                    const double lo = bounds.lower[static_cast<std::size_t>(d)];
+                    const double hi = bounds.upper[static_cast<std::size_t>(d)];
+                    const double t = std::generate_canonical<double, 53>(rng);
+                    x0[static_cast<std::size_t>(d)] = lo + (hi - lo) * t;
+                }
+                auto objective = [&function](const std::vector<std::vector<double>>& X, void*) {
+                    return function(X);
+                };
 
-            auto settings = minion::DefaultSettings().getDefaultSettings(config.algo);
-            settings["convergence_tol"] = 1e-8;
-            minion::Minimizer optimizer(
-                objective,
-                minion_bounds,
-                x0,
-                nullptr,
-                nullptr,
-                config.algo,
-                config.max_evals,
-                static_cast<int>(config.seed),
-                settings);
-            const minion::MinionResult result = optimizer.optimize();
-            const double error = std::abs(result.fun - spec.known_global_value);
-            const bool ok = std::isfinite(result.fun);
-            failed += ok ? 0 : 1;
+                auto settings = minion::DefaultSettings().getDefaultSettings(config.algo);
+                settings["convergence_tol"] = 1e-8;
+                minion::Minimizer optimizer(
+                    objective,
+                    minion_bounds,
+                    x0,
+                    nullptr,
+                    nullptr,
+                    config.algo,
+                    config.max_evals,
+                    static_cast<int>(config.seed),
+                    settings);
+                const minion::MinionResult result = optimizer.optimize();
+                const double error = std::abs(result.fun - spec.known_global_value);
+                const bool ok = std::isfinite(result.fun);
+                failed += ok ? 0 : 1;
 
-            std::cout << std::left
-                      << std::setw(6) << i
-                      << std::setw(14) << fields[0]
-                      << std::setw(14) << fields[1]
-                      << std::setw(12) << fields[2]
-                      << std::setw(30) << truncate_with_ellipsis(fields[3], 29)
-                      << std::right
-                      << std::setw(16) << std::scientific << std::setprecision(6) << result.fun
-                      << std::setw(16) << result.nfev
-                      << std::setw(16) << std::scientific << std::setprecision(3) << error
-                      << "\n";
+                std::cout << std::left
+                          << std::setw(6) << i
+                          << std::setw(14) << fields[0]
+                          << std::setw(14) << fields[1]
+                          << std::setw(12) << fields[2]
+                          << std::setw(30) << truncate_with_ellipsis(fields[3], 29)
+                          << std::right
+                          << std::setw(16) << std::scientific << std::setprecision(6) << result.fun
+                          << std::setw(16) << result.nfev
+                          << std::setw(16) << std::scientific << std::setprecision(3) << error
+                          << "\n";
+            } catch (const std::exception& e) {
+                const auto function = suite.function(i);
+                std::cerr << "run_minimize failed at index " << i
+                          << " label=" << function.spec().function_class_label
+                          << ": " << e.what() << "\n";
+                throw;
+            }
         }
 
         return failed == 0 ? 0 : 1;
