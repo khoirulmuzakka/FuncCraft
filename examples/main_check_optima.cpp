@@ -47,7 +47,7 @@ FuncCraft::SuiteSpec make_spec(const CheckConfig& config) {
     spec.requested_number_of_functions = config.max_functions;
     spec.master_seed = config.seed;
     spec.f_opt = config.f_opt;
-    spec.suite_label = "check_basicf_optima";
+    spec.suite_label = "check_optima";
     return spec;
 }
 
@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) {
 
         return failures == 0 ? 0 : 1;
     } catch (const std::exception& e) {
-        std::cerr << "check_basicf_optima failed: " << e.what() << "\n";
+        std::cerr << "check_optima failed: " << e.what() << "\n";
         return 1;
     }
 }
