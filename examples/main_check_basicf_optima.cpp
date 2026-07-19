@@ -1,41 +1,87 @@
-#include "benchmark.h"
-
+#include "suite.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <string>
 
 namespace {
 
 struct CheckConfig {
-    int function_count = 500;
     int dimension = 10;
+    int max_functions = 500;
     unsigned long long seed = 1;
-    double assigned_fmin = 100.0;
     double tolerance = 1.0e-8;
+    double f_opt = 100.0;
 };
+
+bool is_integer_arg(const char* text) {
+    if (text == nullptr || *text == '\0') {
+        return false;
+    }
+    char* end = nullptr;
+    std::strtol(text, &end, 10);
+    return end != nullptr && *end == '\0';
+}
 
 CheckConfig parse_cli(int argc, char* argv[]) {
     CheckConfig config;
-    if (argc > 1) config.function_count = std::max(FuncCraft::BenchmarkSuite::mandatory_function_count(), std::atoi(argv[1]));
-    if (argc > 2) config.dimension = std::max(2, std::atoi(argv[2]));
-    if (argc > 3) config.seed = static_cast<unsigned long long>(std::strtoull(argv[3], nullptr, 10));
-    if (argc > 4) config.assigned_fmin = std::atof(argv[4]);
-    if (argc > 5) config.tolerance = std::atof(argv[5]);
+    int arg_index = 1;
+    if (argc > 1 && !is_integer_arg(argv[1])) {
+        ++arg_index;
+    }
+    if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
+    if (argc > arg_index + 1) config.max_functions = std::max(1, std::atoi(argv[arg_index + 1]));
+    if (argc > arg_index + 2) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 2], nullptr, 10));
+    if (argc > arg_index + 3) config.tolerance = std::atof(argv[arg_index + 3]);
+    if (argc > arg_index + 4) config.f_opt = std::atof(argv[arg_index + 4]);
     return config;
 }
 
-std::string trim_label(std::string label, std::size_t width) {
-    if (label.size() <= width) {
-        return label;
+FuncCraft::SuiteSpec make_spec(const CheckConfig& config) {
+    FuncCraft::SuiteSpec spec;
+    spec.supported_dimensions = std::to_string(config.dimension);
+    spec.max_dimension = config.dimension;
+    spec.requested_number_of_functions = config.max_functions;
+    spec.master_seed = config.seed;
+    spec.f_opt = config.f_opt;
+    spec.suite_label = "check_basicf_optima";
+    return spec;
+}
+
+std::array<std::string, 4> split_class_label(const std::string& label) {
+    std::array<std::string, 4> fields = {"-", "-", "-", "-"};
+    std::size_t start = 0;
+    while (start < label.size()) {
+        const std::size_t end = label.find(';', start);
+        const std::string token = label.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        const std::size_t eq = token.find('=');
+        if (eq != std::string::npos) {
+            const std::string key = token.substr(0, eq);
+            const std::string value = token.substr(eq + 1);
+            if (key == "C") fields[0] = value;
+            if (key == "P") fields[1] = value;
+            if (key == "T") fields[2] = value;
+            if (key == "G") fields[3] = value;
+        }
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
     }
-    if (width <= 3) {
-        return label.substr(0, width);
+    return fields;
+}
+
+std::string truncate_with_ellipsis(const std::string& text, std::size_t max_len) {
+    if (text.size() <= max_len) {
+        return text;
     }
-    return label.substr(0, width - 3) + "...";
+    if (max_len <= 3) {
+        return text.substr(0, max_len);
+    }
+    return text.substr(0, max_len - 3) + "...";
 }
 
 } // namespace
@@ -43,43 +89,44 @@ std::string trim_label(std::string label, std::size_t width) {
 int main(int argc, char* argv[]) {
     try {
         const CheckConfig config = parse_cli(argc, argv);
-
-        FuncCraft::BenchmarkSuiteOptions options;
-        options.function_count = config.function_count;
-        options.dimension = config.dimension;
-        options.seed = config.seed;
-        options.assigned_fmin = config.assigned_fmin;
-
-        const FuncCraft::BenchmarkSuite suite(options);
+        const FuncCraft::BenchmarkSuite suite(make_spec(config), config.dimension);
 
         int failures = 0;
         double max_abs_error = 0.0;
 
         std::cout << "FuncCraft optimum check\n";
-        std::cout << "functions=" << suite.size()
-                  << ", dimension=" << options.dimension
-                  << ", seed=" << options.seed
-                  << ", assigned_fmin=" << std::scientific << options.assigned_fmin
-                  << ", tolerance=" << std::scientific << config.tolerance << "\n\n";
+        std::cout << "size=" << suite.size()
+                  << ", max_number_of_functions=" << suite.max_number_of_functions()
+                  << ", dimension=" << suite.dimension()
+                  << ", requested_functions=" << config.max_functions
+                  << ", seed=" << config.seed
+                  << ", tolerance=" << std::scientific << config.tolerance
+                  << ", f_opt=" << config.f_opt << "\n\n";
 
         std::cout << std::left
                   << std::setw(6) << "idx"
-                  << std::setw(15) << "C"
-                  << std::setw(10) << "P"
-                  << std::setw(8) << "T"
-                  << std::setw(42) << "G"
+                  << std::setw(14) << "C"
+                  << std::setw(14) << "P"
+                  << std::setw(12) << "T"
+                  << std::setw(30) << "G"
                   << std::right
+                  << std::setw(16) << "max(x_i*)"
                   << std::setw(16) << "f(x*)"
                   << std::setw(14) << "|err|"
                   << std::setw(8) << "status"
                   << "\n";
-        std::cout << std::string(119, '-') << "\n";
+        std::cout << std::string(110, '-') << "\n";
 
-        for (int i = 0; i < suite.size(); ++i) {
-            const auto& function = suite.function(i);
-            const auto& metadata = function.metadata();
-            const double value = function(std::vector<std::vector<double>>{metadata.known_global_minimizer}).front();
-            const double error = std::fabs(value - metadata.known_global_value);
+        const int function_count = std::min(config.max_functions, suite.size());
+        for (int i = 0; i < function_count; ++i) {
+            const auto function = suite.function(i);
+            const auto& spec = function.spec();
+            const auto fields = split_class_label(spec.function_class_label);
+            const double max_x_star = spec.known_global_minimizer.empty()
+                ? 0.0
+                : *std::max_element(spec.known_global_minimizer.begin(), spec.known_global_minimizer.end());
+            const double value = function(std::vector<std::vector<double>>{spec.known_global_minimizer}).front();
+            const double error = std::fabs(value - spec.known_global_value);
             const bool ok = std::isfinite(value) && error <= config.tolerance;
 
             max_abs_error = std::max(max_abs_error, error);
@@ -87,20 +134,21 @@ int main(int argc, char* argv[]) {
 
             std::cout << std::left
                       << std::setw(6) << i
-                      << std::setw(15) << FuncCraft::to_string(metadata.function_class.composition)
-                      << std::setw(10) << FuncCraft::to_string(metadata.function_class.value_transform)
-                      << std::setw(8) << FuncCraft::to_string(metadata.function_class.coordinate_transform)
-                      << std::setw(42) << trim_label(metadata.parameters.at("class_label"), 41)
+                      << std::setw(14) << fields[0]
+                      << std::setw(14) << fields[1]
+                      << std::setw(12) << fields[2]
+                      << std::setw(30) << truncate_with_ellipsis(fields[3], 29)
                       << std::right
+                      << std::setw(16) << std::scientific << std::setprecision(6) << max_x_star
                       << std::setw(16) << std::scientific << std::setprecision(6) << value
                       << std::setw(14) << std::scientific << std::setprecision(3) << error
                       << std::setw(8) << (ok ? "OK" : "FAIL")
                       << "\n";
         }
 
-        std::cout << std::string(119, '-') << "\n";
-        std::cout << "Summary: checked=" << suite.size()
-                  << ", passed=" << (suite.size() - failures)
+        std::cout << std::string(110, '-') << "\n";
+        std::cout << "Summary: checked=" << function_count
+                  << ", passed=" << (function_count - failures)
                   << ", failed=" << failures
                   << ", max_abs_error=" << std::scientific << std::setprecision(6) << max_abs_error
                   << "\n";

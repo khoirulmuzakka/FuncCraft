@@ -191,7 +191,7 @@ BlockRotationTransform::BlockRotationTransform(
 
 std::vector<double> BlockRotationTransform::apply(const std::vector<double>& x) const {
     require_dimension(x, input_dimension(), "block rotation transform input");
-    std::vector<double> y = x;
+    std::vector<double> y = target_point_;
     std::vector<double> selected(selected_indices_.size(), 0.0);
     for (std::size_t i = 0; i < selected_indices_.size(); ++i) {
         const auto idx = static_cast<std::size_t>(selected_indices_[i]);

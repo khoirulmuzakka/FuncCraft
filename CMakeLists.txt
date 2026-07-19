@@ -19,6 +19,7 @@ add_library(funccraft STATIC
     src/support.cpp
     src/builder.cpp
     src/suite.cpp
+    src/benchmark_function.cpp
     src/coordinate_transforms.cpp
     src/value_transforms.cpp
     src/composition.cpp

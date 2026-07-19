@@ -114,6 +114,10 @@ private:
  * `selected_indices` uses 0-based indices into the full input vector. The full
  * vector dimension is preserved; only the selected coordinates are replaced by
  * the rotated block. Unselected coordinates pass through unchanged.
+ *
+ * When this transform is used by a composed benchmark function, the suite may
+ * assign disjoint index blocks to different components so that each component
+ * acts on a non-overlapping subspace.
  */
 class BlockRotationTransform final : public CoordinateTransform {
 public:

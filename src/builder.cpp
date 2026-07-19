@@ -306,8 +306,9 @@ ComposedFunction FunctionBuilder::build() const {
         built_spec.composition_spec,
         built_spec.component_specs.size());
     const int dimension = built_spec.dimension;
+    const double bias = built_spec.known_global_value;
 
-    return [components, composition, dimension](const std::vector<std::vector<double>>& X) {
+    return [components, composition, dimension, bias](const std::vector<std::vector<double>>& X) {
         std::vector<double> values;
         values.reserve(X.size());
         for (const auto& x : X) {
@@ -319,7 +320,7 @@ ComposedFunction FunctionBuilder::build() const {
                 const double value = (*component.basic_function)(std::vector<std::vector<double>>{transformed}).front();
                 component_values.push_back(component.value_transform->apply(value));
             }
-            values.push_back(composition->apply(x, component_values));
+            values.push_back(bias + composition->apply(x, component_values));
         }
         return values;
     };
