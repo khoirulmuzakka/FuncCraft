@@ -317,8 +317,9 @@ ComposedFunction FunctionBuilder::build() const {
             component_values.reserve(components->size());
             for (const auto& component : *components) {
                 const auto transformed = component.coordinate_transform->apply(x);
-                const double value = (*component.basic_function)(std::vector<std::vector<double>>{transformed}).front();
-                component_values.push_back(component.value_transform->apply(value));
+                const double raw_value = (*component.basic_function)(std::vector<std::vector<double>>{transformed}).front();
+                const double scaled_value = component.basic_function->lambda * raw_value;
+                component_values.push_back(component.value_transform->apply(scaled_value));
             }
             values.push_back(bias + composition->apply(x, component_values));
         }
