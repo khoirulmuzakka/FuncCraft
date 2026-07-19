@@ -10,6 +10,46 @@
 namespace FuncCraft {
 namespace detail {
 
+namespace {
+
+double uniform_signed01(std::mt19937_64& rng) {
+    return 2.0 * uniform01(rng) - 1.0;
+}
+
+double matrix_determinant(std::vector<std::vector<double>> matrix) {
+    const std::size_t n = matrix.size();
+    double det = 1.0;
+    for (std::size_t i = 0; i < n; ++i) {
+        std::size_t pivot = i;
+        double pivot_abs = std::fabs(matrix[i][i]);
+        for (std::size_t r = i + 1; r < n; ++r) {
+            const double candidate = std::fabs(matrix[r][i]);
+            if (candidate > pivot_abs) {
+                pivot_abs = candidate;
+                pivot = r;
+            }
+        }
+        if (pivot_abs < 1.0e-15) {
+            return 0.0;
+        }
+        if (pivot != i) {
+            std::swap(matrix[pivot], matrix[i]);
+            det = -det;
+        }
+        const double pivot_value = matrix[i][i];
+        det *= pivot_value;
+        for (std::size_t r = i + 1; r < n; ++r) {
+            const double factor = matrix[r][i] / pivot_value;
+            for (std::size_t c = i; c < n; ++c) {
+                matrix[r][c] -= factor * matrix[i][c];
+            }
+        }
+    }
+    return det;
+}
+
+} // namespace
+
 void require(bool condition, const std::string& message) {
     if (!condition) {
         throw std::invalid_argument(message);
@@ -68,26 +108,35 @@ int uniform_int(std::mt19937_64& rng, int lo, int hi) {
 }
 
 double normal01(std::mt19937_64& rng) {
-    std::normal_distribution<double> dist(0.0, 1.0);
-    return dist(rng);
+    double u1 = uniform01(rng);
+    while (u1 <= 0.0) {
+        u1 = uniform01(rng);
+    }
+    const double u2 = uniform01(rng);
+    const double r = std::sqrt(-2.0 * std::log(u1));
+    const double theta = 2.0 * kPi * u2;
+    return r * std::cos(theta);
 }
 
 std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, int dimension) {
+    require(dimension > 0, "rotation matrix dimension must be positive");
+
     std::vector<std::vector<double>> q(
         static_cast<std::size_t>(dimension),
         std::vector<double>(static_cast<std::size_t>(dimension), 0.0));
     std::vector<double> column(static_cast<std::size_t>(dimension), 0.0);
 
     for (int col = 0; col < dimension; ++col) {
-        while (true) {
+        bool accepted = false;
+        for (int attempt = 0; attempt < 128 && !accepted; ++attempt) {
             for (double& value : column) {
-                value = normal01(rng);
+                value = uniform_signed01(rng);
             }
             for (int prev = 0; prev < col; ++prev) {
                 double dot = 0.0;
                 for (int row = 0; row < dimension; ++row) {
                     dot += column[static_cast<std::size_t>(row)] *
-                           q[static_cast<std::size_t>(row)][static_cast<std::size_t>(prev)];
+                        q[static_cast<std::size_t>(row)][static_cast<std::size_t>(prev)];
                 }
                 for (int row = 0; row < dimension; ++row) {
                     column[static_cast<std::size_t>(row)] -=
@@ -108,7 +157,14 @@ std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, in
                 q[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)] =
                     column[static_cast<std::size_t>(row)] * inv_norm;
             }
-            break;
+            accepted = true;
+        }
+        require(accepted, "could not generate a stable rotation matrix");
+    }
+
+    if (matrix_determinant(q) < 0.0) {
+        for (int row = 0; row < dimension; ++row) {
+            q[static_cast<std::size_t>(row)][0] = -q[static_cast<std::size_t>(row)][0];
         }
     }
     return q;

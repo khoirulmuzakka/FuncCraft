@@ -6,8 +6,10 @@
  * @brief Scalar transforms applied to primitive function values.
  *
  * These transforms reshape the output of a base function before composition.
+ * Every value transform must preserve the origin: `f(0) == 0`.
  */
 
+#include "function_spec.h"
 #include "core.h"
 
 namespace FuncCraft {
@@ -16,32 +18,50 @@ class ValueTransform {
 public:
     virtual ~ValueTransform() = default;
     /**
-     * @brief Transform one scalar function value.
-     */
-    virtual double apply(double u) const = 0;
+ * @brief Transform one scalar function value.
+ *
+ * The base class rejects negative inputs, rejects negative transformed
+ * outputs, and enforces the origin-preserving rule by checking
+ * `raw_apply(0.0) == 0.0` up to numerical error.
+ */
+    double apply(double u) const;
     /**
      * @brief Return the transform family used by this object.
      */
     virtual ValueTransformClass transform_class() const = 0;
+    virtual ValueTransformSpec spec() const = 0;
+
+protected:
+    virtual double raw_apply(double u) const = 0;
 };
 
 /**
  * @brief Identity value transform that returns the input unchanged.
+ *
+ * This is valid because `f(0) == 0`.
  */
 class IdentityValueTransform final : public ValueTransform {
 public:
-    double apply(double u) const override;
     ValueTransformClass transform_class() const override;
+    ValueTransformSpec spec() const override;
+
+protected:
+    double raw_apply(double u) const override;
 };
 
 /**
  * @brief Power-law scalar transform.
+ *
+ * This transform is origin-preserving for the supported parameter ranges.
  */
 class PowerValueTransform final : public ValueTransform {
 public:
-    PowerValueTransform(double alpha, double p);
-    double apply(double u) const override;
+    PowerValueTransform(double alpha = 1.0, double p = 1.0);
     ValueTransformClass transform_class() const override;
+    ValueTransformSpec spec() const override;
+
+protected:
+    double raw_apply(double u) const override;
 
 private:
     double alpha_ = 1.0;
@@ -50,12 +70,17 @@ private:
 
 /**
  * @brief Oscillatory scalar transform used to create rugged landscapes.
+ *
+ * This transform is origin-preserving for the supported parameter ranges.
  */
 class OscillatoryValueTransform final : public ValueTransform {
 public:
-    OscillatoryValueTransform(double epsilon, double alpha);
-    double apply(double u) const override;
+    OscillatoryValueTransform(double epsilon = 0.1, double alpha = 1.0);
     ValueTransformClass transform_class() const override;
+    ValueTransformSpec spec() const override;
+
+protected:
+    double raw_apply(double u) const override;
 
 private:
     double epsilon_ = 0.1;
@@ -64,12 +89,17 @@ private:
 
 /**
  * @brief Cosine-based transform that forces the value near zero at the origin.
+ *
+ * This transform is origin-preserving for the supported parameter ranges.
  */
 class CosineZeroValueTransform final : public ValueTransform {
 public:
-    explicit CosineZeroValueTransform(double alpha);
-    double apply(double u) const override;
+    explicit CosineZeroValueTransform(double alpha = 1.0);
     ValueTransformClass transform_class() const override;
+    ValueTransformSpec spec() const override;
+
+protected:
+    double raw_apply(double u) const override;
 
 private:
     double alpha_ = 1.0;

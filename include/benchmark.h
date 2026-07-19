@@ -6,10 +6,11 @@
  * @brief Convenience umbrella header for the public FuncCraft benchmark API.
  *
  * Include this header when you want access to the suite builder, transforms,
- * composition types, and benchmark metadata in one place.
+ * composition types, and function specification types in one place.
  */
 
 #include "builder.h"
+#include "benchmark_function.h"
 #include "composition.h"
 #include "coordinate_transforms.h"
 #include "core.h"

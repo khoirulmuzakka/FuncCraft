@@ -10,9 +10,8 @@
  * transforms.
  */
 
+#include "function_spec.h"
 #include "core.h"
-#include "coordinate_transforms.h"
-#include "value_transforms.h"
 
 #include <memory>
 #include <vector>
@@ -25,45 +24,74 @@ public:
     /**
      * @brief Combine transformed component values into one scalar output.
      */
-    virtual double apply(const std::vector<double>& x, const std::vector<double>& z) const = 0;
+    double apply(const std::vector<double>& x, const std::vector<double>& z) const;
     /**
      * @brief Return the composition family used by this strategy.
      */
     virtual CompositionClass composition_class() const = 0;
+    virtual CompositionSpec spec() const = 0;
+
+protected:
+    virtual double raw_apply(const std::vector<double>& x, const std::vector<double>& z) const = 0;
+};
+
+/**
+ * @brief Base for compositions that only depend on the component values.
+ */
+class CommonPointComposition : public CompositionFunction {
+protected:
+    double raw_apply(const std::vector<double>& x, const std::vector<double>& z) const final;
+    virtual double common_raw_apply(const std::vector<double>& z) const = 0;
+};
+
+/**
+ * @brief Base for compositions that may depend on both the point and values.
+ */
+class DeceptivePointComposition : public CompositionFunction {
+protected:
+    double raw_apply(const std::vector<double>& x, const std::vector<double>& z) const final;
+    virtual double deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const = 0;
 };
 
 /**
  * @brief Trivial composition that forwards the single component value.
  */
-class SingleComponentComposition final : public CompositionFunction {
+class SingleComponentComposition final : public CommonPointComposition {
 public:
-    double apply(const std::vector<double>& x, const std::vector<double>& z) const override;
     CompositionClass composition_class() const override;
+    CompositionSpec spec() const override;
+
+protected:
+    double common_raw_apply(const std::vector<double>& z) const override;
 };
 
 /**
  * @brief Weighted sum composition across multiple components.
  */
-class WeightedSumComposition final : public CompositionFunction {
+class WeightedSumComposition final : public CommonPointComposition {
 public:
     explicit WeightedSumComposition(std::vector<double> weights);
-    double apply(const std::vector<double>& x, const std::vector<double>& z) const override;
+    explicit WeightedSumComposition(std::size_t components);
     CompositionClass composition_class() const override;
 
 private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    CompositionSpec spec() const override;
     std::vector<double> weights_;
 };
 
 /**
  * @brief Power-mean composition across multiple components.
  */
-class PowerMeanComposition final : public CompositionFunction {
+class PowerMeanComposition final : public CommonPointComposition {
 public:
     PowerMeanComposition(std::vector<double> weights, double p);
-    double apply(const std::vector<double>& x, const std::vector<double>& z) const override;
+    PowerMeanComposition(std::size_t components, double p = 2.0);
     CompositionClass composition_class() const override;
 
 private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    CompositionSpec spec() const override;
     std::vector<double> weights_;
     double p_ = 1.0;
 };
@@ -71,13 +99,15 @@ private:
 /**
  * @brief Level-well composition with sinusoidal shaping.
  */
-class LevelWellComposition final : public CompositionFunction {
+class LevelWellComposition final : public CommonPointComposition {
 public:
     LevelWellComposition(std::vector<double> weights, double epsilon, double alpha);
-    double apply(const std::vector<double>& x, const std::vector<double>& z) const override;
+    LevelWellComposition(std::size_t components, double epsilon = 0.1, double alpha = 1.0);
     CompositionClass composition_class() const override;
 
 private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    CompositionSpec spec() const override;
     std::vector<double> weights_;
     double epsilon_ = 0.1;
     double alpha_ = 1.0;
@@ -86,7 +116,7 @@ private:
 /**
  * @brief Softmax-based deceptive composition with optional local selection.
  */
-class DeceptiveSoftmaxComposition final : public CompositionFunction {
+class DeceptiveSoftmaxComposition final : public DeceptivePointComposition {
 public:
     DeceptiveSoftmaxComposition(std::vector<std::vector<double>> centers, std::vector<double> offsets, double sharpness);
     DeceptiveSoftmaxComposition(
@@ -94,61 +124,19 @@ public:
         std::vector<double> offsets,
         double sharpness,
         double local_selection_radius);
-    double apply(const std::vector<double>& x, const std::vector<double>& z) const override;
+    DeceptiveSoftmaxComposition(
+        std::vector<std::vector<double>> centers,
+        double sharpness = 1.0,
+        double local_selection_radius = 0.0);
     CompositionClass composition_class() const override;
 
 private:
+    double deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
+    CompositionSpec spec() const override;
     std::vector<std::vector<double>> centers_;
     std::vector<double> offsets_;
     double sharpness_ = 1.0;
     double local_selection_radius_ = 0.0;
-};
-
-/**
- * @brief One primitive component inside a composed benchmark function.
- */
-struct Component {
-    std::shared_ptr<BasicF> base;
-    std::shared_ptr<CoordinateTransform> coordinate_transform;
-    std::shared_ptr<ValueTransform> value_transform;
-};
-
-/**
- * @brief Concrete benchmark function assembled from components and a composition rule.
- */
-class ComposedFunction final {
-public:
-    ComposedFunction(
-        Domain domain,
-        std::vector<Component> components,
-        std::shared_ptr<CompositionFunction> composition,
-        FunctionMetadata metadata);
-
-    std::vector<double> operator()(const std::vector<std::vector<double>>& X) const;
-    /**
-     * @brief Return the metadata describing this composed function.
-     */
-    const FunctionMetadata& metadata() const;
-    /**
-     * @brief Return the input domain of this composed function.
-     */
-    const Domain& domain() const;
-    /**
-     * @brief Return the problem dimension.
-     */
-    int dimension() const;
-    /**
-     * @brief Evaluate all transformed component values for a single input point.
-     */
-    std::vector<double> component_values(const std::vector<double>& x) const;
-
-private:
-    double evaluate_single(const std::vector<double>& x) const;
-
-    Domain domain_;
-    std::vector<Component> components_;
-    std::shared_ptr<CompositionFunction> composition_;
-    FunctionMetadata metadata_;
 };
 
 } // namespace FuncCraft

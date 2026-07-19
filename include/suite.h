@@ -9,7 +9,7 @@
  * of composed benchmark functions using a deterministic recipe.
  */
 
-#include "composition.h"
+#include "benchmark_function.h"
 
 namespace FuncCraft {
 
@@ -44,7 +44,7 @@ public:
     /**
      * @brief Access one generated function by index.
      */
-    const ComposedFunction& function(int index) const;
+    const BenchmarkFunction& function(int index) const;
     /**
      * @brief Batch-evaluate one generated function at multiple points.
      */
@@ -56,11 +56,11 @@ public:
     /**
      * @brief Return all generated functions.
      */
-    const std::vector<ComposedFunction>& functions() const;
+    const std::vector<BenchmarkFunction>& functions() const;
 
 private:
     BenchmarkSuiteOptions options_;
-    std::vector<ComposedFunction> functions_;
+    std::vector<BenchmarkFunction> functions_;
 };
 
 /**

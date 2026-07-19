@@ -1,17 +1,15 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[journal]{IEEEtran}
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage{lmodern}
 \usepackage{amsmath,amssymb,amsfonts,amsthm}
-\usepackage{geometry}
 \usepackage{graphicx}
-\usepackage{hyperref}
+\usepackage{cite}
 \usepackage{enumitem}
 \usepackage{longtable}
+\usepackage{hyperref}
 
 
-\geometry{margin=1in}
 \setlist[itemize]{leftmargin=1.5em}
 
 % --- Add these lines here ---
@@ -28,32 +26,36 @@
 
 \title{General Framework for Scalable Construction of Optimization Benchmark Functions}
 \author{
-	Khoirul Faiq Muzakka\(^{\ast\dagger}\),
-	Martin Finsterbusch\(^{\ast}\)\\
-	\small \(^{\ast}\)Institute of Energy Materials and Devices (IMD-2)\\
-	\small Forschungszentrum J\"ulich GmbH, Germany\\
-	\small \(^{\dagger}\)Email: \href{mailto:k.muzakka@fz-juelich.de}{k.muzakka@fz-juelich.de}
+	Khoirul Faiq Muzakka and Martin Finsterbusch%
+	\thanks{Khoirul Faiq Muzakka and Martin Finsterbusch are with the
+	Institute of Energy Materials and Devices (IMD-2), Forschungszentrum
+	J\"ulich GmbH, Germany (e-mail: k.muzakka@fz-juelich.de).}
 }
-\date{\today}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-This paper proposes a general framework for constructing scalable families of
-continuous optimization benchmark functions from known base functions. The
-framework gives explicit construction prescriptions together with sufficient
-conditions that preserve analytically known global optima. It is intended as a
-programmable extension of existing benchmark suites, enabling many reproducible
-problem instances with controlled landscape properties and known reference
-optima. A C++ and Python implementation, \textsc{FuncCraft}, is provided to support
-practical benchmark generation and future large-scale studies of algorithm
-robustness.
+This paper presents a general framework for constructing scalable continuous
+optimization benchmark functions from known base functions. The construction
+separates three design choices: coordinate transformations that modify the
+search-space geometry, value transformations that reshape individual component
+landscapes, and composition functions that combine the transformed components.
+For these ingredients, we give sufficient conditions that preserve analytically
+known global optima, so new benchmark instances can be generated without
+proving each function separately. The same decomposition also gives a natural
+classification and metadata scheme for organizing and reproducing generated
+instances. A controlled numerical experiment with a differential
+evolution-based optimizer illustrates how different choices of coordinate
+transformation, value transformation, and composition function affect the
+observed optimization difficulty.
 \end{abstract}
 
-\setcounter{tocdepth}{1}
-\tableofcontents
+\begin{IEEEkeywords}
+Benchmark functions, derivative-free optimization, evolutionary computation,
+global optimization, numerical optimization.
+\end{IEEEkeywords}
 
 
 \section{Introduction}
@@ -63,8 +65,8 @@ Benchmark functions play a central role in the development and evaluation of
 optimization algorithms. They provide controlled test problems for analyzing
 convergence behavior, robustness, scalability, exploration--exploitation
 trade-offs, and algorithmic performance under different landscape properties.
-Consequently, benchmark suites such as the CEC competitions and the BBOB
-testbed have become standard evaluation platforms for numerical optimization.
+Consequently, benchmark suites such as the CEC competitions\cite{cec2017, cec2020, cec2022} and the BBOB
+testbed\cite{Hansen2009BBOBFunctions} have become standard evaluation platforms for numerical optimization.
 
 Despite their widespread use, existing benchmark suites share a common
 limitation: they contain only a relatively small number of manually designed
@@ -74,12 +76,12 @@ indispensable for standardized comparison, they inevitably sample only a tiny
 fraction of the enormous space of possible optimization landscapes. As a
 result, an optimization algorithm may perform well on a particular benchmark
 suite while exhibiting substantially different behavior on related, but
-unrepresented, landscape structures.
+unrepresented, landscape structures\cite{PIOTROWSKI2023101378}.
 
 This limitation becomes increasingly important as optimization algorithms become
 more sophisticated. Modern optimization methods are often designed to be robust
 across a wide variety of problem classes rather than being tailored to a small
-collection of canonical functions. Consequently, robustness studies require
+collection of canonical functions. Consequently, robustness studies may require
 algorithms to be evaluated on hundreds or even thousands of diverse benchmark
 instances, rather than on only a few dozen manually constructed problems.
 Achieving such large-scale evaluation is difficult if every benchmark function
@@ -94,76 +96,56 @@ important analytical properties, most notably the location and value of the
 global optimum.
 
 More specifically, the proposed framework views benchmark construction as a
-sequence of three independent design stages. First, coordinate transformations
-modify the geometry of the search space through operations such as shifting,
-rotation, scaling, conditioning, subspace selection, or nonlinear warping.
-Second, value transformations reshape the objective values of individual
-components, allowing the construction of plateaus, repeated minima,
-oscillations, saturation, or additional local minima while preserving known
-global optima whenever desired. Finally, a composition function combines the
-transformed components into the final objective function, controlling the
-interaction among component landscapes, spatial dominance, basin hierarchy,
-deception, and multimodality.
-
-This decomposition naturally separates benchmark design into three independent
-questions:
-\begin{enumerate}
-	\item How should the search-space geometry be modified?
-	\item How should the landscape of each component be reshaped?
-	\item How should the transformed components interact?
-\end{enumerate}
-Rather than treating these operations independently for each benchmark
-function, the proposed framework provides a unified mathematical formalism in
-which each operation is represented explicitly and can be analyzed separately.
-
-The proposed three-stage decomposition serves both as a constructive framework
-for benchmark generation and as a natural taxonomy for benchmark
-classification. On the constructive side, each stage can be extended
-independently without modifying the overall framework: new coordinate
-transformations, value transformations, or composition functions can be
-incorporated simply by introducing new instances of the corresponding
-construction ingredients. Consequently, the framework should be viewed as a design language
-for optimization landscapes rather than as a fixed benchmark collection. At
-the same time, the same decomposition provides a systematic classification of
-generated benchmark functions. Instead of assigning an arbitrary name to each
-generated instance, a benchmark can be characterized by its underlying base
-functions together with its coordinate-transformation class,
-value-transformation class, and composition-function class. This structural
-representation separates the general construction recipe from its numerical
-parameters and random seed, enabling large benchmark collections to be
-organized into meaningful families, compared according to their dominant
-landscape mechanisms, and reproduced exactly through associated metadata.
+sequence of three independent design stages. First, coordinate transformations,
+denoted by \(T_i\), modify the geometry of the search space through operations
+such as shifting, rotation, scaling, conditioning, subspace selection, or
+nonlinear warping. Second, value transformations, denoted by \(\phi_i\),
+reshape the objective values of individual components, allowing the construction
+of plateaus, repeated minima, oscillations, saturation, or additional local
+minima while preserving known global optima whenever desired. Finally, a
+composition function, denoted by \(\psi\), combines the transformed components
+into the final objective function, controlling the interaction among component
+landscapes, spatial dominance, basin hierarchy, deception, and multimodality.
 
 
-The framework also establishes sufficient conditions under which the generated
-benchmark function retains a known global optimum. This provides theoretical
-guarantees that are essential for optimization benchmarking, where objective
-errors, success rates, and convergence behavior must be evaluated with respect
-to a known optimum. Beyond preserving known optima, the framework also provides
-systematic prescriptions for constructing benchmark functions with prescribed
-landscape characteristics, including multimodality, deceptive basins,
-nonseparability, ill-conditioning, variable interaction, repeated optima, and
-hierarchical compositions.
+The same three stages also give a simple way to organize generated
+benchmarks. New coordinate transformations, value transformations, or
+composition rules can be added without changing the rest of the construction,
+so the framework acts more like a design language than a fixed benchmark
+suite. Each generated function can then be described by its base functions and
+by the classes of \(T_i\), \(\phi_i\), and \(\psi\), together with the
+numerical parameters and random seed needed for exact reproduction. This makes
+large benchmark collections easier to group, compare, and reproduce.
 
-To facilitate practical use of the proposed methodology, we provide both C++
-and Python implementations in an open-source software package called
-\textsc{FuncCraft}. Rather than supplying a fixed collection of benchmark
-functions, \textsc{FuncCraft} enables users to generate arbitrarily many
-benchmark instances by combining different coordinate transformations, value
-transformations, and composition functions. This enables large-scale robustness
-studies involving hundreds or thousands of benchmark functions generated from a
-common mathematical framework.
 
-The primary contribution of this paper is the development of the mathematical
-and computational foundation underlying this framework. We establish general
+The framework also establishes general conditions under which the generated
+benchmark function retains a known global optimum. These conditions are stated
+at the level of the three construction ingredients \(T_i\), \(\phi_i\), and
+\(\psi\), rather than separately for every generated function. As a result, a
+user only needs to verify that the chosen transformations and composition rule
+satisfy the stated conditions; the optimum-preservation guarantee then follows
+from the abstract construction. This is useful for optimization benchmarking,
+where objective errors, success rates, and convergence behavior must be
+evaluated with respect to a known optimum. Beyond preserving known optima, the
+framework also provides systematic prescriptions for constructing benchmark
+functions with prescribed landscape characteristics, including multimodality,
+deceptive basins, nonseparability, ill-conditioning, variable interaction,
+repeated optima, and hierarchical compositions.
+
+The primary contribution of this paper is the mathematical and computational
+foundation for this construction approach. We establish general
 minimum-preservation conditions, develop constructive prescriptions for
 benchmark generation, analyze the roles of the individual construction
-ingredients, and show how the same construction decomposition induces a natural
-classification of generated functions. We further provide a structured labeling and metadata
-scheme for organizing large benchmark collections and reproducing individual
-instances exactly. Extensive benchmarking of optimization algorithms on large
-collections of automatically generated functions is beyond the scope of the
-present paper and will be reported in a separate companion study.
+ingredients, and show how the same decomposition induces a natural
+classification of generated functions. To support practical use, we provide C++
+and Python implementations in an open-source package called
+\textsc{FuncCraft}, together with a structured labeling and metadata scheme for
+organizing large benchmark collections and reproducing individual instances
+exactly. We also include a controlled numerical experiment with ARRDE to
+illustrate how different choices of coordinate transformation, value
+transformation, and composition function affect the observed difficulty of the
+generated problems. A broader comparison of many optimization algorithms on
+large automatically generated benchmark collections is left for future work.
 
 
 % --------------------------------------------------------------------------
@@ -300,55 +282,9 @@ this section shows how to choose the three ingredients in
 conditions in Proposition~\ref{f_helper}: zero value at a prescribed point and
 nonnegativity everywhere.
 
-\begin{proposition}[\(\psi\)-condition for minimum preservation]
-	\label{thm:general-minimum-preservation}
-	Let
-	\[
-	z_i(x)
-	=
-	\phi_i(g_i(T_i(x))),
-	\qquad i=1,\ldots,m,
-	\]
-	and let \(\bar x\in\Omega\) be a candidate prescribed minimizer. Choose a
-	composition function \(\psi:\Omega\times\mathbb{R}^m\to\mathbb{R}\) so that
-	\[
-	\psi(\bar x,z_1(\bar x),\ldots,z_m(\bar x))=0,
-	\]
-	and
-	\[
-	\psi(x,z_1(x),\ldots,z_m(x))\ge0
-	\qquad
-	\forall x\in\Omega.
-	\]
-	Then the generated function \(f(x)=\psi(x,z_1(x),\ldots,z_m(x))\) satisfies
-	\[
-	\bar x\in\operatorname*{arg\,min}_{x\in\Omega} f(x),
-	\]
-	and the global minimum value is \(0\).
-\end{proposition}
-
-\begin{proof}
-	This follows immediately from Proposition~\ref{f_helper}, applied to
-	\(h=f\). 
-\end{proof}
-
-\begin{remark}
-	The conditions in Proposition~\ref{thm:general-minimum-preservation} are
-	sufficient, but not necessary. The proposition gives a condition on
-	\(\psi\) on the reachable pairs \((x,z(x))\): the candidate point must be
-	mapped to zero, and every reachable pair must be mapped to a nonnegative
-	value. Thus, Proposition~\ref{thm:general-minimum-preservation} should be interpreted as
-	a practical sufficient condition for constructing benchmark functions with a
-	known optimum, not as a complete characterization of all possible
-	minimum-preserving compositions.
-\end{remark}
-
-
-Proposition~\ref{thm:general-minimum-preservation} places the final
-responsibility on the composition function \(\psi\). To make that condition
-easy to verify, we next impose a simple requirement on each value
-transformation. This ensures that every transformed component remains a
-nonnegative function with a known zero at the base-function minimizer.
+We start at the component level. The next condition ensures that a value
+transformation preserves the known zero of a base function and does not create
+negative component values.
 
 \begin{proposition}[\(\phi_i\)-condition for preserving component minima]
 	\label{prop:minimum-preserving-value-transformations}
@@ -468,13 +404,63 @@ nonnegative function with a known zero at the base-function minimizer.
 	domain, or an explicit restriction on \(T(\Omega)\).
 \end{remark}
 
-With the component value transformations and coordinate pullbacks fixed, the
-remaining design question is how to combine the prescribed component values.
-The next proposition is the general prescribed-point construction: components
-may be assigned to one or more prescribed points, and the resulting
-component-value vectors are then passed to \(\psi\). This separates the
-geometric placement of component minima from the final decision, made by
-\(\psi\), about which prescribed points become global or local minima.
+The preceding two propositions control the component values before composition:
+\(\phi_i\) preserves nonnegativity and zero values, while \(T_i\) places those
+component minima at prescribed points in the full search space. The remaining
+condition is imposed on the final composition function \(\psi\).
+
+\begin{proposition}[\(\psi\)-condition for minimum preservation]
+	\label{thm:general-minimum-preservation}
+	Let
+	\[
+	z_i(x)
+	=
+	\phi_i(g_i(T_i(x))),
+	\qquad i=1,\ldots,m,
+	\]
+	and let \(\bar x\in\Omega\) be a candidate prescribed minimizer. Choose a
+	composition function \(\psi:\Omega\times\mathbb{R}^m\to\mathbb{R}\) so that
+	\[
+	\psi(\bar x,z_1(\bar x),\ldots,z_m(\bar x))=0,
+	\]
+	and
+	\[
+	\psi(x,z_1(x),\ldots,z_m(x))\ge0
+	\qquad
+	\forall x\in\Omega.
+	\]
+	Then the generated function \(f(x)=\psi(x,z_1(x),\ldots,z_m(x))\) satisfies
+	\[
+	\bar x\in\operatorname*{arg\,min}_{x\in\Omega} f(x),
+	\]
+	and the global minimum value is \(0\).
+\end{proposition}
+
+\begin{proof}
+	This follows immediately from Proposition~\ref{f_helper}, applied to
+	\(h=f\). 
+\end{proof}
+
+\begin{remark}
+	The conditions in Proposition~\ref{thm:general-minimum-preservation} are
+	sufficient, but not necessary. The proposition gives a condition on
+	\(\psi\) on the reachable pairs \((x,z(x))\): the candidate point must be
+	mapped to zero, and every reachable pair must be mapped to a nonnegative
+	value. Thus, Proposition~\ref{thm:general-minimum-preservation} should be
+	interpreted as a practical sufficient condition for constructing benchmark
+	functions with a known optimum, not as a complete characterization of all
+	possible minimum-preserving compositions.
+\end{remark}
+
+Proposition~\ref{thm:general-minimum-preservation} is the general
+minimum-preservation statement for the composed function: for any chosen
+component functions and any composition rule \(\psi\), it is enough that the
+reachable composed values are nonnegative and that the prescribed point is
+mapped to zero. The next proposition applies this general statement to a
+structured prescribed-point construction. Components are assigned to one or
+more prescribed points, the coordinate maps place their component minima there,
+and \(\psi\) then determines which prescribed points are global minimizers,
+local minimizers, or deceptive local minimizers.
 
 \begin{proposition}[Construction from prescribed points]
 	\label{thm:prescribed-point-construction}
@@ -677,7 +663,7 @@ separately, starting from derivative and Hessian relations and then discussing
 their consequences for preservation, shape change, and generation of new local
 minima.
 
-\subsection{Coordinate transformations $T_i$}
+\subsection{\texorpdfstring{Coordinate transformations \(T_i\)}{Coordinate transformations Ti}}
 \label{subsec:coordinate-transformations}
 
 
@@ -841,7 +827,7 @@ rotated, and conditioned basin. The nonlinear folded transformation maps two
 different points in the search space to the same base optimum, producing two
 global basins from the same unimodal component.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 	\centering
 	\includegraphics[width=\textwidth]{figures/coordinate_transform_sphere_3d.pdf}
 	\caption{Coordinate transformations applied to the two-dimensional Sphere
@@ -851,9 +837,9 @@ global basins from the same unimodal component.
 	\(T(x_1,x_2)=((x_1^2-a^2)/s_1,x_2/s_2)\) duplicates the base optimum and
 	creates two global minimizers.}
 	\label{fig:coordinate-transform-sphere-3d}
-\end{figure}
+\end{figure*}
 
-\subsection{Value transformations $\phi_i$}
+\subsection{\texorpdfstring{Value transformations \(\phi_i\)}{Value transformations phi i}}
 \label{subsec:value-transformations}
 
 The value transformation \(\phi_i\) acts after the coordinate-transformed base
@@ -954,13 +940,17 @@ new local minima by themselves. Typical examples are
 	\phi(u)=\log(1+\alpha u),
 \]
 with parameters chosen so that \(\phi(0)=0\), \(\phi(u)\ge0\), and \(\phi\) is
-increasing on the relevant range. Linear scaling changes the vertical scale.
-Powers with \(p>1\) flatten the optimum, while powers with \(0<p<1\) sharpen it
-and may introduce nonsmoothness at \(u=0\). Logarithmic transformations compress
-large values. 
-
-%If \(\phi\) is nondecreasing but not strictly increasing, then global minimizers are still preserved, but the local-minimum structure may become less isolated. For example, a saturating or clipped transformation can map an interval of objective values to the same constant. This can create plateaus, neutral regions, or non-isolated minimizer sets, even though no lower value is created.
-
+increasing on the relevant range. These choices affect the landscape in
+different ways. Linear scaling changes only the vertical scale. A power
+transformation changes how quickly the objective grows away from the minimum
+value \(u=0\): \(p>1\) makes small positive values even smaller, producing a
+flatter basin near the minimizer, whereas \(0<p<1\) makes small positive values
+larger, producing a sharper basin. In the latter case, the slope of \(u^p\)
+becomes unbounded as \(u\to0^+\), so \(u^p\) is not differentiable at the origin
+and the transformed objective may become nonsmooth at the preserved minimizer.
+Logarithmic transformations have a different role: they leave the ordering of
+objective values unchanged while compressing large values far from the
+minimum.
 
 
 Beyond preserving or reshaping existing minima, a value transformation can also
@@ -1027,14 +1017,14 @@ show how value transformations can rescale the objective, flatten or sharpen
 the optimum, compress large values, create repeated optima, or add
 oscillatory local structure.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 	\centering
 	\includegraphics[width=\textwidth]{figures/value_transform_quadratic.pdf}
 	\caption{Examples of value transformations applied to the same quadratic
 	base function \(g(x)=x^2\) on \([-100,100]\). Each panel uses its own
 	vertical scale to emphasize the induced shape.}
 	\label{fig:value-transform-quadratic}
-\end{figure}
+\end{figure*}
 
 In summary, strictly increasing value transformations preserve local minima and
 only change shape. Nondecreasing transformations with flat intervals preserve
@@ -1046,7 +1036,7 @@ minimum-preservation argument no longer applies without a separate analysis.
 
 
 
-\subsection{Composition function $\psi$}
+\subsection{\texorpdfstring{Composition function \(\psi\)}{Composition function psi}}
 \label{subsec:composition-function}
 
 The composition function \(\psi\) combines the current point and the transformed
@@ -1060,12 +1050,13 @@ Thus the final objective is
 \[
 	f(x)=\psi(x,z(x)).
 \]
-Equivalently, one may write \(\psi_x(z)=\psi(x,z)\). This notation is useful
-when \(\psi\) uses spatial weights or gates. The \(x\)-independent case
-\(\psi(x,z)=\psi(z)\) remains an important special case.
+The composition may depend explicitly on \(x\), for example through spatial
+weights or gates. The \(x\)-independent case \(\psi(x,z)=\psi(z)\) remains an
+important special case.
 
 By design, \(\psi\) should preserve the known global minimum. For a prescribed
-component-value vector \(v^\star=z(x^\star)\), the basic sufficient condition is
+component-value vector \(v^\star=z(x^\star)\), the basic sufficient condition
+from Proposition~\ref{thm:general-minimum-preservation} is
 \[
 	\psi(x^\star,v^\star)=0,
 	\qquad
@@ -1086,16 +1077,17 @@ differentiable, then
 If both are twice differentiable, then
 \begin{align}
 	\nabla^2 f(x)
-	={}&
+	&={}
 	\nabla_{xx}^2\psi(x,z(x))
 	+
 	\nabla_{xz}^2\psi(x,z(x))J_z(x)
-	+
-	J_z(x)^T\nabla_{zx}^2\psi(x,z(x))
 	\nonumber\\
 	&+
-	J_z(x)^T\nabla_{zz}^2\psi(x,z(x))J_z(x)
+	J_z(x)^T\nabla_{zx}^2\psi(x,z(x))
 	+
+	J_z(x)^T\nabla_{zz}^2\psi(x,z(x))J_z(x)
+	\nonumber\\
+	&+
 	\sum_{i=1}^m
 	\frac{\partial\psi}{\partial z_i}(x,z(x))\nabla^2 z_i(x).
 	\label{eq:composition-hessian}
@@ -1135,6 +1127,12 @@ stationary point becomes a local minimum only when the composed value cannot
 decrease in a neighborhood of \(x_0\). Therefore, composition can create local
 minima through interaction among components, even when no single component
 alone has a local minimum at that point.
+
+The following subsections turn these general observations into concrete
+composition patterns. We first consider the simplest case, where all components
+are arranged to share the same prescribed minimizer, and then move to
+constructions that deliberately place deceptive local basins at different
+points.
 
 \subsubsection{Same-point minimizers}
 
@@ -1262,7 +1260,7 @@ function. The height and color are based on \(\log(1+f)\), which makes both the
 prescribed optimum and the large-scale landscape shape visible in the same
 plot.
 
-\begin{figure}[ht]
+\begin{figure*}[t]
 	\centering
 	\includegraphics[width=\textwidth]{figures/composition_operators_3d.pdf}
 	\caption{Three-dimensional examples of composition functions applied on
@@ -1271,7 +1269,7 @@ plot.
 		\(\log(1+f)\) as both height and color. The nonmonotone level-well example
 		uses \(\psi(z)=s(1+0.65\sin(20s))\), where \(s=z_1+z_2\).}
 	\label{fig:composition-functions-3d}
-\end{figure}
+\end{figure*}
 
 
 \subsubsection{Deceptive point minimizers}
@@ -1523,9 +1521,16 @@ Rastrigin/Ellipsoid, Ackley/Rosenbrock, and Griewank/Sphere. In each panel, the
 first component defines the global basin with offset \(b=0\), while the second
 component defines a suboptimal deceptive basin with positive offset. The
 weights select one component near each prescribed point and blend the
-components away from these neighborhoods.
+components away from these neighborhoods. The figure shows that the prescribed
+global minimum remains visible, while an additional local
+deceptive minimum appears. Thus the construction can preserve
+the known global optimum and, at the same time, introduce a separate attractive
+basin that may draw an optimizer away from it. The shape between the two basins
+also depends on the selected component pair, illustrating that the weighting
+mechanism can create different transition landscapes even when the same
+prescribed-point logic is used.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 	\centering
 	\includegraphics[width=\textwidth]{figures/deceptive_weighted_composition_3d.pdf}
 	\caption{Three-dimensional examples of deceptive weighted compositions on
@@ -1535,25 +1540,9 @@ components away from these neighborhoods.
 		suboptimal deceptive minimizer induced by the second component. Each surface
 		uses \(\log(1+f)\) as both height and color.}
 	\label{fig:deceptive-weighted-composition-3d}
-\end{figure}
+\end{figure*}
 
 
-The local differential behavior follows the same logic as in the preceding
-transformation and composition discussions. Inside a neighborhood \(U_i\) where
-the switching conditions make \(w_i=1\) and \(w_j=0\) for \(j\ne i\), the
-composed function reduces to
-\[
-	f(x)=z_i(x)+b_i=\phi_i(g_i(T_i(x)))+b_i.
-\]
-Thus, if \(\tilde x_i\) is an interior smooth basin minimum of the \(i\)-th
-component, the Hessian at \(\tilde x_i\) is the Hessian of that transformed
-component, scaled by \(\phi_i'(0)\), exactly as in the value- and
-coordinate-transformation analyses. Away from these locally selected regions,
-the derivatives of the weights also contribute. In particular, terms involving
-\((z_i(x)+b_i)\nabla w_i(x)\) can create additional stationary points in
-transition regions between basins. Hence the construction guarantees the
-prescribed deceptive local minima, while the switching functions may introduce
-further landscape structure.
 
 
 \section{Classification of Functions}
@@ -1618,7 +1607,7 @@ below fixes concrete parameter choices for each treatment. This separation is
 important because the label identifies the construction mechanism, whereas the
 parameter record \(\theta\) determines the particular benchmark instance that an optimization algorithm minimizes.
 
-\begin{table}[t]
+\begin{table*}[t]
 	\centering
 	\scriptsize
 	\caption{Initial classification dictionary for generated benchmark functions.}
@@ -1670,7 +1659,7 @@ parameter record \(\theta\) determines the particular benchmark instance that an
 		\(T_i(x)=A_i(x-\bar{x})+x_i^\star\) \\
 		\hline
 	\end{tabular}
-\end{table}
+\end{table*}
 
 The labels in Table~\ref{tab:classification-dictionary} describe structural
 choices only; numerical values such as \(\alpha\), \(\epsilon\), \(p\), softmax
@@ -1678,13 +1667,14 @@ sharpness, rotations, affine matrices, subspace indices, and component weights
 belong to \(\theta\). We therefore keep the label fixed when comparing the same
 mechanism, and vary \(\theta\) only to generate reproducible instances. 
 
-We use adaptive restart-refine differential evolution (ARRDE)\cite{muzakka2026robustdifferentialevolutionnonlinear} as the
-test optimizer. ARRDE is chosen because it has been evaluated in a study using
-CEC benchmark collections from CEC2011, CEC2017, CEC2019, CEC2020, and CEC2022.
-That study compared ARRDE against state-of-the-art algorithms and reported that
-ARRDE ranked first over the benchmark functions used in the comparison. The
-purpose here is not to retune ARRDE, but to use a strong fixed optimizer to show
-how the different construction mechanisms change the observed difficulty of the
+We use adaptive restart-refine differential evolution
+(ARRDE)\cite{muzakka2026robustdifferentialevolutionnonlinear} as the test
+optimizer. ARRDE is a strong recent differential-evolution variant that has
+been evaluated in an extensive study covering benchmark collections from
+CEC2011, CEC2017, CEC2019, CEC2020, and CEC2022. It was compared against
+state-of-the-art algorithms and winners of CEC competitions, and was shown to
+be very competitive. The purpose here is not to tune ARRDE, but to show how the
+different construction mechanisms change the observed difficulty of the
 generated functions.
 
 All generated instances are shifted so that the target minimum value is
@@ -1717,7 +1707,7 @@ controlled parts.
 		orthogonal matrix with row scales increasing geometrically from
 		\(1\) to \(10^2\). Thus this block tests the effect of axis
 		alignment, rotation, and affine ill-conditioning.
-	\item \textbf{Effect of \(\phi_i\).} We again use the 28 base functions,
+	\item \textbf{Effect of value transformation \(\phi_i\).} We again use the 28 base functions,
 		but now fix the coordinate transformation to \texttt{ROT}. Only the
 		value transformation is changed. The treatment \texttt{NONE} uses
 		\(\phi(u)=u\). The treatment \texttt{COSZERO} uses
@@ -1727,7 +1717,7 @@ controlled parts.
 		which gives a sharp near-minimum shape, while \texttt{POWER\_P10}
 		uses \(\phi(u)=u^{10}\), which gives a very flat near-minimum
 		shape.
-	\item \textbf{Effect of \(\psi\).} We generate 30 composition instances.
+	\item \textbf{Effect of composition function \(\psi\).} We generate 30 composition instances.
 		Each instance is formed by randomly selecting \(m=5\) base functions.
 		For a fixed instance, the selected base functions, rotations,
 		dimension, and value transformation are kept unchanged, and only the
@@ -1745,14 +1735,14 @@ controlled parts.
 
 
 
-\begin{figure}[t]
+\begin{figure*}[t]
 	\centering
-	\begin{minipage}{0.48\textwidth}
+	\begin{minipage}{0.4\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{figures/experiment_coord_tre.pdf}
 	\end{minipage}
-	\hfill
-	\begin{minipage}{0.48\textwidth}
+	%\hfill
+	\begin{minipage}{0.4\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{figures/experiment_coord_solved_fraction.pdf}
 	\end{minipage}
@@ -1760,17 +1750,17 @@ controlled parts.
 		performance. Left: average transformed relative error. Right: fraction of
 		solved problems.}
 	\label{fig:experiment-coordinate}
-\end{figure}
+\end{figure*}
 
 
-\begin{figure}[t]
+\begin{figure*}[t]
 	\centering
-	\begin{minipage}{0.48\textwidth}
+	\begin{minipage}{0.4\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{figures/experiment_value_tre.pdf}
 	\end{minipage}
-	\hfill
-	\begin{minipage}{0.48\textwidth}
+%	\hfill
+	\begin{minipage}{0.4\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{figures/experiment_value_solved_fraction.pdf}
 	\end{minipage}
@@ -1778,16 +1768,16 @@ controlled parts.
 		performance. Left: average transformed relative error. Right: fraction of
 		solved problems.}
 	\label{fig:experiment-value}
-\end{figure}
+\end{figure*}
 
-\begin{figure}[t]
+\begin{figure*}[t]
 	\centering
-	\begin{minipage}{0.48\textwidth}
+	\begin{minipage}{0.4\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{figures/experiment_composition_tre.pdf}
 	\end{minipage}
-	\hfill
-	\begin{minipage}{0.48\textwidth}
+	%\hfill
+	\begin{minipage}{0.4\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{figures/experiment_composition_solved_fraction.pdf}
 	\end{minipage}
@@ -1795,7 +1785,7 @@ controlled parts.
 		Left: average transformed relative error. Right: fraction of solved
 		problems.}
 	\label{fig:experiment-composition}
-\end{figure}
+\end{figure*}
 
 
 Figure~\ref{fig:experiment-coordinate} shows the effect of the coordinate
@@ -1856,35 +1846,19 @@ shared component minimizer.
 \section{Conclusion}
 
 This paper introduced a general framework for constructing scalable benchmark
-functions from known base functions. The construction separates the benchmark
-design into coordinate transformations, value transformations, and composition
-functions. This separation makes the role of each ingredient explicit:
-coordinate transformations control the geometry of the search space, value
-transformations reshape individual component landscapes, and composition
-functions determine how transformed components interact in the final objective.
+functions from known base functions. By separating coordinate transformations,
+value transformations, and composition functions, the framework makes the main
+landscape-design choices explicit while preserving analytically known optima
+under simple sufficient conditions. This allows benchmark instances to be
+generated systematically without proving each function from scratch.
 
-The main theoretical contribution is a set of sufficient conditions that
-preserve analytically known global optima. Starting from nonnegative base
-functions with known minimum value zero, the framework gives prescriptions for
-minimum-preserving value transformations, coordinate pullbacks, prescribed
-points, same-point minimizers, nested constructions, and deceptive local
-minimizers. These results provide a flexible way to generate benchmark
-functions whose optima remain known while still allowing substantial control
-over multimodality, conditioning, separability, repeated optima, local basin
-structure, and deception.
-
-The framework also gives a natural classification scheme for generated
-functions. Instead of assigning a new name to every benchmark instance, a
-generated function can be labeled by its composition-function class,
-value-transformation class, coordinate-transformation class, selected base
-functions, and parameter record. This makes large benchmark collections easier
-to organize, reproduce, and analyze.
-
-The proposed \textsc{FuncCraft} implementation is intended to make this
-construction practical in C++ and Python. The numerical experiment with ARRDE
-illustrates how the classification scheme can be used to assess algorithm
-robustness across controlled families of landscape mechanisms rather than only
-across a small fixed set of manually designed functions.
+The same decomposition also provides a natural classification and metadata
+scheme based on the selected base functions, transformation classes,
+composition class, and instance parameters. This makes generated benchmark
+collections easier to organize, reproduce, and analyze. The numerical
+experiment with ARRDE illustrates that different choices of these construction
+ingredients lead to different observed optimization difficulties, supporting
+the use of the framework for controlled studies of algorithm robustness.
 
 
 
@@ -1903,20 +1877,14 @@ content, experiments, and conclusions were developed and
 verified by the authors.
 
 
-\bibliographystyle{plain}
+\twocolumn
+\bibliographystyle{IEEEtran}
 \bibliography{ref}
 
 
 
-
-
-
-
-
-
-
-
-\appendix
+\onecolumn
+\appendices
 
 \section{Base Function Library}
 \label{app:base-functions}
@@ -2050,7 +2018,6 @@ part of the implemented primitive.
 	Multimodal, nonseparable, periodic structure. \\
 \end{longtable}
 \endgroup
-
 
 
 \end{document}

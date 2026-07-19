@@ -3,16 +3,15 @@
 
 /**
  * @file core.h
- * @brief Core benchmark metadata types and shared enumerations.
+ * @brief Core benchmark types and shared enumerations.
  *
  * This header defines the basic domain container, the classification enums
- * used to describe generated benchmark functions, and the metadata record
- * stored alongside composed functions.
+ * used to describe generated benchmark functions, and the compact class label
+ * helper used by the builder.
  */
 
 #include "basicf.h"
 
-#include <map>
 #include <string>
 #include <vector>
 
@@ -49,12 +48,10 @@ enum class CoordinateTransformClass {
     None,
     /// Rotation transform.
     Rotation,
-    /// Subspace/block transform.
-    Block,
     /// Affine transform.
     Affine,
-    /// Nonlinear fold transform.
-    NonlinearFold,
+    /// Block rotation transform on a selected subspace.
+    BlockRotation,
     /// Mixed coordinate transforms across components.
     Mixed,
 };
@@ -79,19 +76,6 @@ struct FunctionClass {
     ValueTransformClass value_transform = ValueTransformClass::None;
     CoordinateTransformClass coordinate_transform = CoordinateTransformClass::None;
     std::vector<BasicFunctionId> base_functions;
-};
-
-/**
- * @brief Metadata attached to each generated benchmark function.
- */
-struct FunctionMetadata {
-    FunctionClass function_class;
-    int dimension = 0;
-    int components = 0;
-    unsigned long long seed = 0;
-    std::vector<double> known_global_minimizer;
-    double known_global_value = 0.0;
-    std::map<std::string, std::string> parameters;
 };
 
 /**

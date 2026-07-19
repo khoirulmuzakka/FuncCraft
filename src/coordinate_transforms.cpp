@@ -1,19 +1,54 @@
 #include "coordinate_transforms.h"
 #include "support.h"
 
-#include <cmath>
+#include <random>
 #include <utility>
 
 namespace FuncCraft {
 using namespace detail;
 
-IdentityTransform::IdentityTransform(int dimension)
-    : dimension_(dimension) {
-    require(dimension > 0, "identity transform dimension must be positive");
+CoordinateTransform::CoordinateTransform(
+    int dimension,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed)
+    : dimension_(dimension),
+      source_point_(std::move(source_point)),
+      target_point_(std::move(target_point)),
+      seed_(seed) {
+    require(dimension_ > 0, "coordinate transform dimension must be positive");
+    require(!source_point_.empty(), "coordinate transform source point must not be empty");
+    require(!target_point_.empty(), "coordinate transform target point must not be empty");
+}
+
+int CoordinateTransform::dimension() const {
+    return dimension_;
+}
+
+std::uint64_t CoordinateTransform::seed() const {
+    return seed_;
+}
+
+const std::vector<double>& CoordinateTransform::source_point() const {
+    return source_point_;
+}
+
+const std::vector<double>& CoordinateTransform::target_point() const {
+    return target_point_;
+}
+
+IdentityTransform::IdentityTransform(
+    int dimension,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed)
+    : CoordinateTransform(dimension, std::move(source_point), std::move(target_point), seed) {
+    require_dimension(source_point_, dimension_, "identity transform source point");
+    require_dimension(target_point_, dimension_, "identity transform target point");
 }
 
 std::vector<double> IdentityTransform::apply(const std::vector<double>& x) const {
-    require_dimension(x, dimension_, "identity transform input");
+    require_dimension(x, input_dimension(), "identity transform input");
     return x;
 }
 
@@ -29,193 +64,175 @@ CoordinateTransformClass IdentityTransform::transform_class() const {
     return CoordinateTransformClass::None;
 }
 
-SubspaceTransform::SubspaceTransform(int input_dimension, std::vector<int> indices)
-    : input_dimension_(input_dimension),
-      indices_(std::move(indices)),
-      center_(indices_.size(), 0.0) {
-    require(input_dimension > 0, "subspace input dimension must be positive");
-    require(!indices_.empty(), "subspace transform needs at least one index");
-    for (int idx : indices_) {
-        require(idx >= 0 && idx < input_dimension_, "subspace index out of range");
-    }
+TransformSpec IdentityTransform::spec() const {
+    TransformSpec spec;
+    spec.kind = "identity";
+    spec.dimension = dimension_;
+    spec.seed = static_cast<int>(seed_);
+    spec.source_point = source_point_;
+    spec.target_point = target_point_;
+    return spec;
 }
 
-SubspaceTransform::SubspaceTransform(int input_dimension, std::vector<int> indices, std::vector<double> center)
-    : input_dimension_(input_dimension),
-      indices_(std::move(indices)),
-      center_(std::move(center)) {
-    require(input_dimension > 0, "subspace input dimension must be positive");
-    require(!indices_.empty(), "subspace transform needs at least one index");
-    require(center_.size() == indices_.size(), "subspace center dimension mismatch");
-    for (int idx : indices_) {
-        require(idx >= 0 && idx < input_dimension_, "subspace index out of range");
-    }
-}
-
-std::vector<double> SubspaceTransform::apply(const std::vector<double>& x) const {
-    require_dimension(x, input_dimension_, "subspace transform input");
-    std::vector<double> y;
-    y.reserve(indices_.size());
-    for (std::size_t i = 0; i < indices_.size(); ++i) {
-        y.push_back(x[static_cast<std::size_t>(indices_[i])] - center_[i]);
-    }
-    return y;
-}
-
-int SubspaceTransform::input_dimension() const {
-    return input_dimension_;
-}
-
-int SubspaceTransform::output_dimension() const {
-    return static_cast<int>(indices_.size());
-}
-
-CoordinateTransformClass SubspaceTransform::transform_class() const {
-    return CoordinateTransformClass::Block;
-}
-
-const std::vector<int>& SubspaceTransform::indices() const {
-    return indices_;
-}
-
-RotationTransform::RotationTransform(std::vector<std::vector<double>> matrix)
-    : matrix_(std::move(matrix)),
-      center_(matrix_.size(), 0.0) {
-    require(!matrix_.empty(), "rotation matrix must have at least one row");
-    const std::size_t dimension = matrix_.size();
-    for (const auto& row : matrix_) {
-        require(row.size() == dimension, "rotation matrix must be square");
-    }
-}
-
-RotationTransform::RotationTransform(std::vector<std::vector<double>> matrix, std::vector<double> center)
-    : matrix_(std::move(matrix)),
-      center_(std::move(center)) {
-    require(!matrix_.empty(), "rotation matrix must have at least one row");
-    const std::size_t dimension = matrix_.size();
-    require(center_.size() == dimension, "rotation center dimension mismatch");
-    for (const auto& row : matrix_) {
-        require(row.size() == dimension, "rotation matrix must be square");
-    }
+RotationTransform::RotationTransform(
+    int dimension,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed)
+    : CoordinateTransform(dimension, std::move(source_point), std::move(target_point), seed) {
+    require_dimension(source_point_, dimension_, "rotation transform source point");
+    require_dimension(target_point_, dimension_, "rotation transform target point");
+    std::mt19937_64 rng(mix_seed(seed_));
+    matrix_ = random_rotation_matrix(rng, dimension_);
 }
 
 std::vector<double> RotationTransform::apply(const std::vector<double>& x) const {
     require_dimension(x, input_dimension(), "rotation transform input");
-    std::vector<double> y(matrix_.size(), 0.0);
-    for (std::size_t r = 0; r < matrix_.size(); ++r) {
-        for (std::size_t c = 0; c < x.size(); ++c) {
-            y[r] += matrix_[r][c] * (x[c] - center_[c]);
+    std::vector<double> y(static_cast<std::size_t>(dimension_), 0.0);
+    for (int r = 0; r < dimension_; ++r) {
+        const auto rr = static_cast<std::size_t>(r);
+        y[rr] = target_point_[rr];
+        for (int c = 0; c < dimension_; ++c) {
+            y[rr] += matrix_[rr][static_cast<std::size_t>(c)]
+                * (x[static_cast<std::size_t>(c)] - source_point_[static_cast<std::size_t>(c)]);
         }
     }
     return y;
 }
 
 int RotationTransform::input_dimension() const {
-    return static_cast<int>(matrix_.size());
+    return dimension_;
 }
 
 int RotationTransform::output_dimension() const {
-    return static_cast<int>(matrix_.size());
+    return dimension_;
 }
 
 CoordinateTransformClass RotationTransform::transform_class() const {
     return CoordinateTransformClass::Rotation;
 }
 
-AffineTransform::AffineTransform(int input_dimension, std::vector<std::vector<double>> matrix, std::vector<double> offset)
-    : input_dimension_(input_dimension),
-      matrix_(std::move(matrix)),
-      offset_(std::move(offset)),
-      center_(static_cast<std::size_t>(input_dimension), 0.0) {
-    require(input_dimension > 0, "affine input dimension must be positive");
-    require(!matrix_.empty(), "affine matrix must have at least one row");
-    require(matrix_.size() == offset_.size(), "affine offset size must match matrix rows");
-    for (const auto& row : matrix_) {
-        require(static_cast<int>(row.size()) == input_dimension_, "affine matrix row dimension mismatch");
-    }
+TransformSpec RotationTransform::spec() const {
+    TransformSpec spec;
+    spec.kind = "rotation";
+    spec.dimension = dimension_;
+    spec.seed = static_cast<int>(seed_);
+    spec.source_point = source_point_;
+    spec.target_point = target_point_;
+    return spec;
 }
 
-AffineTransform::AffineTransform(std::vector<std::vector<double>> matrix, std::vector<double> center, std::vector<double> target)
-    : input_dimension_(static_cast<int>(center.size())),
-      matrix_(std::move(matrix)),
-      offset_(std::move(target)),
-      center_(std::move(center)) {
-    require(input_dimension_ > 0, "affine input dimension must be positive");
-    require(!matrix_.empty(), "affine matrix must have at least one row");
-    require(matrix_.size() == offset_.size(), "affine target size must match matrix rows");
-    for (const auto& row : matrix_) {
-        require(static_cast<int>(row.size()) == input_dimension_, "affine matrix row dimension mismatch");
-    }
-}
-
-AffineTransform AffineTransform::map_point_to_point(
-    std::vector<std::vector<double>> matrix,
-    const std::vector<double>& source_point,
-    const std::vector<double>& target_point) {
-    require(!matrix.empty(), "affine matrix must have at least one row");
-    require(matrix.size() == target_point.size(), "target point dimension must match matrix rows");
-    const int input_dimension = static_cast<int>(source_point.size());
-    std::vector<double> offset(target_point.size(), 0.0);
-    for (std::size_t r = 0; r < matrix.size(); ++r) {
-        require(static_cast<int>(matrix[r].size()) == input_dimension, "affine matrix row dimension mismatch");
-        double mapped = 0.0;
-        for (std::size_t c = 0; c < source_point.size(); ++c) {
-            mapped += matrix[r][c] * source_point[c];
-        }
-        offset[r] = target_point[r] - mapped;
-    }
-    return AffineTransform(input_dimension, std::move(matrix), std::move(offset));
+AffineTransform::AffineTransform(
+    int dimension,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed)
+    : CoordinateTransform(dimension, std::move(source_point), std::move(target_point), seed) {
+    require_dimension(source_point_, dimension_, "affine transform source point");
+    require_dimension(target_point_, dimension_, "affine transform target point");
+    std::mt19937_64 rng(mix_seed(seed_));
+    matrix_ = random_affine_matrix(rng, dimension_);
 }
 
 std::vector<double> AffineTransform::apply(const std::vector<double>& x) const {
-    require_dimension(x, input_dimension_, "affine transform input");
-    std::vector<double> y(matrix_.size(), 0.0);
-    for (std::size_t r = 0; r < matrix_.size(); ++r) {
-        y[r] = offset_[r];
-        for (std::size_t c = 0; c < x.size(); ++c) {
-            y[r] += matrix_[r][c] * (x[c] - center_[c]);
+    require_dimension(x, input_dimension(), "affine transform input");
+    std::vector<double> y(static_cast<std::size_t>(dimension_), 0.0);
+    for (int r = 0; r < dimension_; ++r) {
+        const auto rr = static_cast<std::size_t>(r);
+        y[rr] = target_point_[rr];
+        for (int c = 0; c < dimension_; ++c) {
+            y[rr] += matrix_[rr][static_cast<std::size_t>(c)]
+                * (x[static_cast<std::size_t>(c)] - source_point_[static_cast<std::size_t>(c)]);
         }
     }
     return y;
 }
 
 int AffineTransform::input_dimension() const {
-    return input_dimension_;
+    return dimension_;
 }
 
 int AffineTransform::output_dimension() const {
-    return static_cast<int>(matrix_.size());
+    return dimension_;
 }
 
 CoordinateTransformClass AffineTransform::transform_class() const {
     return CoordinateTransformClass::Affine;
 }
 
-FoldTransform::FoldTransform(int dimension, int folded_coordinate)
-    : dimension_(dimension),
-      folded_coordinate_(folded_coordinate) {
-    require(dimension > 0, "fold transform dimension must be positive");
-    require(folded_coordinate >= 0 && folded_coordinate < dimension, "folded coordinate out of range");
+TransformSpec AffineTransform::spec() const {
+    TransformSpec spec;
+    spec.kind = "affine";
+    spec.dimension = dimension_;
+    spec.seed = static_cast<int>(seed_);
+    spec.source_point = source_point_;
+    spec.target_point = target_point_;
+    return spec;
 }
 
-std::vector<double> FoldTransform::apply(const std::vector<double>& x) const {
-    require_dimension(x, dimension_, "fold transform input");
+BlockRotationTransform::BlockRotationTransform(
+    int dimension,
+    std::vector<int> selected_indices,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed)
+    : CoordinateTransform(dimension, std::move(source_point), std::move(target_point), seed),
+      selected_indices_(std::move(selected_indices)) {
+    require(dimension_ > 0, "block rotation transform dimension must be positive");
+    require(!selected_indices_.empty(), "block rotation transform needs at least one selected index");
+    require_dimension(source_point_, dimension_, "block rotation source point");
+    require_dimension(target_point_, dimension_, "block rotation target point");
+    for (int idx : selected_indices_) {
+        require(idx >= 0 && idx < dimension_, "block rotation selected index out of range");
+    }
+    std::mt19937_64 rng(mix_seed(seed_));
+    matrix_ = random_rotation_matrix(rng, static_cast<int>(selected_indices_.size()));
+}
+
+std::vector<double> BlockRotationTransform::apply(const std::vector<double>& x) const {
+    require_dimension(x, input_dimension(), "block rotation transform input");
     std::vector<double> y = x;
-    const auto idx = static_cast<std::size_t>(folded_coordinate_);
-    y[idx] = std::fabs(y[idx]);
+    std::vector<double> selected(selected_indices_.size(), 0.0);
+    for (std::size_t i = 0; i < selected_indices_.size(); ++i) {
+        const auto idx = static_cast<std::size_t>(selected_indices_[i]);
+        selected[i] = x[idx] - source_point_[idx];
+    }
+
+    for (std::size_t r = 0; r < selected_indices_.size(); ++r) {
+        const auto out_idx = static_cast<std::size_t>(selected_indices_[r]);
+        y[out_idx] = target_point_[out_idx];
+        for (std::size_t c = 0; c < selected_indices_.size(); ++c) {
+            y[out_idx] += matrix_[r][c] * selected[c];
+        }
+    }
     return y;
 }
 
-int FoldTransform::input_dimension() const {
+int BlockRotationTransform::input_dimension() const {
     return dimension_;
 }
 
-int FoldTransform::output_dimension() const {
+int BlockRotationTransform::output_dimension() const {
     return dimension_;
 }
 
-CoordinateTransformClass FoldTransform::transform_class() const {
-    return CoordinateTransformClass::NonlinearFold;
+CoordinateTransformClass BlockRotationTransform::transform_class() const {
+    return CoordinateTransformClass::BlockRotation;
+}
+
+TransformSpec BlockRotationTransform::spec() const {
+    TransformSpec spec;
+    spec.kind = "block_rotation";
+    spec.dimension = dimension_;
+    spec.seed = static_cast<int>(seed_);
+    spec.selected_indices = selected_indices_;
+    spec.source_point = source_point_;
+    spec.target_point = target_point_;
+    return spec;
+}
+
+const std::vector<int>& BlockRotationTransform::selected_indices() const {
+    return selected_indices_;
 }
 
 } // namespace FuncCraft

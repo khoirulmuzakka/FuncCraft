@@ -4,13 +4,12 @@
 /**
  * @file coordinate_transforms.h
  * @brief Coordinate transforms used to remap benchmark input vectors.
- *
- * These transforms reshape or reparameterize the input before it reaches the
- * primitive base function.
  */
 
+#include "function_spec.h"
 #include "core.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace FuncCraft {
@@ -18,113 +17,124 @@ namespace FuncCraft {
 class CoordinateTransform {
 public:
     virtual ~CoordinateTransform() = default;
-    /**
-     * @brief Apply the transform to one input vector.
-     */
+
     virtual std::vector<double> apply(const std::vector<double>& x) const = 0;
-    /**
-     * @brief Return the expected input dimension.
-     */
     virtual int input_dimension() const = 0;
-    /**
-     * @brief Return the produced output dimension.
-     */
     virtual int output_dimension() const = 0;
-    /**
-     * @brief Return the transform family used by this object.
-     */
     virtual CoordinateTransformClass transform_class() const = 0;
+    virtual TransformSpec spec() const = 0;
+
+    int dimension() const;
+    std::uint64_t seed() const;
+    const std::vector<double>& source_point() const;
+    const std::vector<double>& target_point() const;
+
+protected:
+    CoordinateTransform(
+        int dimension,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed);
+
+    int dimension_ = 0;
+    std::vector<double> source_point_;
+    std::vector<double> target_point_;
+    std::uint64_t seed_ = 0;
 };
 
 /**
- * @brief Identity transform that forwards its input unchanged.
+ * @brief Identity transform with the standard source/target/seed signature.
  */
 class IdentityTransform final : public CoordinateTransform {
 public:
-    explicit IdentityTransform(int dimension);
+    IdentityTransform(
+        int dimension,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed);
+
     std::vector<double> apply(const std::vector<double>& x) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
-
-private:
-    int dimension_ = 0;
+    TransformSpec spec() const override;
 };
 
 /**
- * @brief Selects a subspace of the input vector and optionally recenters it.
- */
-class SubspaceTransform final : public CoordinateTransform {
-public:
-    SubspaceTransform(int input_dimension, std::vector<int> indices);
-    SubspaceTransform(int input_dimension, std::vector<int> indices, std::vector<double> center);
-    std::vector<double> apply(const std::vector<double>& x) const override;
-    int input_dimension() const override;
-    int output_dimension() const override;
-    CoordinateTransformClass transform_class() const override;
-    const std::vector<int>& indices() const;
-
-private:
-    int input_dimension_ = 0;
-    std::vector<int> indices_;
-    std::vector<double> center_;
-};
-
-/**
- * @brief Applies a rotation matrix around an optional center point.
+ * @brief Applies a seed-generated rotation matrix around a source point.
+ *
+ * The input, source point, and target point all have the full transform
+ * dimension. The rotated result replaces the full vector.
  */
 class RotationTransform final : public CoordinateTransform {
 public:
-    explicit RotationTransform(std::vector<std::vector<double>> matrix);
-    RotationTransform(std::vector<std::vector<double>> matrix, std::vector<double> center);
+    RotationTransform(
+        int dimension,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed);
+
     std::vector<double> apply(const std::vector<double>& x) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
+    TransformSpec spec() const override;
 
 private:
     std::vector<std::vector<double>> matrix_;
-    std::vector<double> center_;
 };
 
 /**
- * @brief Applies a full affine mapping from the input space to the output space.
+ * @brief Applies a seed-generated affine matrix around a source point.
+ *
+ * The input, source point, and target point all have the full transform
+ * dimension. The affine result replaces the full vector.
  */
 class AffineTransform final : public CoordinateTransform {
 public:
-    AffineTransform(int input_dimension, std::vector<std::vector<double>> matrix, std::vector<double> offset);
-    AffineTransform(std::vector<std::vector<double>> matrix, std::vector<double> center, std::vector<double> target);
-    static AffineTransform map_point_to_point(
-        std::vector<std::vector<double>> matrix,
-        const std::vector<double>& source_point,
-        const std::vector<double>& target_point);
+    AffineTransform(
+        int dimension,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed);
 
     std::vector<double> apply(const std::vector<double>& x) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
+    TransformSpec spec() const override;
 
 private:
-    int input_dimension_ = 0;
     std::vector<std::vector<double>> matrix_;
-    std::vector<double> offset_;
-    std::vector<double> center_;
 };
 
 /**
- * @brief Folds one coordinate into a nonlinear variant while keeping dimension.
+ * @brief Selects coordinates from the full vector and rotates only that block.
+ *
+ * `selected_indices` uses 0-based indices into the full input vector. The full
+ * vector dimension is preserved; only the selected coordinates are replaced by
+ * the rotated block. Unselected coordinates pass through unchanged.
  */
-class FoldTransform final : public CoordinateTransform {
+class BlockRotationTransform final : public CoordinateTransform {
 public:
-    FoldTransform(int dimension, int folded_coordinate = 0);
+    BlockRotationTransform(
+        int dimension,
+        std::vector<int> selected_indices,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed);
+
     std::vector<double> apply(const std::vector<double>& x) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
+    TransformSpec spec() const override;
+
+    const std::vector<int>& selected_indices() const;
 
 private:
-    int dimension_ = 0;
-    int folded_coordinate_ = 0;
+    std::vector<int> selected_indices_;
+    std::vector<std::vector<double>> matrix_;
 };
 
 } // namespace FuncCraft

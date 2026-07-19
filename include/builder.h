@@ -3,20 +3,42 @@
 
 /**
  * @file builder.h
- * @brief Fluent builder for constructing composed benchmark functions.
+ * @brief Low-level helpers for assembling benchmark functions.
  *
- * Use this API to assemble a benchmark from primitive base functions,
- * coordinate transforms, value transforms, and a composition rule.
+ * This header exposes the runtime ingredients used to build benchmark
+ * functions as well as the low-level callable type returned by the builder.
  */
 
+#include "basicf.h"
 #include "composition.h"
+#include "coordinate_transforms.h"
+#include "core.h"
+#include "function_spec.h"
+#include "value_transforms.h"
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace FuncCraft {
 
+/**
+ * @brief Runtime callable for a composed benchmark function.
+ *
+ * The callable consumes a batch of input vectors and returns one scalar value
+ * per input vector. It intentionally carries no metadata or helper methods.
+ */
+using ComposedFunction = std::function<std::vector<double>(const std::vector<std::vector<double>>& X)>;
+
+/**
+ * @brief Low-level builder that stores components and materializes specs.
+ *
+ * Use this class when you want to assemble a function from primitive
+ * ingredients directly. It produces either a plain-data spec or a runtime
+ * callable, depending on the entry point you use.
+ */
 class FunctionBuilder final {
 public:
     explicit FunctionBuilder(int dimension);
@@ -50,30 +72,78 @@ public:
      */
     FunctionBuilder& composition(std::shared_ptr<CompositionFunction> composition);
     /**
-     * @brief Store an arbitrary metadata parameter.
+     * @brief Store an arbitrary string parameter in the final spec.
      */
     FunctionBuilder& parameter(std::string key, std::string value);
 
     /**
-     * @brief Materialize the final composed function.
+     * @brief Materialize the final composed runtime callable.
      */
     ComposedFunction build() const;
+    /**
+     * @brief Materialize the plain-data specification accumulated so far.
+     *
+     * The returned spec includes a normalized `function_class_label` and the
+     * known global optimum fields captured by the builder.
+     */
+    FunctionSpec build_spec() const;
+    /**
+     * @brief Return the plain-data function specification accumulated so far.
+     */
+    FunctionSpec spec() const;
 
 private:
     Domain domain_;
     unsigned long long seed_ = 0;
     std::vector<double> x_star_;
     double f_star_ = 0.0;
-    std::vector<Component> components_;
+    std::vector<ComponentSpec> component_specs_;
     std::shared_ptr<CompositionFunction> composition_;
     FunctionClass function_class_;
     std::map<std::string, std::string> parameters_;
 };
 
 /**
- * @brief Create a value transform instance from its enum class.
+ * @brief Parse a basic-function name into a runtime identifier.
  */
-std::shared_ptr<ValueTransform> make_value_transform(ValueTransformClass cls, double a = 1.0, double b = 1.0);
+BasicFunctionId parse_basic_function_id(const std::string& name);
+/**
+ * @brief Create a runtime basic function from a plain name and dimension.
+ *
+ * The returned object owns the selected primitive function instance.
+ */
+std::shared_ptr<BasicF> make_basic_function(const std::string& name, int dimension);
+/**
+ * @brief Build a domain object from a plain function specification.
+ *
+ * Missing bounds fall back to the default `[-100, 100]` interval per axis.
+ */
+Domain make_domain(const FunctionSpec& spec);
+/**
+ * @brief Parse string parameters into a key-value map.
+ *
+ * Strings without `=` are treated as flags with an empty value.
+ */
+std::map<std::string, std::string> parse_parameters(const std::vector<std::string>& parameters);
+/**
+ * @brief Create a runtime coordinate transform from a plain transform spec.
+ *
+ * The spec must provide the full ambient dimension, source point, target
+ * point, and any family-specific indices or parameters.
+ */
+std::shared_ptr<CoordinateTransform> make_coordinate_transform(const TransformSpec& spec);
+/**
+ * @brief Create a runtime value transform from a plain value-transform spec.
+ *
+ * The spec selects the family and supplies its scalar parameters.
+ */
+std::shared_ptr<ValueTransform> make_value_transform(const ValueTransformSpec& spec);
+/**
+ * @brief Create a runtime composition rule from a plain composition spec.
+ *
+ * The component count is used to validate or fill in family defaults.
+ */
+std::shared_ptr<CompositionFunction> make_composition(const CompositionSpec& spec, std::size_t component_count);
 /**
  * @brief Create a weighted-sum composition with uniform weights.
  */

@@ -1,25 +1,168 @@
 #include "builder.h"
+#include "basicf.h"
 #include "support.h"
 
+#include <map>
+#include <cctype>
 #include <stdexcept>
 #include <utility>
 
 namespace FuncCraft {
 using namespace detail;
 
-std::shared_ptr<ValueTransform> make_value_transform(ValueTransformClass cls, double a, double b) {
-    switch (cls) {
-    case ValueTransformClass::None:
-        return std::make_shared<IdentityValueTransform>();
-    case ValueTransformClass::CosineZero:
-        return std::make_shared<CosineZeroValueTransform>(a);
-    case ValueTransformClass::Oscillatory:
-        return std::make_shared<OscillatoryValueTransform>(a, b);
-    case ValueTransformClass::Power:
-        return std::make_shared<PowerValueTransform>(a, b);
-    default:
-        throw std::invalid_argument("unknown value transform class");
+namespace {
+
+std::string normalize_token(std::string value) {
+    std::string normalized;
+    normalized.reserve(value.size());
+    for (unsigned char ch : value) {
+        if (ch == '_' || ch == '-' || std::isspace(ch)) {
+            continue;
+        }
+        normalized.push_back(static_cast<char>(std::tolower(ch)));
     }
+    return normalized;
+}
+
+} // namespace
+
+BasicFunctionId parse_basic_function_id(const std::string& name) {
+    const std::string normalized = normalize_token(name);
+    for (BasicFunctionId id : list_basic_functions()) {
+        if (normalize_token(to_string(id)) == normalized) {
+            return id;
+        }
+    }
+    throw std::invalid_argument("unknown basic function name: " + name);
+}
+
+std::shared_ptr<BasicF> make_basic_function(const std::string& name, int dimension) {
+    return make_basicf_ptr(parse_basic_function_id(name), dimension);
+}
+
+std::map<std::string, std::string> parse_parameters(const std::vector<std::string>& parameters) {
+    std::map<std::string, std::string> result;
+    for (const std::string& entry : parameters) {
+        const std::size_t pos = entry.find('=');
+        if (pos == std::string::npos) {
+            result[entry] = "";
+        } else {
+            result[entry.substr(0, pos)] = entry.substr(pos + 1);
+        }
+    }
+    return result;
+}
+
+Domain make_domain(const FunctionSpec& spec) {
+    require(spec.dimension > 0, "function dimension must be positive");
+
+    Domain domain(spec.dimension);
+    if (!spec.lower_bound.empty() || !spec.upper_bound.empty()) {
+        require(static_cast<int>(spec.lower_bound.size()) == spec.dimension, "lower bound dimension mismatch");
+        require(static_cast<int>(spec.upper_bound.size()) == spec.dimension, "upper bound dimension mismatch");
+        domain.lower = spec.lower_bound;
+        domain.upper = spec.upper_bound;
+    }
+    require(domain.lower.size() == domain.upper.size(), "domain bound size mismatch");
+    for (std::size_t i = 0; i < domain.lower.size(); ++i) {
+        require(domain.lower[i] <= domain.upper[i], "domain lower bound must not exceed upper bound");
+    }
+    return domain;
+}
+
+std::shared_ptr<CoordinateTransform> make_coordinate_transform(const TransformSpec& spec) {
+    const std::string kind = normalize_token(spec.kind);
+    require(spec.dimension > 0, "coordinate transform dimension must be positive");
+    require(static_cast<int>(spec.source_point.size()) == spec.dimension, "coordinate transform source point dimension mismatch");
+    require(static_cast<int>(spec.target_point.size()) == spec.dimension, "coordinate transform target point dimension mismatch");
+
+    const std::uint64_t seed = static_cast<std::uint64_t>(static_cast<std::uint32_t>(spec.seed));
+    if (kind.empty() || kind == "identity" || kind == "none") {
+        return std::make_shared<IdentityTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
+    }
+    if (kind == "rotation" || kind == "rot") {
+        return std::make_shared<RotationTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
+    }
+    if (kind == "affine" || kind == "aff") {
+        return std::make_shared<AffineTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
+    }
+    if (kind == "blockrotation" || kind == "blockrot" || kind == "brot") {
+        require(!spec.selected_indices.empty(), "block rotation transform needs selected indices");
+        return std::make_shared<BlockRotationTransform>(
+            spec.dimension,
+            spec.selected_indices,
+            spec.source_point,
+            spec.target_point,
+            seed);
+    }
+    throw std::invalid_argument("unknown coordinate transform kind: " + spec.kind);
+}
+
+std::shared_ptr<ValueTransform> make_value_transform(const ValueTransformSpec& spec) {
+    const std::string kind = normalize_token(spec.kind);
+    if (kind.empty() || kind == "identity" || kind == "none") {
+        return std::make_shared<IdentityValueTransform>();
+    }
+    if (kind == "power") {
+        const double alpha = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double p = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        return std::make_shared<PowerValueTransform>(alpha, p);
+    }
+    if (kind == "oscillatory" || kind == "osc") {
+        const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.1;
+        const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        return std::make_shared<OscillatoryValueTransform>(epsilon, alpha);
+    }
+    if (kind == "cosinezero" || kind == "coszero") {
+        const double alpha = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        return std::make_shared<CosineZeroValueTransform>(alpha);
+    }
+    throw std::invalid_argument("unknown value transform kind: " + spec.kind);
+}
+
+std::shared_ptr<CompositionFunction> make_composition(const CompositionSpec& spec, std::size_t component_count) {
+    const std::string kind = normalize_token(spec.kind);
+    if (kind.empty() || kind == "singlecomponent" || kind == "single") {
+        require(component_count == 1, "single-component composition requires exactly one component");
+        return std::make_shared<SingleComponentComposition>();
+    }
+    if (kind == "weightedsum" || kind == "sum" || kind == "cpm") {
+        std::vector<double> weights = spec.weights.empty()
+            ? std::vector<double>(component_count, 1.0)
+            : spec.weights;
+        return std::make_shared<WeightedSumComposition>(std::move(weights));
+    }
+    if (kind == "powermean" || kind == "powermeancomposition") {
+        const double p = spec.parameters.empty() ? 2.0 : spec.parameters[0];
+        std::vector<double> weights = spec.weights.empty()
+            ? std::vector<double>(component_count, 1.0)
+            : spec.weights;
+        return std::make_shared<PowerMeanComposition>(std::move(weights), p);
+    }
+    if (kind == "levelwell" || kind == "lvlwell") {
+        const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.1;
+        const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        std::vector<double> weights = spec.weights.empty()
+            ? std::vector<double>(component_count, 1.0)
+            : spec.weights;
+        return std::make_shared<LevelWellComposition>(std::move(weights), epsilon, alpha);
+    }
+    if (kind == "deceptivesoftmax" || kind == "dpm") {
+        const double sharpness = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double local_selection_radius = spec.parameters.size() > 1 ? spec.parameters[1] : 0.0;
+        std::vector<std::vector<double>> centers = spec.centers;
+        std::vector<double> offsets = spec.offsets;
+        require(!centers.empty(), "deceptive softmax composition needs centers");
+        if (offsets.empty()) {
+            offsets.assign(centers.size(), 0.0);
+        }
+        return std::make_shared<DeceptiveSoftmaxComposition>(
+            std::move(centers),
+            std::move(offsets),
+            sharpness,
+            local_selection_radius);
+    }
+    throw std::invalid_argument("unknown composition kind: " + spec.kind);
 }
 
 std::shared_ptr<CompositionFunction> make_weighted_sum(std::size_t components) {
@@ -69,16 +212,18 @@ FunctionBuilder& FunctionBuilder::add_component(
     require(coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
     require(coordinate_transform->output_dimension() == component_dimension, "component transform output dimension mismatch");
 
-    Component component;
-    component.base = std::make_shared<BasicF>(id, component_dimension);
-    component.coordinate_transform = std::move(coordinate_transform);
-    component.value_transform = std::move(value_transform);
-    components_.push_back(std::move(component));
+    ComponentSpec component_spec;
+    component_spec.base_function = to_string(id);
+    component_spec.component_dimension = component_dimension;
+    component_spec.coordinate_transform = coordinate_transform->spec();
+    component_spec.value_transform = value_transform->spec();
+    component_spec.seed = static_cast<int>(coordinate_transform->seed());
+    component_specs_.push_back(std::move(component_spec));
 
     function_class_.base_functions.push_back(id);
-    const CoordinateTransformClass t_class = components_.back().coordinate_transform->transform_class();
-    const ValueTransformClass p_class = components_.back().value_transform->transform_class();
-    if (components_.size() == 1) {
+    const CoordinateTransformClass t_class = coordinate_transform->transform_class();
+    const ValueTransformClass p_class = value_transform->transform_class();
+    if (component_specs_.size() == 1) {
         function_class_.coordinate_transform = t_class;
         function_class_.value_transform = p_class;
     } else {
@@ -104,28 +249,80 @@ FunctionBuilder& FunctionBuilder::parameter(std::string key, std::string value) 
     return *this;
 }
 
-ComposedFunction FunctionBuilder::build() const {
-    require(!components_.empty(), "cannot build function without components");
-    std::shared_ptr<CompositionFunction> composition = composition_;
+FunctionSpec FunctionBuilder::spec() const {
+    return build_spec();
+}
+
+FunctionSpec FunctionBuilder::build_spec() const {
+    require(!component_specs_.empty(), "cannot build function without components");
+
     FunctionClass cls = function_class_;
-    if (!composition) {
-        composition = components_.size() == 1
+    const std::shared_ptr<CompositionFunction> composition = composition_
+        ? composition_
+        : (component_specs_.size() == 1
             ? std::shared_ptr<CompositionFunction>(std::make_shared<SingleComponentComposition>())
-            : make_weighted_sum(components_.size());
+            : make_weighted_sum(component_specs_.size()));
+    if (function_class_.composition == CompositionClass::None) {
         cls.composition = composition->composition_class();
     }
 
-    FunctionMetadata metadata;
-    metadata.function_class = cls;
-    metadata.dimension = domain_.dimension();
-    metadata.components = static_cast<int>(components_.size());
-    metadata.seed = seed_;
-    metadata.known_global_minimizer = x_star_;
-    metadata.known_global_value = f_star_;
-    metadata.parameters = parameters_;
-    metadata.parameters.emplace("class_label", class_label(cls));
+    FunctionSpec spec;
+    spec.dimension = domain_.dimension();
+    spec.lower_bound = domain_.lower;
+    spec.upper_bound = domain_.upper;
+    spec.seed = seed_;
+    spec.component_specs = component_specs_;
+    spec.composition_spec = composition->spec();
+    spec.function_class_label = class_label(cls);
+    spec.known_global_minimizer = x_star_;
+    spec.known_global_value = f_star_;
+    spec.parameters.reserve(parameters_.size());
+    for (const auto& [key, value] : parameters_) {
+        spec.parameters.push_back(key + "=" + value);
+    }
+    return spec;
+}
 
-    return ComposedFunction(domain_, components_, composition, std::move(metadata));
+ComposedFunction FunctionBuilder::build() const {
+    const FunctionSpec built_spec = build_spec();
+
+    struct RuntimeComponent {
+        std::shared_ptr<BasicF> basic_function;
+        std::shared_ptr<CoordinateTransform> coordinate_transform;
+        std::shared_ptr<ValueTransform> value_transform;
+    };
+
+    auto components = std::make_shared<std::vector<RuntimeComponent>>();
+    components->reserve(built_spec.component_specs.size());
+    for (const ComponentSpec& component_spec : built_spec.component_specs) {
+        components->push_back(RuntimeComponent{
+            make_basic_function(component_spec.base_function, component_spec.component_dimension),
+            make_coordinate_transform(component_spec.coordinate_transform),
+            make_value_transform(component_spec.value_transform),
+        });
+    }
+
+    std::shared_ptr<CompositionFunction> composition = make_composition(
+        built_spec.composition_spec,
+        built_spec.component_specs.size());
+    const int dimension = built_spec.dimension;
+
+    return [components, composition, dimension](const std::vector<std::vector<double>>& X) {
+        std::vector<double> values;
+        values.reserve(X.size());
+        for (const auto& x : X) {
+            require_dimension(x, dimension, "benchmark function input");
+            std::vector<double> component_values;
+            component_values.reserve(components->size());
+            for (const auto& component : *components) {
+                const auto transformed = component.coordinate_transform->apply(x);
+                const double value = (*component.basic_function)(std::vector<std::vector<double>>{transformed}).front();
+                component_values.push_back(component.value_transform->apply(value));
+            }
+            values.push_back(composition->apply(x, component_values));
+        }
+        return values;
+    };
 }
 
 } // namespace FuncCraft

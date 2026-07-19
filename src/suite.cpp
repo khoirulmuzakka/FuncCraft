@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numeric>
 #include <random>
 #include <set>
 #include <sstream>
@@ -45,50 +44,22 @@ std::vector<double> random_point_in_domain_away_from_origin(
     return x;
 }
 
-std::vector<double> select_center(const std::vector<double>& center, const std::vector<int>& indices) {
-    std::vector<double> selected;
-    selected.reserve(indices.size());
-    for (int idx : indices) {
-        selected.push_back(center[static_cast<std::size_t>(idx)]);
-    }
-    return selected;
-}
-
 std::shared_ptr<CoordinateTransform> make_suite_coordinate_transform(
     CoordinateTransformClass cls,
     int dimension,
     const std::vector<double>& x_star,
     std::mt19937_64& rng) {
+    const std::vector<double> origin(static_cast<std::size_t>(dimension), 0.0);
     switch (cls) {
     case CoordinateTransformClass::None:
-        return std::make_shared<IdentityTransform>(dimension);
+        return std::make_shared<IdentityTransform>(dimension, x_star, x_star, rng());
     case CoordinateTransformClass::Rotation:
-        return std::make_shared<RotationTransform>(random_rotation_matrix(rng, dimension), x_star);
+        return std::make_shared<RotationTransform>(dimension, x_star, origin, rng());
     case CoordinateTransformClass::Affine:
-        return std::make_shared<AffineTransform>(
-            random_affine_matrix(rng, dimension),
-            x_star,
-            std::vector<double>(static_cast<std::size_t>(dimension), 0.0));
-    case CoordinateTransformClass::NonlinearFold:
-        return std::make_shared<FoldTransform>(dimension, 0);
+        return std::make_shared<AffineTransform>(dimension, x_star, origin, rng());
     default:
         throw std::invalid_argument("unsupported suite coordinate transform");
     }
-}
-
-std::vector<std::vector<int>> random_disjoint_blocks(std::mt19937_64& rng, int dimension, int block_count) {
-    require(block_count > 0, "block count must be positive");
-    require(block_count <= dimension, "block count must not exceed dimension");
-
-    std::vector<int> indices(static_cast<std::size_t>(dimension), 0);
-    std::iota(indices.begin(), indices.end(), 0);
-    stable_shuffle(indices, rng);
-
-    std::vector<std::vector<int>> blocks(static_cast<std::size_t>(block_count));
-    for (int i = 0; i < dimension; ++i) {
-        blocks[static_cast<std::size_t>(i % block_count)].push_back(indices[static_cast<std::size_t>(i)]);
-    }
-    return blocks;
 }
 
 std::shared_ptr<ValueTransform> make_suite_value_transform(ValueTransformClass cls, std::mt19937_64& rng) {
@@ -194,7 +165,7 @@ CompositionClass random_general_composition_class(std::mt19937_64& rng) {
     return CompositionClass::CommonPointLevelWell;
 }
 
-ComposedFunction make_single_rotated_basic(
+BenchmarkFunction make_single_rotated_basic(
     BasicFunctionId id,
     const Domain& domain,
     const std::vector<double>& x_star,
@@ -213,13 +184,13 @@ ComposedFunction make_single_rotated_basic(
         .add_component(
             id,
             dimension,
-            std::make_shared<RotationTransform>(random_rotation_matrix(rng, dimension), x_star),
+            std::make_shared<RotationTransform>(dimension, x_star, std::vector<double>(static_cast<std::size_t>(dimension), 0.0), rng()),
             std::make_shared<IdentityValueTransform>())
         .composition(std::make_shared<SingleComponentComposition>());
-    return builder.build();
+    return BenchmarkFunction(builder.build_spec());
 }
 
-ComposedFunction make_single_unimodal_transform(
+BenchmarkFunction make_single_unimodal_transform(
     BasicFunctionId id,
     ValueTransformClass p,
     const Domain& domain,
@@ -238,13 +209,13 @@ ComposedFunction make_single_unimodal_transform(
         .add_component(
             id,
             dimension,
-            std::make_shared<RotationTransform>(random_rotation_matrix(rng, dimension), x_star),
+            std::make_shared<RotationTransform>(dimension, x_star, std::vector<double>(static_cast<std::size_t>(dimension), 0.0), rng()),
             make_suite_value_transform(p, rng))
         .composition(std::make_shared<SingleComponentComposition>());
-    return builder.build();
+    return BenchmarkFunction(builder.build_spec());
 }
 
-ComposedFunction make_general_suite_function(
+BenchmarkFunction make_general_suite_function(
     const std::vector<BasicFunctionId>& bases,
     CompositionClass c,
     ValueTransformClass p,
@@ -284,26 +255,12 @@ ComposedFunction make_general_suite_function(
         builder.parameter("dpm_bias_increment", std::to_string(deceptive_step));
     }
 
-    std::vector<std::vector<int>> blocks;
-    if (t == CoordinateTransformClass::Block) {
-        blocks = random_disjoint_blocks(rng, dimension, static_cast<int>(bases.size()));
-    }
-
     for (std::size_t i = 0; i < bases.size(); ++i) {
         const BasicFunctionId id = bases[i];
-        std::shared_ptr<CoordinateTransform> coordinate_transform;
-        int component_dimension = dimension;
-        if (t == CoordinateTransformClass::Block) {
-            coordinate_transform = std::make_shared<SubspaceTransform>(dimension, blocks[i], select_center(prescribed_centers[i], blocks[i]));
-            component_dimension = static_cast<int>(blocks[i].size());
-        } else {
-            coordinate_transform = make_suite_coordinate_transform(t, dimension, prescribed_centers[i], rng);
-        }
-
         builder.add_component(
             id,
-            component_dimension,
-            coordinate_transform,
+            dimension,
+            make_suite_coordinate_transform(t, dimension, prescribed_centers[i], rng),
             make_suite_value_transform(p, rng));
     }
     builder.composition(make_suite_composition(
@@ -313,7 +270,7 @@ ComposedFunction make_general_suite_function(
         prescribed_centers,
         prescribed_offsets,
         rng));
-    return builder.build();
+    return BenchmarkFunction(builder.build_spec());
 }
 
 } // namespace
@@ -379,14 +336,14 @@ BenchmarkSuite::BenchmarkSuite(BenchmarkSuiteOptions options)
         ValueTransformClass::Power,
     };
     const std::vector<CoordinateTransformClass> coordinate_transforms = {
+        CoordinateTransformClass::None,
         CoordinateTransformClass::Rotation,
-        CoordinateTransformClass::Block,
         CoordinateTransformClass::Affine,
     };
 
     std::set<std::string> used;
     for (const auto& f : functions_) {
-        used.insert(class_label(f.metadata().function_class) + "|mandatory|" + std::to_string(slot));
+        used.insert(f.spec().function_class_label + "|mandatory|" + std::to_string(slot));
     }
 
     std::mt19937_64 rng(mix_seed(options_.seed ^ 0x4f1bbcdd3a2d1f7bull));
@@ -427,7 +384,7 @@ int BenchmarkSuite::size() const {
     return static_cast<int>(functions_.size());
 }
 
-const ComposedFunction& BenchmarkSuite::function(int index) const {
+const BenchmarkFunction& BenchmarkSuite::function(int index) const {
     require(index >= 0 && index < size(), "benchmark function index out of range");
     return functions_[static_cast<std::size_t>(index)];
 }
@@ -440,7 +397,7 @@ const BenchmarkSuiteOptions& BenchmarkSuite::options() const {
     return options_;
 }
 
-const std::vector<ComposedFunction>& BenchmarkSuite::functions() const {
+const std::vector<BenchmarkFunction>& BenchmarkSuite::functions() const {
     return functions_;
 }
 

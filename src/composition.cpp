@@ -10,7 +10,25 @@
 namespace FuncCraft {
 using namespace detail;
 
-double SingleComponentComposition::apply(const std::vector<double>&, const std::vector<double>& z) const {
+double CompositionFunction::apply(const std::vector<double>& x, const std::vector<double>& z) const {
+    require(!z.empty(), "composition requires at least one component");
+    require(!x.empty(), "composition point must not be empty");
+    return raw_apply(x, z);
+}
+
+double CommonPointComposition::raw_apply(const std::vector<double>& x, const std::vector<double>& z) const {
+    (void)x;
+    require(!z.empty(), "common-point composition requires at least one component");
+    return common_raw_apply(z);
+}
+
+double DeceptivePointComposition::raw_apply(const std::vector<double>& x, const std::vector<double>& z) const {
+    require(!z.empty(), "deceptive composition requires at least one component");
+    require(!x.empty(), "deceptive composition point must not be empty");
+    return deceptive_raw_apply(x, z);
+}
+
+double SingleComponentComposition::common_raw_apply(const std::vector<double>& z) const {
     require(z.size() == 1, "single-component composition requires exactly one component");
     return z.front();
 }
@@ -19,17 +37,35 @@ CompositionClass SingleComponentComposition::composition_class() const {
     return CompositionClass::None;
 }
 
+CompositionSpec SingleComponentComposition::spec() const {
+    CompositionSpec spec;
+    spec.kind = "single_component";
+    return spec;
+}
+
 WeightedSumComposition::WeightedSumComposition(std::vector<double> weights)
     : weights_(std::move(weights)) {
     require(!weights_.empty(), "weighted sum needs at least one weight");
 }
 
-double WeightedSumComposition::apply(const std::vector<double>&, const std::vector<double>& z) const {
+WeightedSumComposition::WeightedSumComposition(std::size_t components)
+    : weights_(components, 1.0) {
+    require(components > 0, "weighted sum needs at least one component");
+}
+
+double WeightedSumComposition::common_raw_apply(const std::vector<double>& z) const {
     return weighted_sum(weights_, z);
 }
 
 CompositionClass WeightedSumComposition::composition_class() const {
     return CompositionClass::CommonPointWeightedSum;
+}
+
+CompositionSpec WeightedSumComposition::spec() const {
+    CompositionSpec spec;
+    spec.kind = "weighted_sum";
+    spec.weights = weights_;
+    return spec;
 }
 
 PowerMeanComposition::PowerMeanComposition(std::vector<double> weights, double p)
@@ -39,7 +75,14 @@ PowerMeanComposition::PowerMeanComposition(std::vector<double> weights, double p
     require(p > 0.0, "power mean exponent must be positive");
 }
 
-double PowerMeanComposition::apply(const std::vector<double>&, const std::vector<double>& z) const {
+PowerMeanComposition::PowerMeanComposition(std::size_t components, double p)
+    : weights_(components, 1.0),
+      p_(p) {
+    require(components > 0, "power mean needs at least one component");
+    require(p > 0.0, "power mean exponent must be positive");
+}
+
+double PowerMeanComposition::common_raw_apply(const std::vector<double>& z) const {
     require(weights_.size() == z.size(), "weight/component size mismatch");
     double sum = 0.0;
     for (std::size_t i = 0; i < z.size(); ++i) {
@@ -54,6 +97,14 @@ CompositionClass PowerMeanComposition::composition_class() const {
     return CompositionClass::CommonPointPowerMean;
 }
 
+CompositionSpec PowerMeanComposition::spec() const {
+    CompositionSpec spec;
+    spec.kind = "power_mean";
+    spec.weights = weights_;
+    spec.parameters = {p_};
+    return spec;
+}
+
 LevelWellComposition::LevelWellComposition(std::vector<double> weights, double epsilon, double alpha)
     : weights_(std::move(weights)),
       epsilon_(epsilon),
@@ -63,13 +114,30 @@ LevelWellComposition::LevelWellComposition(std::vector<double> weights, double e
     require(alpha >= 0.0, "level-well alpha must be nonnegative");
 }
 
-double LevelWellComposition::apply(const std::vector<double>&, const std::vector<double>& z) const {
+LevelWellComposition::LevelWellComposition(std::size_t components, double epsilon, double alpha)
+    : weights_(components, 1.0),
+      epsilon_(epsilon),
+      alpha_(alpha) {
+    require(components > 0, "level well needs at least one component");
+    require(epsilon >= 0.0 && epsilon < 1.0, "level-well epsilon must be in [0, 1)");
+    require(alpha >= 0.0, "level-well alpha must be nonnegative");
+}
+
+double LevelWellComposition::common_raw_apply(const std::vector<double>& z) const {
     const double s = weighted_sum(weights_, z);
     return s * (1.0 + epsilon_ * std::sin(alpha_ * s));
 }
 
 CompositionClass LevelWellComposition::composition_class() const {
     return CompositionClass::CommonPointLevelWell;
+}
+
+CompositionSpec LevelWellComposition::spec() const {
+    CompositionSpec spec;
+    spec.kind = "level_well";
+    spec.weights = weights_;
+    spec.parameters = {epsilon_, alpha_};
+    return spec;
 }
 
 DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
@@ -98,7 +166,17 @@ DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
     local_selection_radius_ = local_selection_radius;
 }
 
-double DeceptiveSoftmaxComposition::apply(const std::vector<double>& x, const std::vector<double>& z) const {
+DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
+    std::vector<std::vector<double>> centers,
+    double sharpness,
+    double local_selection_radius)
+    : DeceptiveSoftmaxComposition(
+          std::move(centers),
+          std::vector<double>(centers.size(), 0.0),
+          sharpness,
+          local_selection_radius) {}
+
+double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const {
     require(z.size() == centers_.size(), "deceptive component size mismatch");
     require(x.size() == centers_.front().size(), "deceptive point dimension mismatch");
 
@@ -132,63 +210,13 @@ CompositionClass DeceptiveSoftmaxComposition::composition_class() const {
     return CompositionClass::DeceptivePointSoftmax;
 }
 
-ComposedFunction::ComposedFunction(
-    Domain domain,
-    std::vector<Component> components,
-    std::shared_ptr<CompositionFunction> composition,
-    FunctionMetadata metadata)
-    : domain_(std::move(domain)),
-      components_(std::move(components)),
-      composition_(std::move(composition)),
-      metadata_(std::move(metadata)) {
-    require(domain_.dimension() > 0, "composed function domain must have positive dimension");
-    require(!components_.empty(), "composed function needs at least one component");
-    require(static_cast<bool>(composition_), "composed function needs a composition");
-    for (const auto& component : components_) {
-        require(static_cast<bool>(component.base), "component base function is null");
-        require(static_cast<bool>(component.coordinate_transform), "component coordinate transform is null");
-        require(static_cast<bool>(component.value_transform), "component value transform is null");
-        require(component.coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
-        require(component.coordinate_transform->output_dimension() == component.base->dimension, "component transform output dimension mismatch");
-    }
-}
-
-double ComposedFunction::evaluate_single(const std::vector<double>& x) const {
-    require_dimension(x, domain_.dimension(), "composed function input");
-    return metadata_.known_global_value + composition_->apply(x, component_values(x));
-}
-
-std::vector<double> ComposedFunction::component_values(const std::vector<double>& x) const {
-    require_dimension(x, domain_.dimension(), "composed function input");
-    std::vector<double> z;
-    z.reserve(components_.size());
-    for (const auto& component : components_) {
-        const std::vector<double> y = component.coordinate_transform->apply(x);
-        const double u = (*component.base)(std::vector<std::vector<double>>{y}).front();
-        z.push_back(component.value_transform->apply(u));
-    }
-    return z;
-}
-
-std::vector<double> ComposedFunction::operator()(const std::vector<std::vector<double>>& X) const {
-    std::vector<double> values;
-    values.reserve(X.size());
-    for (const auto& x : X) {
-        values.push_back(evaluate_single(x));
-    }
-    return values;
-}
-
-const FunctionMetadata& ComposedFunction::metadata() const {
-    return metadata_;
-}
-
-const Domain& ComposedFunction::domain() const {
-    return domain_;
-}
-
-int ComposedFunction::dimension() const {
-    return domain_.dimension();
+CompositionSpec DeceptiveSoftmaxComposition::spec() const {
+    CompositionSpec spec;
+    spec.kind = "deceptive_softmax";
+    spec.centers = centers_;
+    spec.offsets = offsets_;
+    spec.parameters = {sharpness_, local_selection_radius_};
+    return spec;
 }
 
 } // namespace FuncCraft

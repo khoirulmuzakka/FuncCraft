@@ -71,12 +71,10 @@ std::string to_string(CoordinateTransformClass cls) {
         return "NONE";
     case CoordinateTransformClass::Rotation:
         return "ROT";
-    case CoordinateTransformClass::Block:
-        return "BLOCK";
     case CoordinateTransformClass::Affine:
         return "AFF";
-    case CoordinateTransformClass::NonlinearFold:
-        return "FOLD";
+    case CoordinateTransformClass::BlockRotation:
+        return "BROT";
     case CoordinateTransformClass::Mixed:
         return "MIXED";
     default:
