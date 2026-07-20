@@ -15,6 +15,7 @@
 #include "benchmark_function.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -238,7 +239,7 @@ public:
     /**
      * @brief Build one generated function lazily for the suite dimension.
      */
-    BenchmarkFunction function(int index) const;
+    const BenchmarkFunction& function(int index) const;
     /**
      * @brief Batch-evaluate one generated function at multiple points.
      */
@@ -269,6 +270,7 @@ private:
     std::uint64_t theoretical_max_number_of_functions_ = 0;
     std::vector<FunctionBlueprint> blueprints_;
     std::vector<int> supported_dimensions_;
+    mutable std::vector<std::optional<BenchmarkFunction>> function_cache_;
 };
 
 /**

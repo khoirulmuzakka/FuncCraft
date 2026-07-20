@@ -174,7 +174,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_property_readonly("theoretical_max_number_of_functions", &FuncCraft::BenchmarkSuite::theoretical_max_number_of_functions)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkSuite::dimension)
         .def("__len__", &FuncCraft::BenchmarkSuite::size)
-        .def("function", &FuncCraft::BenchmarkSuite::function, py::arg("index"))
+        .def("function", &FuncCraft::BenchmarkSuite::function, py::arg("index"), py::return_value_policy::reference_internal)
         .def("evaluate", [](const FuncCraft::BenchmarkSuite& self, int index, const std::vector<std::vector<double>>& X) {
             return self(index, X);
         }, py::arg("index"), py::arg("points"))

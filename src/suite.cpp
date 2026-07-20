@@ -585,6 +585,7 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
     }
 
     spec_.max_number_of_functions = static_cast<int>(blueprints_.size());
+    function_cache_.resize(blueprints_.size());
     std::cout << "BenchmarkSuite generated. Requested functions: " << requested_count
               << ", theoretical max functions: " << theoretical_max_number_of_functions_
               << ", generated functions: " << max_number_of_functions()
@@ -713,9 +714,13 @@ int BenchmarkSuite::dimension() const {
     return dimension_;
 }
 
-BenchmarkFunction BenchmarkSuite::function(int index) const {
+const BenchmarkFunction& BenchmarkSuite::function(int index) const {
     require(index >= 0 && index < size(), "benchmark function index out of range");
-    return build_function(blueprints_[static_cast<std::size_t>(index)]);
+    const std::size_t pos = static_cast<std::size_t>(index);
+    if (!function_cache_[pos].has_value()) {
+        function_cache_[pos].emplace(build_function(blueprints_[pos]));
+    }
+    return *function_cache_[pos];
 }
 
 std::vector<double> BenchmarkSuite::operator()(int index, const std::vector<std::vector<double>>& X) const {

@@ -40,8 +40,12 @@ class BenchmarkFunction:
     """
 
     def __init__(self, spec):
-        self._function = _funccraft.BenchmarkFunction(_as_native_function_spec(spec))
-        self._spec = FunctionSpec.from_cpp(self._function.spec)
+        if isinstance(spec, _funccraft.BenchmarkFunction):
+            self._function = spec
+            self._spec = FunctionSpec.from_cpp(self._function.spec)
+        else:
+            self._function = _funccraft.BenchmarkFunction(_as_native_function_spec(spec))
+            self._spec = FunctionSpec.from_cpp(self._function.spec)
 
     @property
     def domain(self):

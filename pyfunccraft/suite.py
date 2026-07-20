@@ -77,7 +77,7 @@ class BenchmarkSuite:
         This returns a Python :class:`BenchmarkFunction` wrapper built from the
         function's normalized spec.
         """
-        return BenchmarkFunction(self._suite.function(index).spec)
+        return BenchmarkFunction(self._suite.function(index))
 
     def evaluate(self, index, points):
         """Evaluate one generated function on a batch of candidate points."""
