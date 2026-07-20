@@ -43,7 +43,6 @@ CheckConfig parse_cli(int argc, char* argv[]) {
 FuncCraft::SuiteSpec make_spec(const CheckConfig& config) {
     FuncCraft::SuiteSpec spec;
     spec.supported_dimensions = std::to_string(config.dimension);
-    spec.max_dimension = config.dimension;
     spec.requested_number_of_functions = config.max_functions;
     spec.master_seed = config.seed;
     spec.f_opt = config.f_opt;

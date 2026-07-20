@@ -44,7 +44,7 @@ std::vector<int> unique_sorted(std::vector<int> values) {
     return values;
 }
 
-std::vector<int> parse_dimension_values(const std::string& expr, int max_dimension) {
+std::vector<int> parse_dimension_values(const std::string& expr, int ambient_dimension) {
     std::string cleaned = trim(expr);
     while (!cleaned.empty() && (cleaned.front() == '[' || cleaned.front() == '(' || cleaned.front() == '{')) {
         cleaned.erase(cleaned.begin());
@@ -54,12 +54,12 @@ std::vector<int> parse_dimension_values(const std::string& expr, int max_dimensi
     }
     cleaned = trim(cleaned);
     const std::string normalized = normalize_token(cleaned);
-    require(max_dimension > 0, "max_dimension must be positive");
+    require(ambient_dimension > 0, "ambient dimension must be positive");
 
     if (normalized.empty() || normalized == "any" || normalized == "all") {
         std::vector<int> values;
-        values.reserve(static_cast<std::size_t>(max_dimension));
-        for (int d = 1; d <= max_dimension; ++d) {
+        values.reserve(static_cast<std::size_t>(ambient_dimension));
+        for (int d = 1; d <= ambient_dimension; ++d) {
             values.push_back(d);
         }
         return values;
@@ -88,9 +88,9 @@ std::vector<int> parse_dimension_values(const std::string& expr, int max_dimensi
         const bool inclusive = gt_pos + 1 < cleaned.size() && cleaned[gt_pos + 1] == '=';
         const int lower = std::stoi(trim(cleaned.substr(gt_pos + (inclusive ? 2 : 1))));
         const int start = inclusive ? lower : lower + 1;
-        require(start <= max_dimension, "supported dimension lower bound exceeds max_dimension");
+        require(start <= ambient_dimension, "supported dimension lower bound exceeds ambient dimension");
         std::vector<int> values;
-        for (int d = start; d <= max_dimension; ++d) {
+        for (int d = start; d <= ambient_dimension; ++d) {
             values.push_back(d);
         }
         return values;
@@ -102,7 +102,7 @@ std::vector<int> parse_dimension_values(const std::string& expr, int max_dimensi
         const int upper = std::stoi(trim(cleaned.substr(dash_pos + 1)));
         require(lower > 0, "supported dimension lower bound must be positive");
         require(upper >= lower, "supported dimension range must be increasing");
-        require(upper <= max_dimension, "supported dimension upper bound exceeds max_dimension");
+        require(upper <= ambient_dimension, "supported dimension upper bound exceeds ambient dimension");
         std::vector<int> values;
         for (int d = lower; d <= upper; ++d) {
             values.push_back(d);
@@ -115,8 +115,8 @@ std::vector<int> parse_dimension_values(const std::string& expr, int max_dimensi
     return {single};
 }
 
-std::vector<int> normalize_dimensions(const SuiteSpec& spec) {
-    std::vector<int> values = parse_dimension_values(spec.supported_dimensions, spec.max_dimension);
+std::vector<int> normalize_dimensions(const SuiteSpec& spec, int ambient_dimension) {
+    std::vector<int> values = parse_dimension_values(spec.supported_dimensions, ambient_dimension);
     values = unique_sorted(std::move(values));
     require(!values.empty(), "suite must support at least one dimension");
     return values;
@@ -219,6 +219,18 @@ std::vector<double> random_point_in_domain(std::mt19937_64& rng, const Domain& d
     for (int i = 0; i < domain.dimension(); ++i) {
         const auto idx = static_cast<std::size_t>(i);
         x[idx] = domain.lower[idx] + (domain.upper[idx] - domain.lower[idx]) * uniform01(rng);
+    }
+    return x;
+}
+
+std::vector<double> random_point_in_shrunk_domain(std::mt19937_64& rng, const Domain& domain, double factor = 0.7) {
+    require(factor > 0.0 && factor <= 1.0, "shrink factor must be in (0, 1]");
+    std::vector<double> x(static_cast<std::size_t>(domain.dimension()), 0.0);
+    for (int i = 0; i < domain.dimension(); ++i) {
+        const auto idx = static_cast<std::size_t>(i);
+        const double lower = domain.lower[idx] * factor;
+        const double upper = domain.upper[idx] * factor;
+        x[idx] = lower + (upper - lower) * uniform01(rng);
     }
     return x;
 }
@@ -478,7 +490,7 @@ std::uint64_t permutation_count(int n, int k) {
 BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
     : spec_(std::move(spec)),
       dimension_(dimension),
-      supported_dimensions_(normalize_dimensions(spec_)) {
+      supported_dimensions_(normalize_dimensions(spec_, dimension_)) {
     require(dimension_ > 0, "suite dimension must be positive");
     require(supports_dimension(dimension_), "suite dimension is not supported by the suite spec");
 
@@ -596,7 +608,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
     std::mt19937_64 rng(mix_seed(blueprint.seed ^ static_cast<std::uint64_t>(dimension_)));
 
     if (!blueprint.composed) {
-        const auto x_star = random_point_in_domain(rng, domain);
+        const auto x_star = random_point_in_shrunk_domain(rng, domain, 0.7);
         builder.known_global_minimizer(x_star);
         builder.parameter("suite_role", "base");
 
@@ -623,8 +635,8 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
     const auto x_star = (normalize_token(blueprint.composition_choice.kind) == "dpmsoftmax"
         || normalize_token(blueprint.composition_choice.kind) == "dpm"
         || normalize_token(blueprint.composition_choice.kind) == "softmax")
-        ? random_point_in_domain_away_from_origin(rng, domain, 5.0)
-        : random_point_in_domain(rng, domain);
+        ? random_point_in_domain_away_from_origin(rng, Domain(dimension_, spec_.lower_bound * 0.7, spec_.upper_bound * 0.7), 5.0)
+        : random_point_in_shrunk_domain(rng, domain, 0.7);
 
     std::vector<std::vector<double>> centers(static_cast<std::size_t>(blueprint.component_count), x_star);
     std::vector<double> offsets(static_cast<std::size_t>(blueprint.component_count), 0.0);
@@ -644,7 +656,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         || normalize_token(blueprint.composition_choice.kind) == "softmax") {
         const double deceptive_step = 10.0 + 0.1 * spec_.f_opt;
         for (int i = 1; i < blueprint.component_count; ++i) {
-            centers[static_cast<std::size_t>(i)] = random_point_in_domain(rng, domain);
+            centers[static_cast<std::size_t>(i)] = random_point_in_shrunk_domain(rng, domain, 0.7);
             offsets[static_cast<std::size_t>(i)] = deceptive_step * static_cast<double>(i);
         }
     }

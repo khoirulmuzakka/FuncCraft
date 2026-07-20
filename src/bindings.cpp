@@ -21,8 +21,6 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("AttractiveSector", FuncCraft::BasicFunctionId::AttractiveSector)
         .value("StepEllipsoidal", FuncCraft::BasicFunctionId::StepEllipsoidal)
         .value("StepRastrigin", FuncCraft::BasicFunctionId::StepRastrigin)
-        .value("BentCigar", FuncCraft::BasicFunctionId::BentCigar)
-        .value("Discus", FuncCraft::BasicFunctionId::Discus)
         .value("Rosenbrock", FuncCraft::BasicFunctionId::Rosenbrock)
         .value("Ackley", FuncCraft::BasicFunctionId::Ackley)
         .value("Rastrigin", FuncCraft::BasicFunctionId::Rastrigin)
@@ -32,10 +30,8 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("DifferentPowers", FuncCraft::BasicFunctionId::DifferentPowers)
         .value("Weierstrass", FuncCraft::BasicFunctionId::Weierstrass)
         .value("SchafferF7", FuncCraft::BasicFunctionId::SchafferF7)
-        .value("SchafferF7Cond10", FuncCraft::BasicFunctionId::SchafferF7Cond10)
         .value("SchafferF7Cond1000", FuncCraft::BasicFunctionId::SchafferF7Cond1000)
         .value("GriewankRosenbrock", FuncCraft::BasicFunctionId::GriewankRosenbrock)
-        .value("Gallagher101", FuncCraft::BasicFunctionId::Gallagher101)
         .value("Gallagher21", FuncCraft::BasicFunctionId::Gallagher21)
         .value("Katsuura", FuncCraft::BasicFunctionId::Katsuura)
         .value("LunacekBiRastrigin", FuncCraft::BasicFunctionId::LunacekBiRastrigin)
@@ -52,12 +48,10 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readonly("dimension", &FuncCraft::BasicF::dimension)
         .def_readonly("x_opt", &FuncCraft::BasicF::x_opt)
         .def_readonly("f_opt", &FuncCraft::BasicF::f_opt)
-        .def_readonly("lambda", &FuncCraft::BasicF::lambda)
         .def_readonly("properties", &FuncCraft::BasicF::properties)
         .def("__repr__", [](const FuncCraft::BasicF& self) {
             return "BasicF(name='" + self.name
-                + "', dimension=" + std::to_string(self.dimension)
-                + ", lambda=" + std::to_string(self.lambda) + ")";
+                + "', dimension=" + std::to_string(self.dimension) + ")";
         });
 
     py::class_<FuncCraft::Domain>(m, "Domain")
@@ -141,7 +135,6 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("base_functions_for_compositions", &FuncCraft::SuiteSpec::base_functions_for_compositions)
         .def_readwrite("requested_number_of_functions", &FuncCraft::SuiteSpec::requested_number_of_functions)
         .def_readwrite("max_number_of_functions", &FuncCraft::SuiteSpec::max_number_of_functions)
-        .def_readwrite("max_dimension", &FuncCraft::SuiteSpec::max_dimension)
         .def_readwrite("master_seed", &FuncCraft::SuiteSpec::master_seed)
         .def_readwrite("lower_bound", &FuncCraft::SuiteSpec::lower_bound)
         .def_readwrite("upper_bound", &FuncCraft::SuiteSpec::upper_bound)
@@ -151,7 +144,6 @@ PYBIND11_MODULE(_funccraft, m) {
             return "SuiteSpec(supported_dimensions='" + self.supported_dimensions
                 + "', max_number_of_functions=" + std::to_string(self.max_number_of_functions)
                 + ", requested_number_of_functions=" + std::to_string(self.requested_number_of_functions)
-                + ", max_dimension=" + std::to_string(self.max_dimension)
                 + ", master_seed=" + std::to_string(self.master_seed)
                 + ", lower_bound=" + std::to_string(self.lower_bound)
                 + ", upper_bound=" + std::to_string(self.upper_bound)
@@ -166,10 +158,13 @@ PYBIND11_MODULE(_funccraft, m) {
         }, py::arg("points"))
         .def_property_readonly("domain", &FuncCraft::BenchmarkFunction::domain, py::return_value_policy::reference_internal)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkFunction::dimension)
+        .def_property_readonly("lambda", &FuncCraft::BenchmarkFunction::lambda)
+        .def_property_readonly("scale", &FuncCraft::BenchmarkFunction::lambda)
         .def_property_readonly("spec", &FuncCraft::BenchmarkFunction::spec, py::return_value_policy::reference_internal)
         .def("__repr__", [](const FuncCraft::BenchmarkFunction& self) {
             return "BenchmarkFunction(dimension=" + std::to_string(self.dimension())
-                + ", label='" + self.spec().function_class_label + "')";
+                + ", label='" + self.spec().function_class_label
+                + "', lambda=" + std::to_string(self.lambda()) + ")";
         });
 
     py::class_<FuncCraft::BenchmarkSuite>(m, "BenchmarkSuite")

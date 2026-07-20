@@ -34,10 +34,6 @@ enum class BasicFunctionId {
     StepEllipsoidal,
     /// Step Rastrigin function.
     StepRastrigin,
-    /// Bent cigar function.
-    BentCigar,
-    /// Discus function.
-    Discus,
     /// Rosenbrock function.
     Rosenbrock,
     /// Ackley function.
@@ -56,14 +52,10 @@ enum class BasicFunctionId {
     Weierstrass,
     /// Schaffer F7 function.
     SchafferF7,
-    /// Schaffer F7 conditioned on 10.
-    SchafferF7Cond10,
     /// Schaffer F7 conditioned on 1000.
     SchafferF7Cond1000,
     /// Griewank-Rosenbrock function.
     GriewankRosenbrock,
-    /// Gallagher 101 peaks function.
-    Gallagher101,
     /// Gallagher 21 peaks function.
     Gallagher21,
     /// Katsuura function.
@@ -84,7 +76,6 @@ enum class BasicFunctionId {
  * - `dimension` is the requested problem dimension;
  * - `x_opt` stores the global optimum of the implemented primitive;
  * - `f_opt` stores the primitive minimum value;
- * - `lambda` stores the natural scale assigned to that primitive;
  * - `properties` is a human-readable summary of the landscape.
  *
  * For CEC-derived primitives, the implementation follows the unshifted CEC base
@@ -116,7 +107,6 @@ public:
     int dimension = 0;
     std::vector<double> x_opt;
     double f_opt = 0.0;
-    double lambda = 1.0;
     std::string properties;
 
 private:

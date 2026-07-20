@@ -110,12 +110,12 @@ struct SuiteSpec {
     /**
      * @brief Mandatory base-function inventory.
      *
-     * Empty means "use all currently implemented base functions".
+     * Empty means "use all currently registered base functions".
      */
     std::vector<int> base_functions = {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-        10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-        20, 21, 22, 23, 24, 25, 26, 27,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        8, 9, 10, 11, 12, 13, 14, 15,
+        16, 17, 18, 19, 20, 21, 22, 23,
     };
     /**
      * @brief Sampling policy for coordinate transforms used by mandatory base functions.
@@ -155,10 +155,13 @@ struct SuiteSpec {
      * @brief Base functions that may be reused when generating composed functions.
      *
      * Empty means "reuse the mandatory base-function inventory".
+     *
+     * The default pool is curated to avoid near-duplicate landscapes while
+     * still covering the main families, including Gallagher.
      */
     std::vector<int> base_functions_for_compositions = {
-        0, 1,
-        3, 7, 11, 12, 13, 14, 17, 18,
+        0, 2, 4, 8, 9, 10, 11, 12,
+        15, 16, 19, 20, 21, 22, 23,
     };
     /**
      * @brief Requested number of functions to generate.
@@ -174,10 +177,6 @@ struct SuiteSpec {
      * This field is populated by the suite constructor after generation.
      */
     int max_number_of_functions = 0;
-    /**
-     * @brief Maximum dimension accepted by `supported_dimensions`.
-     */
-    int max_dimension = 1000;
     /**
      * @brief Master seed used to derive all other random seeds in the suite.
      */

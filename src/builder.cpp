@@ -308,10 +308,9 @@ ComposedFunction FunctionBuilder::build() const {
         built_spec.composition_spec,
         built_spec.component_specs.size());
     const int dimension = built_spec.dimension;
-    const double bias = built_spec.known_global_value;
     const double penalty = std::numeric_limits<double>::infinity();
 
-    return [components, composition, dimension, bias, penalty](const std::vector<std::vector<double>>& X) {
+    return [components, composition, dimension, penalty](const std::vector<std::vector<double>>& X) {
         std::vector<double> values;
         values.reserve(X.size());
         for (const auto& x : X) {
@@ -326,8 +325,7 @@ ComposedFunction FunctionBuilder::build() const {
                     invalid = true;
                     break;
                 }
-                const double scaled_value = component.basic_function->lambda * raw_value;
-                const double transformed_value = component.value_transform->apply(scaled_value);
+                const double transformed_value = component.value_transform->apply(raw_value);
                 if (!std::isfinite(transformed_value)) {
                     invalid = true;
                     break;
@@ -343,7 +341,7 @@ ComposedFunction FunctionBuilder::build() const {
                 values.push_back(penalty);
                 continue;
             }
-            values.push_back(bias + composed);
+            values.push_back(composed);
         }
         return values;
     };

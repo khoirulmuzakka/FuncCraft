@@ -345,20 +345,20 @@ double katsuura_eval(const double* x, int dimension) {
 }
 
 double lunacek_bi_rastrigin_eval(const double* x, int dimension) {
-    constexpr double mu1 = 2.5;
+    constexpr double mu0 = 2.5;
     constexpr double d = 1.0;
     const double s = 1.0 - 0.5 / (std::sqrt(static_cast<double>(dimension) + 20.0) - 4.1);
-    const double mu2 = -std::sqrt((mu1 * mu1 - d) / s);
+    const double mu1 = -std::sqrt((mu0 * mu0 - d) / s);
 
     double sum1 = 0.0;
     double sum2 = 0.0;
     double rastrigin = 0.0;
     for (int i = 0; i < dimension; ++i) {
-        const double z = 0.2 * x[i];
-        const double shifted = z + mu1;
-        sum1 += sqr(shifted - mu1);
-        sum2 += sqr(shifted - mu2);
-        rastrigin += 10.0 * (1.0 - std::cos(2.0 * kPi * z));
+        const double y = 0.1 * x[i];
+        const double z = 2.0 * y;
+        sum1 += sqr(z);
+        sum2 += sqr(z + mu0 - mu1);
+        rastrigin += 10.0 * (1.0 - std::cos(2.0 * kPi * y));
     }
     return std::min(sum1, d * static_cast<double>(dimension) + s * sum2) + rastrigin;
 }
@@ -407,10 +407,8 @@ bool basic_is_multimodal(BasicFunctionId id) {
     case BasicFunctionId::Schwefel:
     case BasicFunctionId::SchafferF7:
     case BasicFunctionId::Weierstrass:
-    case BasicFunctionId::SchafferF7Cond10:
     case BasicFunctionId::SchafferF7Cond1000:
     case BasicFunctionId::GriewankRosenbrock:
-    case BasicFunctionId::Gallagher101:
     case BasicFunctionId::Gallagher21:
     case BasicFunctionId::Katsuura:
     case BasicFunctionId::LunacekBiRastrigin:
@@ -418,59 +416,6 @@ bool basic_is_multimodal(BasicFunctionId id) {
         return true;
     default:
         return false;
-    }
-}
-
-double lambda_for(BasicFunctionId id) {
-    switch (id) {
-    case BasicFunctionId::Sphere:
-        return 1.0;
-    case BasicFunctionId::SumDifferentPowers:
-        return 1.0;
-    case BasicFunctionId::Ellipsoidal:
-    case BasicFunctionId::BentCigar:
-    case BasicFunctionId::Discus:
-    case BasicFunctionId::StepEllipsoidal:
-    case BasicFunctionId::SchafferF7Cond1000:
-        return 1.0e6;
-    case BasicFunctionId::BuecheRastrigin:
-    case BasicFunctionId::Rastrigin:
-    case BasicFunctionId::StepRastrigin:
-    case BasicFunctionId::Weierstrass:
-    case BasicFunctionId::LunacekBiRastrigin:
-        return 10.0;
-    case BasicFunctionId::LinearSlope:
-        return 100.0;
-    case BasicFunctionId::AttractiveSector:
-        return 10000.0;
-    case BasicFunctionId::Rosenbrock:
-    case BasicFunctionId::GriewankRosenbrock:
-        return 1.0e3;
-    case BasicFunctionId::Ackley:
-        return 32.0;
-    case BasicFunctionId::Griewank:
-        return 1.0;
-    case BasicFunctionId::Schwefel:
-        return 418.9828872724338;
-    case BasicFunctionId::SharpRidge:
-        return 100.0;
-    case BasicFunctionId::DifferentPowers:
-        return 100.0;
-    case BasicFunctionId::SchafferF7:
-        return 1.0;
-    case BasicFunctionId::SchafferF7Cond10:
-        return 10.0;
-    case BasicFunctionId::Gallagher101:
-    case BasicFunctionId::Gallagher21:
-        return 100.0;
-    case BasicFunctionId::Katsuura:
-        return 1.0;
-    case BasicFunctionId::Zakharov:
-        return 1.0e3;
-    case BasicFunctionId::Levy:
-        return 10.0;
-    default:
-        return 1.0;
     }
 }
 
@@ -492,10 +437,6 @@ std::string properties_for(BasicFunctionId id) {
         return "Basic function, Step Ellipsoidal, unimodal, non-smooth, ill-conditioned.";
     case BasicFunctionId::StepRastrigin:
         return "Basic function, CEC step Rastrigin, multimodal, separable, non-continuous.";
-    case BasicFunctionId::BentCigar:
-        return "Basic function, Bent Cigar, unimodal, non-separable by conditioning, ill-conditioned.";
-    case BasicFunctionId::Discus:
-        return "Basic function, Discus, unimodal, non-separable by conditioning, ill-conditioned.";
     case BasicFunctionId::Rosenbrock:
         return "Basic function, Rosenbrock, unimodal, non-separable, narrow curved valley.";
     case BasicFunctionId::Ackley:
@@ -514,14 +455,8 @@ std::string properties_for(BasicFunctionId id) {
         return "Basic function, Weierstrass, multimodal, non-separable when externally rotated, fractal ruggedness.";
     case BasicFunctionId::SchafferF7:
         return "Basic function, CEC Schaffer F7, multimodal, non-separable, pairwise radial coupling.";
-    case BasicFunctionId::SchafferF7Cond10:
-        return "Basic function, Schaffer F7, multimodal, non-separable, condition 10.";
-    case BasicFunctionId::SchafferF7Cond1000:
-        return "Basic function, Schaffer F7, multimodal, non-separable, condition 1000.";
     case BasicFunctionId::GriewankRosenbrock:
         return "Basic function, Griewank-Rosenbrock F8F2, multimodal, non-separable, funnel-like composition.";
-    case BasicFunctionId::Gallagher101:
-        return "Basic function, Gallagher 101 peaks, multimodal, non-separable, many local optima.";
     case BasicFunctionId::Gallagher21:
         return "Basic function, Gallagher 21 peaks, multimodal, non-separable, few dominant peaks.";
     case BasicFunctionId::Katsuura:
@@ -546,18 +481,17 @@ BasicF::BasicF(BasicFunctionId id, int dim)
     dimension = dim;
     x_opt = x_opt_for(id, dim);
     f_opt = 0.0;
-    lambda = lambda_for(id);
     properties = properties_for(id);
     initialize_state();
 }
 
 void BasicF::initialize_state() {
     peaks_.clear();
-    if (id_ != BasicFunctionId::Gallagher101 && id_ != BasicFunctionId::Gallagher21) {
+    if (id_ != BasicFunctionId::Gallagher21) {
         return;
     }
 
-    const int peak_count = id_ == BasicFunctionId::Gallagher101 ? 101 : 21;
+    const int peak_count = 21;
     peaks_.resize(static_cast<std::size_t>(peak_count));
     peaks_[0].center.assign(static_cast<std::size_t>(dimension), 0.0);
     peaks_[0].weight = 10.0;
@@ -592,10 +526,6 @@ double BasicF::evaluate_impl(const double* x) const {
         return step_ellipsoidal_eval(x, dimension);
     case BasicFunctionId::StepRastrigin:
         return step_rastrigin_eval(x, dimension);
-    case BasicFunctionId::BentCigar:
-        return bent_cigar_eval(x, dimension);
-    case BasicFunctionId::Discus:
-        return discus_eval(x, dimension);
     case BasicFunctionId::Rosenbrock:
         return rosenbrock_cec_eval(x, dimension);
     case BasicFunctionId::Ackley:
@@ -614,13 +544,10 @@ double BasicF::evaluate_impl(const double* x) const {
         return weierstrass_eval(x, dimension);
     case BasicFunctionId::SchafferF7:
         return schaffer_f7_cec_eval(x, dimension);
-    case BasicFunctionId::SchafferF7Cond10:
-        return schaffer_f7_eval(x, dimension, 10.0);
     case BasicFunctionId::SchafferF7Cond1000:
         return schaffer_f7_eval(x, dimension, 1000.0);
     case BasicFunctionId::GriewankRosenbrock:
         return griewank_rosenbrock_eval(x, dimension);
-    case BasicFunctionId::Gallagher101:
     case BasicFunctionId::Gallagher21: {
         double best = std::numeric_limits<double>::infinity();
         for (const PeakData& peak : peaks_) {
@@ -679,10 +606,6 @@ std::string to_string(BasicFunctionId id) {
         return "StepEllipsoidal";
     case BasicFunctionId::StepRastrigin:
         return "StepRastrigin";
-    case BasicFunctionId::BentCigar:
-        return "BentCigar";
-    case BasicFunctionId::Discus:
-        return "Discus";
     case BasicFunctionId::Rosenbrock:
         return "Rosenbrock";
     case BasicFunctionId::Ackley:
@@ -701,14 +624,10 @@ std::string to_string(BasicFunctionId id) {
         return "Weierstrass";
     case BasicFunctionId::SchafferF7:
         return "SchafferF7";
-    case BasicFunctionId::SchafferF7Cond10:
-        return "SchafferF7Cond10";
     case BasicFunctionId::SchafferF7Cond1000:
         return "SchafferF7Cond1000";
     case BasicFunctionId::GriewankRosenbrock:
         return "GriewankRosenbrock";
-    case BasicFunctionId::Gallagher101:
-        return "Gallagher101";
     case BasicFunctionId::Gallagher21:
         return "Gallagher21";
     case BasicFunctionId::Katsuura:
@@ -733,6 +652,8 @@ bool is_unimodal(BasicFunctionId id) {
 }
 
 std::vector<BasicFunctionId> list_basic_functions() {
+    // Registry order intentionally excludes near-duplicate landscapes such as
+    // BentCigar, Discus, SchafferF7Cond10, and Gallagher101.
     return {
         BasicFunctionId::Sphere,
         BasicFunctionId::SumDifferentPowers,
@@ -742,8 +663,6 @@ std::vector<BasicFunctionId> list_basic_functions() {
         BasicFunctionId::AttractiveSector,
         BasicFunctionId::StepEllipsoidal,
         BasicFunctionId::StepRastrigin,
-        BasicFunctionId::BentCigar,
-        BasicFunctionId::Discus,
         BasicFunctionId::Rosenbrock,
         BasicFunctionId::Ackley,
         BasicFunctionId::Rastrigin,
@@ -753,10 +672,8 @@ std::vector<BasicFunctionId> list_basic_functions() {
         BasicFunctionId::DifferentPowers,
         BasicFunctionId::Weierstrass,
         BasicFunctionId::SchafferF7,
-        BasicFunctionId::SchafferF7Cond10,
         BasicFunctionId::SchafferF7Cond1000,
         BasicFunctionId::GriewankRosenbrock,
-        BasicFunctionId::Gallagher101,
         BasicFunctionId::Gallagher21,
         BasicFunctionId::Katsuura,
         BasicFunctionId::LunacekBiRastrigin,

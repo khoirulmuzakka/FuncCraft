@@ -50,7 +50,6 @@ RunConfig parse_cli(int argc, char* argv[]) {
 FuncCraft::SuiteSpec make_spec(const RunConfig& config) {
     FuncCraft::SuiteSpec spec;
     spec.supported_dimensions = std::to_string(config.dimension);
-    spec.max_dimension = config.dimension;
     spec.requested_number_of_functions = config.num_functions;
     spec.master_seed = config.seed;
     spec.f_opt = config.f_opt;

@@ -40,11 +40,11 @@ def _copy_list(values):
 
 
 def _default_base_functions():
-    return list(range(28))
+    return list(range(24))
 
 
 def _default_composition_base_functions():
-    return [0, 1, 3, 7, 11, 12, 13, 14, 17, 18]
+    return [0, 2, 4, 8, 9, 10, 11, 12, 15, 16, 19, 20, 21, 22, 23]
 
 
 def _default_base_function_coord_transforms():
@@ -593,7 +593,6 @@ class SuiteSpec(SpecMapping):
         ("base_functions_for_compositions", _default_composition_base_functions()),
         ("requested_number_of_functions", 0),
         ("max_number_of_functions", 0),
-        ("max_dimension", 1000),
         ("master_seed", 1),
         ("lower_bound", -100.0),
         ("upper_bound", 100.0),
@@ -612,7 +611,6 @@ class SuiteSpec(SpecMapping):
         base_functions_for_compositions=None,
         requested_number_of_functions=0,
         max_number_of_functions=0,
-        max_dimension=1000,
         master_seed=1,
         lower_bound=-100.0,
         upper_bound=100.0,
@@ -645,7 +643,6 @@ class SuiteSpec(SpecMapping):
         )
         self.requested_number_of_functions = requested_number_of_functions
         self.max_number_of_functions = max_number_of_functions
-        self.max_dimension = max_dimension
         self.master_seed = master_seed
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
@@ -664,7 +661,6 @@ class SuiteSpec(SpecMapping):
             base_functions_for_compositions=_copy_list(native.base_functions_for_compositions),
             requested_number_of_functions=int(native.requested_number_of_functions),
             max_number_of_functions=int(native.max_number_of_functions),
-            max_dimension=int(native.max_dimension),
             master_seed=int(native.master_seed),
             lower_bound=float(native.lower_bound),
             upper_bound=float(native.upper_bound),
@@ -684,7 +680,6 @@ class SuiteSpec(SpecMapping):
             base_functions_for_compositions=_copy_list(data.get("base_functions_for_compositions", _default_composition_base_functions())),
             requested_number_of_functions=data.get("requested_number_of_functions", 0),
             max_number_of_functions=data.get("max_number_of_functions", 0),
-            max_dimension=data.get("max_dimension", 1000),
             master_seed=data.get("master_seed", 1),
             lower_bound=data.get("lower_bound", -100.0),
             upper_bound=data.get("upper_bound", 100.0),
@@ -703,7 +698,6 @@ class SuiteSpec(SpecMapping):
         native.base_functions_for_compositions = _copy_list(self.base_functions_for_compositions)
         native.requested_number_of_functions = self.requested_number_of_functions
         native.max_number_of_functions = self.max_number_of_functions
-        native.max_dimension = self.max_dimension
         native.master_seed = self.master_seed
         native.lower_bound = self.lower_bound
         native.upper_bound = self.upper_bound

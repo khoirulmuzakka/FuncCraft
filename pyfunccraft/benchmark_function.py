@@ -54,6 +54,16 @@ class BenchmarkFunction:
         return self._function.dimension
 
     @property
+    def scale(self):
+        """Return the runtime lambda used to normalize composed values."""
+        return self._function.scale
+
+    @property
+    def lambda_(self):
+        """Alias for :attr:`scale`."""
+        return self._function.scale
+
+    @property
     def spec(self):
         """Return the normalized function specification used to build it."""
         return self._spec
@@ -73,7 +83,8 @@ class BenchmarkFunction:
         return (
             "BenchmarkFunction("
             f"dimension={self.dimension}, "
-            f"label='{self.spec.function_class_label}')"
+            f"label='{self.spec.function_class_label}', "
+            f"scale={self.scale})"
         )
 
 

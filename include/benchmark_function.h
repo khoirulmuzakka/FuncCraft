@@ -48,6 +48,10 @@ public:
      */
     int dimension() const;
     /**
+     * @brief Return the runtime scale factor used to normalize composed values.
+     */
+    double lambda() const;
+    /**
      * @brief Return the complete specification used to build this function.
      *
      * The returned spec is the normalized source record, including the
@@ -58,6 +62,8 @@ public:
 private:
     FunctionSpec spec_;
     Domain domain_;
+    double lambda_ = 1.0;
+    double bias_ = 0.0;
     ComposedFunction function_;
 };
 
