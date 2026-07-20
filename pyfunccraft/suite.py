@@ -25,6 +25,16 @@ def make_benchmark_suite(spec, dimension):
     return BenchmarkSuite(spec, dimension)
 
 
+def load_suite_spec_yaml(path):
+    """Load a :class:`SuiteSpec` from a YAML file."""
+    return SuiteSpec.from_cpp(_funccraft.load_suite_spec_yaml(str(path)))
+
+
+def make_benchmark_suite_from_yaml(path, dimension):
+    """Build a :class:`BenchmarkSuite` directly from a YAML file."""
+    return BenchmarkSuite(path, dimension)
+
+
 class BenchmarkSuite:
     """Concrete suite of generated benchmark functions.
 
@@ -43,8 +53,19 @@ class BenchmarkSuite:
     """
 
     def __init__(self, spec, dimension):
-        self._suite = _funccraft.BenchmarkSuite(_as_native_suite_spec(spec), dimension)
+        if isinstance(spec, str):
+            self._suite = _funccraft.BenchmarkSuite(spec, dimension)
+        else:
+            self._suite = _funccraft.BenchmarkSuite(_as_native_suite_spec(spec), dimension)
         self._spec = SuiteSpec.from_cpp(self._suite.spec)
+
+    @classmethod
+    def from_cpp(cls, native):
+        """Wrap an already-built native benchmark suite."""
+        obj = cls.__new__(cls)
+        obj._suite = native
+        obj._spec = SuiteSpec.from_cpp(native.spec)
+        return obj
 
     @property
     def size(self):
@@ -101,6 +122,8 @@ class BenchmarkSuite:
 __all__ = [
     "BenchmarkSuite",
     "ChoiceSpec",
+    "load_suite_spec_yaml",
     "SuiteSpec",
     "make_benchmark_suite",
+    "make_benchmark_suite_from_yaml",
 ]

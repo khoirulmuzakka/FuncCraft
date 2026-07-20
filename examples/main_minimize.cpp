@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -20,6 +21,7 @@ struct RunConfig {
     int dimension = 10;
     std::size_t max_evals = 10000;
     int num_functions = 32;
+    int population_size = 0;
     unsigned long long seed = 1;
     double f_opt = 100.0;
 };
@@ -42,18 +44,35 @@ RunConfig parse_cli(int argc, char* argv[]) {
     if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
     if (argc > arg_index + 1) config.max_evals = static_cast<std::size_t>(std::strtoull(argv[arg_index + 1], nullptr, 10));
     if (argc > arg_index + 2) config.num_functions = std::max(1, std::atoi(argv[arg_index + 2]));
-    if (argc > arg_index + 3) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 3], nullptr, 10));
-    if (argc > arg_index + 4) config.f_opt = std::atof(argv[arg_index + 4]);
+    if (argc > arg_index + 3) config.population_size = std::max(0, std::atoi(argv[arg_index + 3]));
+    if (argc > arg_index + 4) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 4], nullptr, 10));
+    if (argc > arg_index + 5) config.f_opt = std::atof(argv[arg_index + 5]);
     return config;
 }
 
-FuncCraft::SuiteSpec make_spec(const RunConfig& config) {
-    FuncCraft::SuiteSpec spec;
-    spec.supported_dimensions = std::to_string(config.dimension);
+std::filesystem::path resolve_default_suite_yaml(const char* argv0) {
+    const std::filesystem::path cwd_candidate = std::filesystem::path("BenchmarkSuites") / "default_suite.yaml";
+    if (std::filesystem::exists(cwd_candidate)) {
+        return cwd_candidate;
+    }
+
+    if (argv0 != nullptr && *argv0 != '\0') {
+        const std::filesystem::path exe_path = std::filesystem::absolute(std::filesystem::path(argv0));
+        const std::filesystem::path exe_dir = exe_path.parent_path();
+        const std::filesystem::path exe_candidate = exe_dir / ".." / "BenchmarkSuites" / "default_suite.yaml";
+        if (std::filesystem::exists(exe_candidate)) {
+            return exe_candidate;
+        }
+    }
+
+    return cwd_candidate;
+}
+
+FuncCraft::SuiteSpec make_spec_from_yaml(const std::filesystem::path& yaml_path, const RunConfig& config) {
+    FuncCraft::SuiteSpec spec = FuncCraft::load_suite_spec_yaml(yaml_path.string());
     spec.requested_number_of_functions = config.num_functions;
     spec.master_seed = config.seed;
     spec.f_opt = config.f_opt;
-    spec.suite_label = "minimize";
     return spec;
 }
 
@@ -98,15 +117,18 @@ int main(int argc, char* argv[]) {
 
     try {
         const RunConfig config = parse_cli(argc, argv);
-        const FuncCraft::BenchmarkSuite suite(make_spec(config), config.dimension);
+        const std::filesystem::path suite_yaml = resolve_default_suite_yaml(argc > 0 ? argv[0] : nullptr);
+        const FuncCraft::BenchmarkSuite suite(make_spec_from_yaml(suite_yaml, config), config.dimension);
 
-        std::cout << "Usage: run_minimize [algo] [dimension] [maxevals] [num_functions] [seed] [f_opt]\n";
+        std::cout << "Usage: run_minimize [algo] [dimension] [maxevals] [num_functions] [population_size] [seed] [f_opt]\n";
+        std::cout << "Suite yaml: " << suite_yaml.string() << "\n";
         std::cout << "Suite size: " << suite.size()
                   << ", max_number_of_functions: " << suite.max_number_of_functions()
                   << ", dimension: " << suite.dimension()
                   << ", requested_functions: " << config.num_functions
                   << ", algo: " << config.algo
                   << ", maxevals: " << config.max_evals
+                  << ", population_size: " << config.population_size
                   << ", seed: " << config.seed
                   << ", f_opt: " << std::scientific << config.f_opt << "\n\n";
 
@@ -150,6 +172,7 @@ int main(int argc, char* argv[]) {
 
                 auto settings = minion::DefaultSettings().getDefaultSettings(config.algo);
                 settings["convergence_tol"] = 1e-8;
+                settings["population_size"] = config.population_size;
                 minion::Minimizer optimizer(
                     objective,
                     minion_bounds,

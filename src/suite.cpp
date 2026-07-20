@@ -14,6 +14,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include <yaml-cpp/yaml.h>
+
 namespace FuncCraft {
 using namespace detail;
 
@@ -42,6 +44,163 @@ std::vector<int> unique_sorted(std::vector<int> values) {
     std::sort(values.begin(), values.end());
     values.erase(std::unique(values.begin(), values.end()), values.end());
     return values;
+}
+
+std::vector<double> yaml_number_sequence_to_double_vector(const YAML::Node& node, const std::string& field) {
+    require(node && node.IsSequence(), field + " must be a YAML sequence");
+    std::vector<double> values;
+    values.reserve(node.size());
+    for (const auto& item : node) {
+        values.push_back(item.as<double>());
+    }
+    return values;
+}
+
+std::vector<int> yaml_number_sequence_to_int_vector(const YAML::Node& node, const std::string& field) {
+    require(node && node.IsSequence(), field + " must be a YAML sequence");
+    std::vector<int> values;
+    values.reserve(node.size());
+    for (const auto& item : node) {
+        values.push_back(item.as<int>());
+    }
+    return values;
+}
+
+std::string yaml_supported_dimensions(const YAML::Node& node) {
+    if (!node || node.IsNull()) {
+        return "any";
+    }
+    if (node.IsScalar()) {
+        return node.as<std::string>();
+    }
+    require(node.IsSequence(), "supported_dimensions must be a scalar or sequence");
+    std::ostringstream out;
+    for (std::size_t i = 0; i < node.size(); ++i) {
+        if (i != 0) {
+            out << ",";
+        }
+        out << node[i].as<int>();
+    }
+    return out.str();
+}
+
+std::vector<int> yaml_int_list(const YAML::Node& node, const std::string& field) {
+    if (!node || node.IsNull()) {
+        return {};
+    }
+    if (node.IsSequence()) {
+        return yaml_number_sequence_to_int_vector(node, field);
+    }
+    if (node.IsScalar()) {
+        const std::string value = trim(node.as<std::string>());
+        if (value.empty()) {
+            return {};
+        }
+        if (value.find(',') != std::string::npos) {
+            std::vector<int> values;
+            std::istringstream in(value);
+            std::string token;
+            while (std::getline(in, token, ',')) {
+                token = trim(token);
+                if (!token.empty()) {
+                    values.push_back(std::stoi(token));
+                }
+            }
+            return values;
+        }
+        return {std::stoi(value)};
+    }
+    throw std::invalid_argument(field + " must be a scalar or sequence");
+}
+
+std::vector<double> yaml_double_list(const YAML::Node& node, const std::string& field) {
+    if (!node || node.IsNull()) {
+        return {};
+    }
+    if (node.IsSequence()) {
+        return yaml_number_sequence_to_double_vector(node, field);
+    }
+    if (node.IsScalar()) {
+        const std::string value = trim(node.as<std::string>());
+        if (value.empty()) {
+            return {};
+        }
+        return {std::stod(value)};
+    }
+    throw std::invalid_argument(field + " must be a scalar or sequence");
+}
+
+ChoiceSpec choice_from_yaml(const YAML::Node& node) {
+    require(node && node.IsMap(), "choice entry must be a YAML mapping");
+    ChoiceSpec spec;
+    if (node["kind"]) {
+        spec.kind = node["kind"].as<std::string>();
+    }
+    if (node["probability"]) {
+        spec.probability = node["probability"].as<double>();
+    }
+    if (node["parameters"]) {
+        spec.parameters = yaml_double_list(node["parameters"], "choice parameters");
+    }
+    return spec;
+}
+
+std::vector<ChoiceSpec> yaml_choice_list(const YAML::Node& node, const std::string& field) {
+    if (!node || node.IsNull()) {
+        return {};
+    }
+    require(node.IsSequence(), field + " must be a YAML sequence");
+    std::vector<ChoiceSpec> values;
+    values.reserve(node.size());
+    for (const auto& item : node) {
+        values.push_back(choice_from_yaml(item));
+    }
+    return values;
+}
+
+SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
+    require(node && node.IsMap(), "suite specification root must be a YAML mapping");
+    SuiteSpec spec;
+    if (node["supported_dimensions"]) {
+        spec.supported_dimensions = yaml_supported_dimensions(node["supported_dimensions"]);
+    }
+    if (node["base_functions"]) {
+        spec.base_functions = yaml_int_list(node["base_functions"], "base_functions");
+    }
+    if (node["base_function_coord_transforms"]) {
+        spec.base_function_coord_transforms = yaml_choice_list(node["base_function_coord_transforms"], "base_function_coord_transforms");
+    }
+    if (node["coord_transforms"]) {
+        spec.coord_transforms = yaml_choice_list(node["coord_transforms"], "coord_transforms");
+    }
+    if (node["value_transforms"]) {
+        spec.value_transforms = yaml_choice_list(node["value_transforms"], "value_transforms");
+    }
+    if (node["composition_functions"]) {
+        spec.composition_functions = yaml_choice_list(node["composition_functions"], "composition_functions");
+    }
+    if (node["base_functions_for_compositions"]) {
+        spec.base_functions_for_compositions = yaml_int_list(node["base_functions_for_compositions"], "base_functions_for_compositions");
+    }
+    if (node["requested_number_of_functions"]) {
+        spec.requested_number_of_functions = node["requested_number_of_functions"].as<int>();
+    }
+    if (node["master_seed"]) {
+        spec.master_seed = node["master_seed"].as<unsigned long long>();
+    }
+    if (node["lower_bound"]) {
+        spec.lower_bound = node["lower_bound"].as<double>();
+    }
+    if (node["upper_bound"]) {
+        spec.upper_bound = node["upper_bound"].as<double>();
+    }
+    if (node["f_opt"]) {
+        spec.f_opt = node["f_opt"].as<double>();
+    }
+    if (node["suite_label"]) {
+        spec.suite_label = node["suite_label"].as<std::string>();
+    }
+    return spec;
 }
 
 std::vector<int> parse_dimension_values(const std::string& expr, int ambient_dimension) {
@@ -357,7 +516,7 @@ CompositionSpec make_composition_spec(
         spec.kind = "deceptive_softmax";
         spec.centers = centers;
         spec.offsets = offsets;
-        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0, 0.0} : choice.parameters;
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{0.001} : choice.parameters;
         return spec;
     }
     throw std::invalid_argument("unknown composition kind in suite spec: " + choice.kind);
@@ -592,6 +751,9 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
               << ", dimension: " << dimension_ << '\n';
 }
 
+BenchmarkSuite::BenchmarkSuite(const std::string& yaml_path, int dimension)
+    : BenchmarkSuite(load_suite_spec_yaml(yaml_path), dimension) {}
+
 bool BenchmarkSuite::supports_dimension(int dimension) const {
     return std::find(supported_dimensions_.begin(), supported_dimensions_.end(), dimension) != supported_dimensions_.end();
 }
@@ -733,6 +895,22 @@ const SuiteSpec& BenchmarkSuite::spec() const {
 
 BenchmarkSuite make_benchmark_suite(SuiteSpec spec, int dimension) {
     return BenchmarkSuite(std::move(spec), dimension);
+}
+
+SuiteSpec load_suite_spec_yaml(const std::string& path) {
+    try {
+        const YAML::Node root = YAML::LoadFile(path);
+        if (root["suite_spec"]) {
+            return suite_spec_from_yaml_node(root["suite_spec"]);
+        }
+        return suite_spec_from_yaml_node(root);
+    } catch (const YAML::Exception& e) {
+        throw std::invalid_argument(std::string("failed to load suite spec from YAML: ") + e.what());
+    }
+}
+
+BenchmarkSuite make_benchmark_suite_from_yaml(const std::string& path, int dimension) {
+    return BenchmarkSuite(load_suite_spec_yaml(path), dimension);
 }
 
 } // namespace FuncCraft

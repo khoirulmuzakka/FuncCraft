@@ -114,20 +114,14 @@ private:
 };
 
 /**
- * @brief Softmax-based deceptive composition with optional local selection.
+ * @brief Softmax-based deceptive composition.
+ *
+ * The output is always computed by a smooth softmax blend over the component
+ * values. There is no hard local-selection region.
  */
 class DeceptiveSoftmaxComposition final : public DeceptivePointComposition {
 public:
-    DeceptiveSoftmaxComposition(std::vector<std::vector<double>> centers, std::vector<double> offsets, double sharpness);
-    DeceptiveSoftmaxComposition(
-        std::vector<std::vector<double>> centers,
-        std::vector<double> offsets,
-        double sharpness,
-        double local_selection_radius);
-    DeceptiveSoftmaxComposition(
-        std::vector<std::vector<double>> centers,
-        double sharpness = 1.0,
-        double local_selection_radius = 0.0);
+    DeceptiveSoftmaxComposition(std::vector<std::vector<double>> centers, std::vector<double> offsets, double sharpness=0.001);
     CompositionClass composition_class() const override;
 
 private:
@@ -135,8 +129,7 @@ private:
     CompositionSpec spec() const override;
     std::vector<std::vector<double>> centers_;
     std::vector<double> offsets_;
-    double sharpness_ = 1.0;
-    double local_selection_radius_ = 0.0;
+    double sharpness_ = 0.001;
 };
 
 } // namespace FuncCraft

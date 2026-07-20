@@ -1,0 +1,43 @@
+supported_dimensions: any
+base_functions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+base_function_coord_transforms:
+  - kind: rotation
+    probability: 0.3
+    parameters: []
+  - kind: affine
+    probability: 0.7
+    parameters: []
+coord_transforms:
+  - kind: rotation
+    probability: 0.3
+    parameters: []
+  - kind: affine
+    probability: 0.3
+    parameters: []
+  - kind: blockrotation
+    probability: 0.4
+    parameters: []
+value_transforms:
+  - kind: osc
+    probability: 0.8
+    parameters: []
+  - kind: power
+    probability: 0.2
+    parameters: []
+composition_functions:
+  - kind: cpmlwell
+    probability: 0.25
+    parameters: []
+  - kind: cpmsum
+    probability: 0.25
+    parameters: []
+  - kind: dpmsoftmax
+    probability: 0.5
+    parameters: [0.001]
+base_functions_for_compositions: [0, 2, 4, 8, 9, 10, 11, 12, 15, 16, 19, 20, 21, 22, 23]
+requested_number_of_functions: 100
+master_seed: 1
+lower_bound: -100.0
+upper_bound: 100.0
+f_opt: 100.0
+suite_label: default

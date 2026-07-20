@@ -156,38 +156,9 @@ DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
     }
 }
 
-DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
-    std::vector<std::vector<double>> centers,
-    std::vector<double> offsets,
-    double sharpness,
-    double local_selection_radius)
-    : DeceptiveSoftmaxComposition(std::move(centers), std::move(offsets), sharpness) {
-    require(local_selection_radius >= 0.0, "local selection radius must be nonnegative");
-    local_selection_radius_ = local_selection_radius;
-}
-
-DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
-    std::vector<std::vector<double>> centers,
-    double sharpness,
-    double local_selection_radius)
-    : DeceptiveSoftmaxComposition(
-          std::move(centers),
-          std::vector<double>(centers.size(), 0.0),
-          sharpness,
-          local_selection_radius) {}
-
 double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const {
     require(z.size() == centers_.size(), "deceptive component size mismatch");
     require(x.size() == centers_.front().size(), "deceptive point dimension mismatch");
-
-    if (local_selection_radius_ > 0.0) {
-        const double radius_sq = local_selection_radius_ * local_selection_radius_;
-        for (std::size_t i = 0; i < centers_.size(); ++i) {
-            if (squared_distance(x, centers_[i]) <= radius_sq) {
-                return z[i] + offsets_[i];
-            }
-        }
-    }
 
     std::vector<double> logits(centers_.size(), 0.0);
     double max_logit = -std::numeric_limits<double>::infinity();
@@ -215,7 +186,7 @@ CompositionSpec DeceptiveSoftmaxComposition::spec() const {
     spec.kind = "deceptive_softmax";
     spec.centers = centers_;
     spec.offsets = offsets_;
-    spec.parameters = {sharpness_, local_selection_radius_};
+    spec.parameters = {sharpness_};
     return spec;
 }
 

@@ -169,6 +169,7 @@ PYBIND11_MODULE(_funccraft, m) {
 
     py::class_<FuncCraft::BenchmarkSuite>(m, "BenchmarkSuite")
         .def(py::init<FuncCraft::SuiteSpec, int>(), py::arg("spec"), py::arg("dimension"))
+        .def(py::init<const std::string&, int>(), py::arg("yaml_path"), py::arg("dimension"))
         .def_property_readonly("size", &FuncCraft::BenchmarkSuite::size)
         .def_property_readonly("max_number_of_functions", &FuncCraft::BenchmarkSuite::max_number_of_functions)
         .def_property_readonly("theoretical_max_number_of_functions", &FuncCraft::BenchmarkSuite::theoretical_max_number_of_functions)
@@ -192,4 +193,7 @@ PYBIND11_MODULE(_funccraft, m) {
     }, py::arg("spec"));
     m.def("make_benchmark_suite", py::overload_cast<FuncCraft::SuiteSpec, int>(&FuncCraft::make_benchmark_suite),
         py::arg("spec"), py::arg("dimension"));
+    m.def("load_suite_spec_yaml", &FuncCraft::load_suite_spec_yaml, py::arg("path"));
+    m.def("make_benchmark_suite_from_yaml", &FuncCraft::make_benchmark_suite_from_yaml,
+        py::arg("path"), py::arg("dimension"));
 }

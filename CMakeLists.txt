@@ -13,6 +13,18 @@ option(FUNCCRAFT_BUILD_PYTHON "Build FuncCraft Python bindings" ON)
 set(FUNCCRAFT_OUTPUT_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 set(FUNCCRAFT_OUTPUT_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG f7320141120f720aecc4c32be25586e7da9eb978
+    GIT_SHALLOW TRUE
+)
+set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "Build yaml-cpp as a shared library" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "Build yaml-cpp contrib" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "Build yaml-cpp tools" FORCE)
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "Build yaml-cpp tests" FORCE)
+FetchContent_MakeAvailable(yaml-cpp)
+
 add_library(funccraft STATIC
     src/basicf.cpp
     src/core.cpp
@@ -32,6 +44,7 @@ target_include_directories(funccraft PUBLIC
 )
 
 target_compile_features(funccraft PUBLIC cxx_std_17)
+target_link_libraries(funccraft PUBLIC yaml-cpp)
 set_target_properties(funccraft PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     ARCHIVE_OUTPUT_DIRECTORY "${FUNCCRAFT_OUTPUT_LIB_DIR}"
