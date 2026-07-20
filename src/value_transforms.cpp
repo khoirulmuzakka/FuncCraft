@@ -18,6 +18,16 @@ double clamp_nonnegative(double value) {
     return value;
 }
 
+double clamp_finite_nonnegative(double value) {
+    if (!std::isfinite(value)) {
+        return std::numeric_limits<double>::max();
+    }
+    if (value < 0.0 && value >= -kValueTransformTolerance) {
+        return 0.0;
+    }
+    return value;
+}
+
 std::string describe_scalar(double value) {
     if (std::isnan(value)) {
         return "nan";
@@ -36,7 +46,7 @@ double ValueTransform::apply(double u) const {
     require(u >= 0.0, "value transform input must be nonnegative (u=" + describe_scalar(u) + ")");
     const double at_origin = raw_apply(0.0);
     require(std::abs(at_origin) <= 1.0e-12, "value transform must satisfy f(0) = 0");
-    const double value = clamp_nonnegative(raw_apply(u));
+    const double value = clamp_finite_nonnegative(raw_apply(u));
     require(value >= 0.0, "value transform output must be nonnegative (f(u)=" + describe_scalar(value) + ")");
     return value;
 }
@@ -66,7 +76,8 @@ PowerValueTransform::PowerValueTransform(double alpha, double p)
 double PowerValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    return alpha_ * std::pow(u, p_);
+    const double value = alpha_ * std::pow(u, p_);
+    return clamp_finite_nonnegative(value);
 }
 
 ValueTransformClass PowerValueTransform::transform_class() const {
@@ -90,7 +101,8 @@ OscillatoryValueTransform::OscillatoryValueTransform(double epsilon, double alph
 double OscillatoryValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    return u * (1.0 + epsilon_ * std::sin(alpha_ * u));
+    const double value = u * (1.0 + epsilon_ * std::sin(alpha_ * u));
+    return clamp_finite_nonnegative(value);
 }
 
 ValueTransformClass OscillatoryValueTransform::transform_class() const {
@@ -112,7 +124,7 @@ CosineZeroValueTransform::CosineZeroValueTransform(double alpha)
 double CosineZeroValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    return 1.0 - std::cos(alpha_ * u);
+    return clamp_finite_nonnegative(1.0 - std::cos(alpha_ * u));
 }
 
 ValueTransformClass CosineZeroValueTransform::transform_class() const {

@@ -61,6 +61,7 @@ composition_functions:
     # parameters = [sharpness, background_strength, background_sharpness]
     parameters: [0.01, 1.0, 0.01]
 base_functions_for_compositions: [0, 2, 4, 7, 8, 9, 10,  12, 15, 16, 17, 19, 20, 21, 23]
+max_components: 10
 requested_number_of_functions: 1000
 master_seed: 1
 lower_bound: -100.0

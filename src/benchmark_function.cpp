@@ -81,6 +81,27 @@ double estimate_lambda(const ComposedFunction& raw_function, const Domain& domai
     return kTargetScale / q90;
 }
 
+double saturating_apply_scale_and_bias(double raw_value, double lambda, double bias) {
+    constexpr double kCap = 1.0e300;
+    if (!std::isfinite(raw_value)) {
+        return kCap;
+    }
+    double scaled = lambda * raw_value;
+    if (!std::isfinite(scaled) || scaled > kCap) {
+        scaled = kCap;
+    } else if (scaled < -kCap) {
+        scaled = -kCap;
+    }
+    double value = bias + scaled;
+    if (!std::isfinite(value) || value > kCap) {
+        return kCap;
+    }
+    if (value < -kCap) {
+        return -kCap;
+    }
+    return value;
+}
+
 } // namespace
 
 BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
@@ -117,9 +138,7 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
     function_ = [raw_function, lambda = lambda_, bias = bias_](const std::vector<std::vector<double>>& X) {
         std::vector<double> values = raw_function(X);
         for (double& value : values) {
-            if (std::isfinite(value)) {
-                value = bias + lambda * value;
-            }
+            value = saturating_apply_scale_and_bias(value, lambda, bias);
         }
         return values;
     };

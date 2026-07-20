@@ -591,6 +591,7 @@ class SuiteSpec(SpecMapping):
         ("value_transforms", _default_value_transforms()),
         ("composition_functions", _default_composition_functions()),
         ("base_functions_for_compositions", _default_composition_base_functions()),
+        ("max_components", 10),
         ("requested_number_of_functions", 0),
         ("max_number_of_functions", 0),
         ("master_seed", 1),
@@ -609,6 +610,7 @@ class SuiteSpec(SpecMapping):
         value_transforms=None,
         composition_functions=None,
         base_functions_for_compositions=None,
+        max_components=10,
         requested_number_of_functions=0,
         max_number_of_functions=0,
         master_seed=1,
@@ -641,6 +643,7 @@ class SuiteSpec(SpecMapping):
             if base_functions_for_compositions is not None
             else _default_composition_base_functions()
         )
+        self.max_components = max_components
         self.requested_number_of_functions = requested_number_of_functions
         self.max_number_of_functions = max_number_of_functions
         self.master_seed = master_seed
@@ -659,6 +662,7 @@ class SuiteSpec(SpecMapping):
             value_transforms=[ChoiceSpec.from_cpp(choice) for choice in native.value_transforms],
             composition_functions=[ChoiceSpec.from_cpp(choice) for choice in native.composition_functions],
             base_functions_for_compositions=_copy_list(native.base_functions_for_compositions),
+            max_components=int(native.max_components),
             requested_number_of_functions=int(native.requested_number_of_functions),
             max_number_of_functions=int(native.max_number_of_functions),
             master_seed=int(native.master_seed),
@@ -678,6 +682,7 @@ class SuiteSpec(SpecMapping):
             value_transforms=[_as_choice_spec(item) for item in data.get("value_transforms", _default_value_transforms())],
             composition_functions=[_as_choice_spec(item) for item in data.get("composition_functions", _default_composition_functions())],
             base_functions_for_compositions=_copy_list(data.get("base_functions_for_compositions", _default_composition_base_functions())),
+            max_components=data.get("max_components", 10),
             requested_number_of_functions=data.get("requested_number_of_functions", 0),
             max_number_of_functions=data.get("max_number_of_functions", 0),
             master_seed=data.get("master_seed", 1),
@@ -696,6 +701,7 @@ class SuiteSpec(SpecMapping):
         native.value_transforms = [_as_choice_spec(choice).to_cpp() for choice in self.value_transforms]
         native.composition_functions = [_as_choice_spec(choice).to_cpp() for choice in self.composition_functions]
         native.base_functions_for_compositions = _copy_list(self.base_functions_for_compositions)
+        native.max_components = self.max_components
         native.requested_number_of_functions = self.requested_number_of_functions
         native.max_number_of_functions = self.max_number_of_functions
         native.master_seed = self.master_seed

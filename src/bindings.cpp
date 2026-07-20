@@ -133,6 +133,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("value_transforms", &FuncCraft::SuiteSpec::value_transforms)
         .def_readwrite("composition_functions", &FuncCraft::SuiteSpec::composition_functions)
         .def_readwrite("base_functions_for_compositions", &FuncCraft::SuiteSpec::base_functions_for_compositions)
+        .def_readwrite("max_components", &FuncCraft::SuiteSpec::max_components)
         .def_readwrite("requested_number_of_functions", &FuncCraft::SuiteSpec::requested_number_of_functions)
         .def_readwrite("max_number_of_functions", &FuncCraft::SuiteSpec::max_number_of_functions)
         .def_readwrite("master_seed", &FuncCraft::SuiteSpec::master_seed)
@@ -142,7 +143,8 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("suite_label", &FuncCraft::SuiteSpec::suite_label)
         .def("__repr__", [](const FuncCraft::SuiteSpec& self) {
             return "SuiteSpec(supported_dimensions='" + self.supported_dimensions
-                + "', max_number_of_functions=" + std::to_string(self.max_number_of_functions)
+                + "', max_components=" + std::to_string(self.max_components)
+                + ", max_number_of_functions=" + std::to_string(self.max_number_of_functions)
                 + ", requested_number_of_functions=" + std::to_string(self.requested_number_of_functions)
                 + ", master_seed=" + std::to_string(self.master_seed)
                 + ", lower_bound=" + std::to_string(self.lower_bound)

@@ -182,6 +182,9 @@ SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
     if (node["base_functions_for_compositions"]) {
         spec.base_functions_for_compositions = yaml_int_list(node["base_functions_for_compositions"], "base_functions_for_compositions");
     }
+    if (node["max_components"]) {
+        spec.max_components = node["max_components"].as<int>();
+    }
     if (node["requested_number_of_functions"]) {
         spec.requested_number_of_functions = node["requested_number_of_functions"].as<int>();
     }
@@ -325,7 +328,7 @@ std::vector<BasicFunctionId> normalize_composition_base_functions(
             result.push_back(static_cast<BasicFunctionId>(raw_id));
         }
     }
-    require(result.size() >= 2, "composition base-function pool must contain at least two base functions");
+    require(!result.empty(), "composition base-function pool must contain at least one base function");
     return result;
 }
 
@@ -560,10 +563,13 @@ std::vector<BasicFunctionId> sample_base_functions(
     int count,
     std::mt19937_64& rng) {
     require(count > 0, "sample count must be positive");
-    require(static_cast<std::size_t>(count) <= pool.size(), "sample count exceeds available base functions");
-    std::vector<BasicFunctionId> selected = pool;
-    stable_shuffle(selected, rng);
-    selected.resize(static_cast<std::size_t>(count));
+    require(!pool.empty(), "sample pool must not be empty");
+    std::vector<BasicFunctionId> selected;
+    selected.reserve(static_cast<std::size_t>(count));
+    for (int i = 0; i < count; ++i) {
+        const int choice = uniform_int(rng, 0, static_cast<int>(pool.size()) - 1);
+        selected.push_back(pool[static_cast<std::size_t>(choice)]);
+    }
     return selected;
 }
 
@@ -632,20 +638,6 @@ std::uint64_t saturating_pow(std::uint64_t base, int exp) {
     return result;
 }
 
-std::uint64_t permutation_count(int n, int k) {
-    if (k < 0 || k > n) {
-        return 0;
-    }
-    std::uint64_t result = 1;
-    for (int i = 0; i < k; ++i) {
-        result = saturating_mul(result, static_cast<std::uint64_t>(n - i));
-        if (result == std::numeric_limits<std::uint64_t>::max()) {
-            break;
-        }
-    }
-    return result;
-}
-
 } // namespace
 
 BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
@@ -662,15 +654,16 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
 
     const int coord_family_count = static_cast<int>(normalize_choices(spec_.coord_transforms, default_coord_transform_choices()).size());
     const int value_family_count = static_cast<int>(normalize_choices(spec_.value_transforms, default_value_transform_choices()).size());
-    const int composition_family_count = static_cast<int>(normalize_choices(spec_.composition_functions, default_composition_choices()).size());
-    const int max_components = std::min<int>(6, static_cast<int>(composition_pool.size()));
+    const auto composition_choices = normalize_choices(spec_.composition_functions, default_composition_choices());
+    const int max_components = spec_.max_components;
+    require(max_components >= 2, "suite spec max_components must be at least 2");
     std::uint64_t theoretical_composed = 0;
     for (int component_count = 2; component_count <= max_components; ++component_count) {
-        const std::uint64_t component_orders = permutation_count(static_cast<int>(composition_pool.size()), component_count);
+        const std::uint64_t component_orders = saturating_pow(static_cast<std::uint64_t>(composition_pool.size()), component_count);
         const std::uint64_t coord_choices = saturating_pow(static_cast<std::uint64_t>(coord_family_count), component_count);
         const std::uint64_t value_choices = saturating_pow(static_cast<std::uint64_t>(value_family_count), component_count);
         const std::uint64_t choices = saturating_mul(component_orders, saturating_mul(coord_choices, value_choices));
-        theoretical_composed = saturating_add(theoretical_composed, saturating_mul(choices, static_cast<std::uint64_t>(composition_family_count)));
+        theoretical_composed = saturating_add(theoretical_composed, saturating_mul(choices, static_cast<std::uint64_t>(composition_choices.size())));
     }
     theoretical_max_number_of_functions_ = saturating_add(
         static_cast<std::uint64_t>(mandatory_base_functions.size()),
@@ -685,9 +678,8 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
     const auto base_choices = normalize_choices(spec_.base_function_coord_transforms, default_base_transform_choices());
     const auto coord_choices = normalize_choices(spec_.coord_transforms, default_coord_transform_choices());
     const auto value_choices = normalize_choices(spec_.value_transforms, default_value_transform_choices());
-    const auto composition_choices = normalize_choices(spec_.composition_functions, default_composition_choices());
     if (requested_count > mandatory_count) {
-        require(composition_pool.size() >= 2, "composition base-function pool must contain at least two functions");
+        require(!composition_pool.empty(), "composition base-function pool must not be empty");
     }
 
     blueprints_.reserve(static_cast<std::size_t>(requested_count));
@@ -713,8 +705,8 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
 
         std::mt19937_64 rng(mix_seed(spec_.master_seed + sequence + 0x3000ull));
         const ChoiceSpec& comp_choice = choose_weighted(composition_choices, rng);
-        const int max_components = std::min<int>(6, static_cast<int>(composition_pool.size()));
-        const int component_count = max_components == 2 ? 2 : uniform_int(rng, 2, max_components);
+        const int max_components = spec_.max_components;
+        const int component_count = uniform_int(rng, 2, max_components);
         std::vector<ChoiceSpec> coord_choices_for_function = coord_choices;
         if (component_count > dimension_) {
             coord_choices_for_function.erase(

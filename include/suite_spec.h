@@ -90,6 +90,7 @@ struct SuiteSpec {
         0, 2, 4, 8, 9, 10, 11, 12,
         15, 16, 19, 20, 21, 22, 23,
     };
+    int max_components = 10;
     int requested_number_of_functions = 0;
     int max_number_of_functions = 0;
     unsigned long long master_seed = 1;

@@ -51,6 +51,19 @@ double sqr(double x) {
     return x * x;
 }
 
+double safe_pow_abs(double x, double exponent) {
+    const double ax = std::fabs(x);
+    if (ax == 0.0) {
+        return 0.0;
+    }
+    const double max_log = std::log(std::numeric_limits<double>::max());
+    const double log_value = exponent * std::log(ax);
+    if (log_value >= max_log) {
+        return std::numeric_limits<double>::max();
+    }
+    return std::exp(log_value);
+}
+
 double asymmetry(double x, double beta) {
     if (x <= 0.0) {
         return x;
@@ -82,7 +95,14 @@ double ellipsoidal_eval(const double* x, int dimension) {
 double sum_different_powers_eval(const double* x, int dimension) {
     double sum = 0.0;
     for (int i = 0; i < dimension; ++i) {
-        sum += std::pow(std::fabs(x[i]), static_cast<double>(i + 1));
+        const double term = safe_pow_abs(x[i], static_cast<double>(i + 1));
+        if (!std::isfinite(term)) {
+            return std::numeric_limits<double>::max();
+        }
+        if (sum > std::numeric_limits<double>::max() - term) {
+            return std::numeric_limits<double>::max();
+        }
+        sum += term;
     }
     return sum;
 }
@@ -261,7 +281,14 @@ double different_powers_eval(const double* x, int dimension) {
     double sum = 0.0;
     for (int i = 0; i < dimension; ++i) {
         const double exponent = 2.0 + 4.0 * static_cast<double>(i) / std::max(1, dimension - 1);
-        sum += std::pow(std::fabs(x[i]), exponent);
+        const double term = safe_pow_abs(x[i], exponent);
+        if (!std::isfinite(term)) {
+            return std::numeric_limits<double>::max();
+        }
+        if (sum > std::numeric_limits<double>::max() - term) {
+            return std::numeric_limits<double>::max();
+        }
+        sum += term;
     }
     return std::sqrt(sum);
 }
