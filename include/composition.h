@@ -116,12 +116,18 @@ private:
 /**
  * @brief Softmax-based deceptive composition.
  *
- * The output is always computed by a smooth softmax blend over the component
- * values. There is no hard local-selection region.
+ * The output is computed by a smooth selective softmax blend, augmented by a
+ * smooth background gate that stays small near each prescribed local basin but
+ * remains positive away from all basins.
  */
 class DeceptiveSoftmaxComposition final : public DeceptivePointComposition {
 public:
-    DeceptiveSoftmaxComposition(std::vector<std::vector<double>> centers, std::vector<double> offsets, double sharpness=0.001);
+    DeceptiveSoftmaxComposition(
+        std::vector<std::vector<double>> centers,
+        std::vector<double> offsets,
+        double sharpness = 0.001,
+        double background_strength = 0.1,
+        double background_sharpness = 0.05);
     CompositionClass composition_class() const override;
 
 private:
@@ -130,6 +136,8 @@ private:
     std::vector<std::vector<double>> centers_;
     std::vector<double> offsets_;
     double sharpness_ = 0.001;
+    double background_strength_ = 0.1;
+    double background_sharpness_ = 0.05;
 };
 
 } // namespace FuncCraft

@@ -65,4 +65,6 @@ docs/*.toc
 docs/*.synctex.gz
 docs/*.fdb_latexmk 
 docs/figures/
+examples/*.pdf
+examples/*.png
 

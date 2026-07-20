@@ -752,7 +752,13 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
 }
 
 BenchmarkSuite::BenchmarkSuite(const std::string& yaml_path, int dimension)
-    : BenchmarkSuite(load_suite_spec_yaml(yaml_path), dimension) {}
+    : BenchmarkSuite(load_suite_spec_yaml(yaml_path), dimension) {
+    std::cout << "A benchmark suite configuration has been read successfully from YAML file: "
+              << yaml_path
+              << " (dimension: " << dimension_
+              << ", requested_functions: " << spec_.requested_number_of_functions
+              << ")\n";
+}
 
 bool BenchmarkSuite::supports_dimension(int dimension) const {
     return std::find(supported_dimensions_.begin(), supported_dimensions_.end(), dimension) != supported_dimensions_.end();

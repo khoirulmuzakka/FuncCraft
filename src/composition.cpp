@@ -143,13 +143,19 @@ CompositionSpec LevelWellComposition::spec() const {
 DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
     std::vector<std::vector<double>> centers,
     std::vector<double> offsets,
-    double sharpness)
+    double sharpness,
+    double background_strength,
+    double background_sharpness)
     : centers_(std::move(centers)),
       offsets_(std::move(offsets)),
-      sharpness_(sharpness) {
+      sharpness_(sharpness),
+      background_strength_(background_strength),
+      background_sharpness_(background_sharpness) {
     require(!centers_.empty(), "deceptive softmax needs at least one center");
     require(centers_.size() == offsets_.size(), "deceptive offsets must match centers");
     require(sharpness_ >= 0.0, "softmax sharpness must be nonnegative");
+    require(background_strength_ >= 0.0, "background strength must be nonnegative");
+    require(background_sharpness_ >= 0.0, "background sharpness must be nonnegative");
     const std::size_t dimension = centers_.front().size();
     for (const auto& center : centers_) {
         require(center.size() == dimension, "deceptive centers must have common dimension");
@@ -167,12 +173,18 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
         max_logit = std::max(max_logit, logits[i]);
     }
 
+    double min_distance = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < centers_.size(); ++i) {
+        min_distance = std::min(min_distance, std::sqrt(squared_distance(x, centers_[i])));
+    }
+    const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance));
+
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
         const double w = std::exp(logits[i] - max_logit);
-        numerator += w * (z[i] + offsets_[i]);
-        denominator += w;
+        numerator += (w + background) * (z[i] + offsets_[i]);
+        denominator += w + background;
     }
     return numerator / denominator;
 }
@@ -186,7 +198,7 @@ CompositionSpec DeceptiveSoftmaxComposition::spec() const {
     spec.kind = "deceptive_softmax";
     spec.centers = centers_;
     spec.offsets = offsets_;
-    spec.parameters = {sharpness_};
+    spec.parameters = {sharpness_, background_strength_, background_sharpness_};
     return spec;
 }
 

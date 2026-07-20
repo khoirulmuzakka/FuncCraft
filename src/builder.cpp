@@ -151,6 +151,8 @@ std::shared_ptr<CompositionFunction> make_composition(const CompositionSpec& spe
     }
     if (kind == "deceptivesoftmax" || kind == "dpm") {
         const double sharpness = spec.parameters.size() > 0 ? spec.parameters[0] : 0.001;
+        const double background_strength = spec.parameters.size() > 1 ? spec.parameters[1] : 0.1;
+        const double background_sharpness = spec.parameters.size() > 2 ? spec.parameters[2] : 0.05;
         std::vector<std::vector<double>> centers = spec.centers;
         std::vector<double> offsets = spec.offsets;
         require(!centers.empty(), "deceptive softmax composition needs centers");
@@ -160,7 +162,9 @@ std::shared_ptr<CompositionFunction> make_composition(const CompositionSpec& spe
         return std::make_shared<DeceptiveSoftmaxComposition>(
             std::move(centers),
             std::move(offsets),
-            sharpness);
+            sharpness,
+            background_strength,
+            background_sharpness);
     }
     throw std::invalid_argument("unknown composition kind: " + spec.kind);
 }
