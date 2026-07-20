@@ -178,11 +178,16 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
         min_distance = std::min(min_distance, std::sqrt(squared_distance(x, centers_[i])));
     }
     const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance));
+    const double optimum_distance = std::sqrt(squared_distance(x, centers_.front()));
+    const double selective_mask = 1.0 - std::exp(-background_sharpness_ * optimum_distance * optimum_distance);
 
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        const double w = std::exp(logits[i] - max_logit);
+        double w = std::exp(logits[i] - max_logit);
+        if (i > 0) {
+            w *= selective_mask;
+        }
         numerator += (w + background) * (z[i] + offsets_[i]);
         denominator += w + background;
     }

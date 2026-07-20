@@ -125,9 +125,9 @@ public:
     DeceptiveSoftmaxComposition(
         std::vector<std::vector<double>> centers,
         std::vector<double> offsets,
-        double sharpness = 0.001,
-        double background_strength = 0.1,
-        double background_sharpness = 0.05);
+        double sharpness = 0.01,
+        double background_strength = 1.0,
+        double background_sharpness = 0.01);
     CompositionClass composition_class() const override;
 
 private:
@@ -135,9 +135,9 @@ private:
     CompositionSpec spec() const override;
     std::vector<std::vector<double>> centers_;
     std::vector<double> offsets_;
-    double sharpness_ = 0.001;
-    double background_strength_ = 0.1;
-    double background_sharpness_ = 0.05;
+    double sharpness_ = 0.01;
+    double background_strength_ = 1.0;
+    double background_sharpness_ = 0.01;
 };
 
 } // namespace FuncCraft

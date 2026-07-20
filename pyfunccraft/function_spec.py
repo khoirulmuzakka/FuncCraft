@@ -73,7 +73,7 @@ def _default_composition_functions():
     return [
         ChoiceSpec("cpmlwell", 0.25),
         ChoiceSpec("cpmsum", 0.25),
-        ChoiceSpec("dpmsoftmax", 0.5),
+        ChoiceSpec("dpmsoftmax", 0.5, [0.01, 1.0, 0.01]),
     ]
 
 

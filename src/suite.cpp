@@ -516,7 +516,9 @@ CompositionSpec make_composition_spec(
         spec.kind = "deceptive_softmax";
         spec.centers = centers;
         spec.offsets = offsets;
-        spec.parameters = choice.parameters.empty() ? std::vector<double>{0.001} : choice.parameters;
+        spec.parameters = choice.parameters.empty()
+            ? std::vector<double>{0.01, 1.0, 0.01}
+            : choice.parameters;
         return spec;
     }
     throw std::invalid_argument("unknown composition kind in suite spec: " + choice.kind);
@@ -801,9 +803,10 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         return BenchmarkFunction(builder.build_spec());
     }
 
-    const auto x_star = (normalize_token(blueprint.composition_choice.kind) == "dpmsoftmax"
+    const bool dpm_mode = normalize_token(blueprint.composition_choice.kind) == "dpmsoftmax"
         || normalize_token(blueprint.composition_choice.kind) == "dpm"
-        || normalize_token(blueprint.composition_choice.kind) == "softmax")
+        || normalize_token(blueprint.composition_choice.kind) == "softmax";
+    const auto x_star = dpm_mode
         ? random_point_in_domain_away_from_origin(rng, Domain(dimension_, spec_.lower_bound * 0.7, spec_.upper_bound * 0.7), 5.0)
         : random_point_in_shrunk_domain(rng, domain, 0.7);
 
@@ -820,12 +823,14 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         require(blueprint.component_count <= dimension_, "block rotation composition requires dimension at least the number of components");
         block_partitions = partition_indices(dimension_, blueprint.component_count, rng);
     }
-    if (normalize_token(blueprint.composition_choice.kind) == "dpmsoftmax"
-        || normalize_token(blueprint.composition_choice.kind) == "dpm"
-        || normalize_token(blueprint.composition_choice.kind) == "softmax") {
+    if (dpm_mode) {
         const double deceptive_step = 10.0 + 0.1 * spec_.f_opt;
         for (int i = 1; i < blueprint.component_count; ++i) {
-            centers[static_cast<std::size_t>(i)] = random_point_in_shrunk_domain(rng, domain, 0.7);
+            if (i == 1) {
+                centers[static_cast<std::size_t>(i)] = std::vector<double>(static_cast<std::size_t>(dimension_), 0.0);
+            } else {
+                centers[static_cast<std::size_t>(i)] = random_point_in_shrunk_domain(rng, domain, 0.7);
+            }
             offsets[static_cast<std::size_t>(i)] = deceptive_step * static_cast<double>(i);
         }
     }

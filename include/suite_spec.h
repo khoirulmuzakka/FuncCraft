@@ -84,7 +84,7 @@ struct SuiteSpec {
     std::vector<ChoiceSpec> composition_functions = {
         make_choice_spec("cpmlwell", 0.25),
         make_choice_spec("cpmsum", 0.25),
-        make_choice_spec("dpmsoftmax", 0.5),
+        ChoiceSpec{"dpmsoftmax", 0.5, {0.01, 1.0, 0.01}},
     };
     std::vector<int> base_functions_for_compositions = {
         0, 2, 4, 8, 9, 10, 11, 12,

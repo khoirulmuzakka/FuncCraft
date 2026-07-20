@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -40,14 +41,21 @@ CheckConfig parse_cli(int argc, char* argv[]) {
     return config;
 }
 
-FuncCraft::SuiteSpec make_spec(const CheckConfig& config) {
-    FuncCraft::SuiteSpec spec;
-    spec.supported_dimensions = std::to_string(config.dimension);
-    spec.requested_number_of_functions = config.max_functions;
-    spec.master_seed = config.seed;
-    spec.f_opt = config.f_opt;
-    spec.suite_label = "check_optima";
-    return spec;
+std::filesystem::path resolve_default_suite_yaml(const char* argv0) {
+    const std::filesystem::path cwd_candidate = std::filesystem::path("BenchmarkSuites") / "default_suite.yaml";
+    if (std::filesystem::exists(cwd_candidate)) {
+        return cwd_candidate;
+    }
+
+    if (argv0 != nullptr && *argv0 != '\0') {
+        const std::filesystem::path exe_path = std::filesystem::absolute(std::filesystem::path(argv0));
+        const std::filesystem::path exe_candidate = exe_path.parent_path() / ".." / "BenchmarkSuites" / "default_suite.yaml";
+        if (std::filesystem::exists(exe_candidate)) {
+            return exe_candidate;
+        }
+    }
+
+    return cwd_candidate;
 }
 
 std::array<std::string, 4> split_class_label(const std::string& label) {
@@ -88,12 +96,19 @@ std::string truncate_with_ellipsis(const std::string& text, std::size_t max_len)
 int main(int argc, char* argv[]) {
     try {
         const CheckConfig config = parse_cli(argc, argv);
-        const FuncCraft::BenchmarkSuite suite(make_spec(config), config.dimension);
+        const std::filesystem::path suite_yaml = resolve_default_suite_yaml(argc > 0 ? argv[0] : nullptr);
+        FuncCraft::SuiteSpec suite_spec = FuncCraft::load_suite_spec_yaml(suite_yaml.string());
+        suite_spec.requested_number_of_functions = config.max_functions;
+        suite_spec.master_seed = config.seed;
+        suite_spec.f_opt = config.f_opt;
+        suite_spec.suite_label = "check_optima";
+        const FuncCraft::BenchmarkSuite suite(suite_spec, config.dimension);
 
         int failures = 0;
         double max_abs_error = 0.0;
 
         std::cout << "FuncCraft optimum check\n";
+        std::cout << "Suite yaml: " << suite_yaml.string() << "\n";
         std::cout << "size=" << suite.size()
                   << ", max_number_of_functions=" << suite.max_number_of_functions()
                   << ", dimension=" << suite.dimension()
