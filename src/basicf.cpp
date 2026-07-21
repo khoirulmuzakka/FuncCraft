@@ -931,9 +931,20 @@ std::vector<double> BasicF::operator()(const std::vector<std::vector<double>>& X
         if (static_cast<int>(X[i].size()) != dimension) {
             throw std::invalid_argument(name + " candidate dimension mismatch");
         }
-        values[i] = evaluate_impl(X[i].data());
+        values[i] = evaluate(X[i].data());
     }
     return values;
+}
+
+double BasicF::evaluate(const std::vector<double>& x) const {
+    if (static_cast<int>(x.size()) != dimension) {
+        throw std::invalid_argument(name + " candidate dimension mismatch");
+    }
+    return evaluate(x.data());
+}
+
+double BasicF::evaluate(const double* x) const {
+    return evaluate_impl(x);
 }
 
 BasicFunctionId BasicF::id() const {

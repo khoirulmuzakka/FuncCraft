@@ -35,7 +35,7 @@ void require_dimension(const std::vector<double>& x, int dimension, const std::s
  *
  * The default primitive box is `[-5, 5]` on every axis.
  */
-std::vector<double> map_point_to_default_domain(const std::vector<double>& point, const Domain& domain);
+void map_point_to_default_domain(const std::vector<double>& point, const Domain& domain, std::vector<double>& out);
 /**
  * @brief Map one point from the default primitive box back into a suite domain.
  *

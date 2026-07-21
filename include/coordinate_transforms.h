@@ -18,7 +18,7 @@ class CoordinateTransform {
 public:
     virtual ~CoordinateTransform() = default;
 
-    virtual std::vector<double> apply(const std::vector<double>& x) const = 0;
+    virtual void apply(const std::vector<double>& x, std::vector<double>& out) const = 0;
     virtual int input_dimension() const = 0;
     virtual int output_dimension() const = 0;
     virtual CoordinateTransformClass transform_class() const = 0;
@@ -53,7 +53,7 @@ public:
         std::vector<double> target_point,
         std::uint64_t seed);
 
-    std::vector<double> apply(const std::vector<double>& x) const override;
+    void apply(const std::vector<double>& x, std::vector<double>& out) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
@@ -74,7 +74,7 @@ public:
         std::vector<double> target_point,
         std::uint64_t seed);
 
-    std::vector<double> apply(const std::vector<double>& x) const override;
+    void apply(const std::vector<double>& x, std::vector<double>& out) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
@@ -98,7 +98,7 @@ public:
         std::vector<double> target_point,
         std::uint64_t seed);
 
-    std::vector<double> apply(const std::vector<double>& x) const override;
+    void apply(const std::vector<double>& x, std::vector<double>& out) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
@@ -128,7 +128,7 @@ public:
         std::vector<double> target_point,
         std::uint64_t seed);
 
-    std::vector<double> apply(const std::vector<double>& x) const override;
+    void apply(const std::vector<double>& x, std::vector<double>& out) const override;
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;

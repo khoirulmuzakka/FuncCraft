@@ -47,9 +47,9 @@ IdentityTransform::IdentityTransform(
     require_dimension(target_point_, dimension_, "identity transform target point");
 }
 
-std::vector<double> IdentityTransform::apply(const std::vector<double>& x) const {
+void IdentityTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
     require_dimension(x, input_dimension(), "identity transform input");
-    return x;
+    out = x;
 }
 
 int IdentityTransform::input_dimension() const {
@@ -86,18 +86,17 @@ RotationTransform::RotationTransform(
     matrix_ = random_rotation_matrix(rng, dimension_);
 }
 
-std::vector<double> RotationTransform::apply(const std::vector<double>& x) const {
+void RotationTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
     require_dimension(x, input_dimension(), "rotation transform input");
-    std::vector<double> y(static_cast<std::size_t>(dimension_), 0.0);
+    out.assign(static_cast<std::size_t>(dimension_), 0.0);
     for (int r = 0; r < dimension_; ++r) {
         const auto rr = static_cast<std::size_t>(r);
-        y[rr] = target_point_[rr];
+        out[rr] = target_point_[rr];
         for (int c = 0; c < dimension_; ++c) {
-            y[rr] += matrix_[rr][static_cast<std::size_t>(c)]
+            out[rr] += matrix_[rr][static_cast<std::size_t>(c)]
                 * (x[static_cast<std::size_t>(c)] - source_point_[static_cast<std::size_t>(c)]);
         }
     }
-    return y;
 }
 
 int RotationTransform::input_dimension() const {
@@ -134,18 +133,17 @@ AffineTransform::AffineTransform(
     matrix_ = random_affine_matrix(rng, dimension_);
 }
 
-std::vector<double> AffineTransform::apply(const std::vector<double>& x) const {
+void AffineTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
     require_dimension(x, input_dimension(), "affine transform input");
-    std::vector<double> y(static_cast<std::size_t>(dimension_), 0.0);
+    out.assign(static_cast<std::size_t>(dimension_), 0.0);
     for (int r = 0; r < dimension_; ++r) {
         const auto rr = static_cast<std::size_t>(r);
-        y[rr] = target_point_[rr];
+        out[rr] = target_point_[rr];
         for (int c = 0; c < dimension_; ++c) {
-            y[rr] += matrix_[rr][static_cast<std::size_t>(c)]
+            out[rr] += matrix_[rr][static_cast<std::size_t>(c)]
                 * (x[static_cast<std::size_t>(c)] - source_point_[static_cast<std::size_t>(c)]);
         }
     }
-    return y;
 }
 
 int AffineTransform::input_dimension() const {
@@ -189,23 +187,18 @@ BlockRotationTransform::BlockRotationTransform(
     matrix_ = random_rotation_matrix(rng, static_cast<int>(selected_indices_.size()));
 }
 
-std::vector<double> BlockRotationTransform::apply(const std::vector<double>& x) const {
+void BlockRotationTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
     require_dimension(x, input_dimension(), "block rotation transform input");
-    std::vector<double> y = target_point_;
-    std::vector<double> selected(selected_indices_.size(), 0.0);
-    for (std::size_t i = 0; i < selected_indices_.size(); ++i) {
-        const auto idx = static_cast<std::size_t>(selected_indices_[i]);
-        selected[i] = x[idx] - source_point_[idx];
-    }
+    out = target_point_;
 
     for (std::size_t r = 0; r < selected_indices_.size(); ++r) {
         const auto out_idx = static_cast<std::size_t>(selected_indices_[r]);
-        y[out_idx] = target_point_[out_idx];
+        out[out_idx] = target_point_[out_idx];
         for (std::size_t c = 0; c < selected_indices_.size(); ++c) {
-            y[out_idx] += matrix_[r][c] * selected[c];
+            const auto in_idx = static_cast<std::size_t>(selected_indices_[c]);
+            out[out_idx] += matrix_[r][c] * (x[in_idx] - source_point_[in_idx]);
         }
     }
-    return y;
 }
 
 int BlockRotationTransform::input_dimension() const {

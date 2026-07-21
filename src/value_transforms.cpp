@@ -44,8 +44,6 @@ std::string describe_scalar(double value) {
 double ValueTransform::apply(double u) const {
     u = clamp_nonnegative(u);
     require(u >= 0.0, "value transform input must be nonnegative (u=" + describe_scalar(u) + ")");
-    const double at_origin = raw_apply(0.0);
-    require(std::abs(at_origin) <= 1.0e-12, "value transform must satisfy f(0) = 0");
     const double value = clamp_finite_nonnegative(raw_apply(u));
     require(value >= 0.0, "value transform output must be nonnegative (f(u)=" + describe_scalar(value) + ")");
     return value;

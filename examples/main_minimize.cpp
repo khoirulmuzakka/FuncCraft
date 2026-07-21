@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
         int failed = 0;
         for (int i = 0; i < function_count; ++i) {
             try {
-                const auto function = suite.function(i);
+                const auto& function = suite.function(i);
                 const auto& spec = function.spec();
                 const auto fields = split_class_label(spec.function_class_label);
                 const auto bounds = function.domain();
@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
                           << std::setw(16) << std::scientific << std::setprecision(3) << error
                           << "\n";
             } catch (const std::exception& e) {
-                const auto function = suite.function(i);
+                const auto& function = suite.function(i);
                 std::cerr << "run_minimize failed at index " << i
                           << " label=" << function.spec().function_class_label
                           << ": " << e.what() << "\n";

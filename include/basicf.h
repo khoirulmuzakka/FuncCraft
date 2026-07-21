@@ -126,6 +126,14 @@ public:
      */
     std::vector<double> operator()(const std::vector<std::vector<double>>& X) const;
     /**
+     * @brief Evaluate the primitive at one input point.
+     */
+    double evaluate(const std::vector<double>& x) const;
+    /**
+     * @brief Evaluate the primitive at one already dimension-checked input point.
+     */
+    double evaluate(const double* x) const;
+    /**
      * @brief Return the primitive identifier.
      */
     BasicFunctionId id() const;

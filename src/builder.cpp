@@ -332,15 +332,17 @@ ComposedFunction FunctionBuilder::build() const {
     return [components, composition, dimension, penalty, domain](const std::vector<std::vector<double>>& X) {
         std::vector<double> values;
         values.reserve(X.size());
+        std::vector<double> component_values(components->size(), 0.0);
+        std::vector<double> transformed(static_cast<std::size_t>(dimension), 0.0);
+        std::vector<double> normalized(static_cast<std::size_t>(dimension), 0.0);
         for (const auto& x : X) {
             require_dimension(x, dimension, "benchmark function input");
-            std::vector<double> component_values;
-            component_values.reserve(components->size());
             bool invalid = false;
-            for (const auto& component : *components) {
-                const auto transformed = component.coordinate_transform->apply(x);
-                const auto normalized = detail::map_point_to_default_domain(transformed, domain);
-                const double raw_value = (*component.basic_function)(std::vector<std::vector<double>>{normalized}).front();
+            for (std::size_t component_index = 0; component_index < components->size(); ++component_index) {
+                const auto& component = (*components)[component_index];
+                component.coordinate_transform->apply(x, transformed);
+                detail::map_point_to_default_domain(transformed, domain, normalized);
+                const double raw_value = component.basic_function->evaluate(normalized.data());
                 if (!std::isfinite(raw_value)) {
                     invalid = true;
                     break;
@@ -361,7 +363,7 @@ ComposedFunction FunctionBuilder::build() const {
                     invalid = true;
                     break;
                 }
-                component_values.push_back(transformed_value);
+                component_values[component_index] = transformed_value;
             }
             if (invalid) {
                 values.push_back(penalty);

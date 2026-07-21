@@ -10,6 +10,24 @@
 namespace FuncCraft {
 using namespace detail;
 
+namespace {
+
+void require_nonnegative_weights(const std::vector<double>& weights) {
+    for (double weight : weights) {
+        require(weight >= 0.0, "weights must be nonnegative");
+    }
+}
+
+double weighted_sum_unchecked(const std::vector<double>& weights, const std::vector<double>& z) {
+    double result = 0.0;
+    for (std::size_t i = 0; i < z.size(); ++i) {
+        result += weights[i] * z[i];
+    }
+    return result;
+}
+
+} // namespace
+
 double CompositionFunction::apply(const std::vector<double>& x, const std::vector<double>& z) const {
     require(!z.empty(), "composition requires at least one component");
     require(!x.empty(), "composition point must not be empty");
@@ -46,6 +64,7 @@ CompositionSpec SingleComponentComposition::spec() const {
 WeightedSumComposition::WeightedSumComposition(std::vector<double> weights)
     : weights_(std::move(weights)) {
     require(!weights_.empty(), "weighted sum needs at least one weight");
+    require_nonnegative_weights(weights_);
 }
 
 WeightedSumComposition::WeightedSumComposition(std::size_t components)
@@ -54,7 +73,8 @@ WeightedSumComposition::WeightedSumComposition(std::size_t components)
 }
 
 double WeightedSumComposition::common_raw_apply(const std::vector<double>& z) const {
-    return weighted_sum(weights_, z);
+    require(weights_.size() == z.size(), "weight/component size mismatch");
+    return weighted_sum_unchecked(weights_, z);
 }
 
 CompositionClass WeightedSumComposition::composition_class() const {
@@ -72,6 +92,7 @@ PowerMeanComposition::PowerMeanComposition(std::vector<double> weights, double p
     : weights_(std::move(weights)),
       p_(p) {
     require(!weights_.empty(), "power mean needs at least one weight");
+    require_nonnegative_weights(weights_);
     require(p > 0.0, "power mean exponent must be positive");
 }
 
@@ -86,7 +107,6 @@ double PowerMeanComposition::common_raw_apply(const std::vector<double>& z) cons
     require(weights_.size() == z.size(), "weight/component size mismatch");
     double sum = 0.0;
     for (std::size_t i = 0; i < z.size(); ++i) {
-        require(weights_[i] >= 0.0, "weights must be nonnegative");
         require(z[i] >= 0.0, "power mean components must be nonnegative");
         sum += weights_[i] * std::pow(z[i], p_);
     }
@@ -110,6 +130,7 @@ LevelWellComposition::LevelWellComposition(std::vector<double> weights, double e
       epsilon_(epsilon),
       alpha_(alpha) {
     require(!weights_.empty(), "level well needs at least one weight");
+    require_nonnegative_weights(weights_);
     require(epsilon >= 0.0 && epsilon < 1.0, "level-well epsilon must be in [0, 1)");
     require(alpha >= 0.0, "level-well alpha must be nonnegative");
 }
@@ -124,7 +145,8 @@ LevelWellComposition::LevelWellComposition(std::size_t components, double epsilo
 }
 
 double LevelWellComposition::common_raw_apply(const std::vector<double>& z) const {
-    const double s = weighted_sum(weights_, z);
+    require(weights_.size() == z.size(), "weight/component size mismatch");
+    const double s = weighted_sum_unchecked(weights_, z);
     return s * (1.0 + epsilon_ * std::sin(alpha_ * s));
 }
 
@@ -160,21 +182,18 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
     require(z.size() == centers_.size(), "deceptive component size mismatch");
     require(x.size() == centers_.front().size(), "deceptive point dimension mismatch");
 
-    std::vector<double> logits(centers_.size(), 0.0);
     double max_logit = -std::numeric_limits<double>::infinity();
-    const double dim = static_cast<double>(centers_.front().size());
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        logits[i] = -sharpness_ * squared_distance(x, centers_[i]);
-        max_logit = std::max(max_logit, logits[i]);
+        max_logit = std::max(max_logit, -sharpness_ * squared_distance(x, centers_[i]));
     }
 
-    const double optimum_distance = std::sqrt(squared_distance(x, centers_.front()));
-    const double selective_mask = 1.0 - std::exp(-optimum_distance * optimum_distance);
+    const double optimum_distance_sq = squared_distance(x, centers_.front());
+    const double selective_mask = 1.0 - std::exp(-optimum_distance_sq);
 
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp(logits[i]-max_logit);
+        double w = std::exp((-sharpness_ * squared_distance(x, centers_[i])) - max_logit);
         if (i > 0) {
             w *= selective_mask;
         }
@@ -223,25 +242,21 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
     require(z.size() == centers_.size(), "deceptive bg component size mismatch");
     require(x.size() == centers_.front().size(), "deceptive bg point dimension mismatch");
 
-    std::vector<double> logits(centers_.size(), 0.0);
     double max_logit = -std::numeric_limits<double>::infinity();
-    for (std::size_t i = 0; i < centers_.size(); ++i) {
-        logits[i] = -sharpness_ * squared_distance(x, centers_[i]);
-        max_logit = std::max(max_logit, logits[i]);
-    }
-
     double min_distance = std::numeric_limits<double>::infinity();
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        min_distance = std::min(min_distance, std::sqrt(squared_distance(x, centers_[i])));
+        const double distance_sq = squared_distance(x, centers_[i]);
+        max_logit = std::max(max_logit, -sharpness_ * distance_sq);
+        min_distance = std::min(min_distance, std::sqrt(distance_sq));
     }
     const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance));
-    const double optimum_distance = std::sqrt(squared_distance(x, centers_.front()));
-    const double selective_mask = 1.0 - std::exp(-optimum_distance * optimum_distance);
+    const double optimum_distance_sq = squared_distance(x, centers_.front());
+    const double selective_mask = 1.0 - std::exp(-optimum_distance_sq);
 
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp(logits[i] - max_logit);
+        double w = std::exp((-sharpness_ * squared_distance(x, centers_[i])) - max_logit);
         if (i > 0) {
             w *= selective_mask;
         }

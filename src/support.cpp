@@ -60,23 +60,22 @@ void require_dimension(const std::vector<double>& x, int dimension, const std::s
     require(static_cast<int>(x.size()) == dimension, name + " dimension mismatch");
 }
 
-std::vector<double> map_point_to_default_domain(const std::vector<double>& point, const Domain& domain) {
+void map_point_to_default_domain(const std::vector<double>& point, const Domain& domain, std::vector<double>& out) {
     require_dimension(point, domain.dimension(), "mapping point");
     constexpr double kDefaultDomainLower = -5.0;
     constexpr double kDefaultDomainUpper = 5.0;
 
-    std::vector<double> normalized(point.size(), 0.0);
+    out.assign(point.size(), 0.0);
     for (std::size_t i = 0; i < point.size(); ++i) {
         const double lo = domain.lower[i];
         const double hi = domain.upper[i];
         if (hi == lo) {
-            normalized[i] = 0.0;
+            out[i] = 0.0;
             continue;
         }
         const double t = (point[i] - lo) / (hi - lo);
-        normalized[i] = kDefaultDomainLower + t * (kDefaultDomainUpper - kDefaultDomainLower);
+        out[i] = kDefaultDomainLower + t * (kDefaultDomainUpper - kDefaultDomainLower);
     }
-    return normalized;
 }
 
 std::vector<double> map_point_from_default_domain(const std::vector<double>& point, const Domain& domain) {
