@@ -68,25 +68,32 @@ struct SuiteSpec {
         8, 9, 10, 11, 12, 13, 14, 15,
         16, 17, 18, 19, 20, 21, 22, 23,
         24, 25, 26, 27, 28, 29, 30, 31,
-        32, 33, 34, 36, 37, 38, 39,
+        32, 33, 34, 35,
     };
     std::vector<ChoiceSpec> base_function_coord_transforms = {
-        make_choice_spec("rotation", 0.3),
-        make_choice_spec("affine", 0.7),
+        make_choice_spec("none", 0.25),
+        make_choice_spec("rotation", 0.25),
+        make_choice_spec("affine", 0.25),
+        make_choice_spec("blockrotation", 0.25),
     };
     std::vector<ChoiceSpec> coord_transforms = {
-        make_choice_spec("rotation", 0.3),
-        make_choice_spec("affine", 0.3),
-        make_choice_spec("blockrotation", 0.4),
+        make_choice_spec("none", 0.25),
+        make_choice_spec("rotation", 0.25),
+        make_choice_spec("affine", 0.25),
+        make_choice_spec("blockrotation", 0.25),
     };
     std::vector<ChoiceSpec> value_transforms = {
-        make_choice_spec("osc", 0.8),
-        make_choice_spec("power", 0.2),
+        make_choice_spec("none", 0.25),
+        make_choice_spec("coszero", 0.25),
+        make_choice_spec("osc", 0.25),
+        make_choice_spec("power", 0.25),
     };
     std::vector<ChoiceSpec> composition_functions = {
-        make_choice_spec("cpmlwell", 0.25),
-        make_choice_spec("cpmsum", 0.25),
-        ChoiceSpec{"dpmsoftmax", 0.5, {0.01, 1.0, 0.01}},
+        make_choice_spec("cpmsum", 0.20),
+        make_choice_spec("cpmlwell", 0.20),
+        make_choice_spec("cpmpmean", 0.20),
+        make_choice_spec("dpmsoftmax", 0.20),
+        make_choice_spec("dpmbgsoftmax", 0.20),
     };
     std::vector<int> base_functions_for_compositions = {
         0, 2, 4, 8, 9, 10, 11, 12,

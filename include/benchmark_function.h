@@ -15,6 +15,10 @@
 #include "function_spec.h"
 #include "core.h"
 
+#include <string>
+
+#include <yaml-cpp/yaml.h>
+
 namespace FuncCraft {
 
 /**
@@ -52,12 +56,24 @@ public:
      */
     double lambda() const;
     /**
+     * @brief Return the runtime additive bias applied after scaling.
+     */
+    double bias() const;
+    /**
      * @brief Return the complete specification used to build this function.
      *
      * The returned spec is the normalized source record, including the
      * derived class label and any captured descriptive fields.
      */
     const FunctionSpec& spec() const;
+    /**
+     * @brief Export the complete reproducibility spec as a YAML node.
+     */
+    YAML::Node export_spec() const;
+    /**
+     * @brief Export the complete reproducibility spec to a YAML file.
+     */
+    void export_spec(const std::string& path) const;
 
 private:
     FunctionSpec spec_;

@@ -27,6 +27,8 @@ namespace FuncCraft {
  * - `selected_indices` is used by block/subspace transforms and is interpreted as 0-based indices.
  * - `source_point` and `target_point` are full-length vectors with size `dimension`.
  * - `parameters` stores extra scalar parameters for transform families that need them.
+ * - `matrix` stores the concrete linear transform used at runtime when the
+ *   transform family has one.
  */
 struct TransformSpec {
     std::string kind;
@@ -36,6 +38,7 @@ struct TransformSpec {
     std::vector<double> source_point;
     std::vector<double> target_point;
     std::vector<double> parameters;
+    std::vector<std::vector<double>> matrix;
 };
 
 /**

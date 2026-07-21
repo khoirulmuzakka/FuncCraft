@@ -73,6 +73,12 @@ public:
         std::vector<double> source_point,
         std::vector<double> target_point,
         std::uint64_t seed);
+    RotationTransform(
+        int dimension,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed,
+        std::vector<std::vector<double>> matrix);
 
     void apply(const std::vector<double>& x, std::vector<double>& out) const override;
     int input_dimension() const override;
@@ -97,6 +103,12 @@ public:
         std::vector<double> source_point,
         std::vector<double> target_point,
         std::uint64_t seed);
+    AffineTransform(
+        int dimension,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed,
+        std::vector<std::vector<double>> matrix);
 
     void apply(const std::vector<double>& x, std::vector<double>& out) const override;
     int input_dimension() const override;
@@ -127,6 +139,13 @@ public:
         std::vector<double> source_point,
         std::vector<double> target_point,
         std::uint64_t seed);
+    BlockRotationTransform(
+        int dimension,
+        std::vector<int> selected_indices,
+        std::vector<double> source_point,
+        std::vector<double> target_point,
+        std::uint64_t seed,
+        std::vector<std::vector<double>> matrix);
 
     void apply(const std::vector<double>& x, std::vector<double>& out) const override;
     int input_dimension() const override;

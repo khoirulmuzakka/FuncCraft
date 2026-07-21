@@ -7,6 +7,27 @@
 namespace FuncCraft {
 using namespace detail;
 
+namespace {
+
+void require_matrix_shape(const std::vector<std::vector<double>>& matrix, int rows, int cols, const std::string& name) {
+    require(static_cast<int>(matrix.size()) == rows, name + " row count mismatch");
+    for (const auto& row : matrix) {
+        require(static_cast<int>(row.size()) == cols, name + " column count mismatch");
+    }
+}
+
+std::vector<std::vector<double>> identity_matrix(int dimension) {
+    std::vector<std::vector<double>> matrix(
+        static_cast<std::size_t>(dimension),
+        std::vector<double>(static_cast<std::size_t>(dimension), 0.0));
+    for (int i = 0; i < dimension; ++i) {
+        matrix[static_cast<std::size_t>(i)][static_cast<std::size_t>(i)] = 1.0;
+    }
+    return matrix;
+}
+
+} // namespace
+
 CoordinateTransform::CoordinateTransform(
     int dimension,
     std::vector<double> source_point,
@@ -71,6 +92,7 @@ TransformSpec IdentityTransform::spec() const {
     spec.seed = static_cast<int>(seed_);
     spec.source_point = source_point_;
     spec.target_point = target_point_;
+    spec.matrix = identity_matrix(dimension_);
     return spec;
 }
 
@@ -84,6 +106,19 @@ RotationTransform::RotationTransform(
     require_dimension(target_point_, dimension_, "rotation transform target point");
     std::mt19937_64 rng(mix_seed(seed_));
     matrix_ = random_rotation_matrix(rng, dimension_);
+}
+
+RotationTransform::RotationTransform(
+    int dimension,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed,
+    std::vector<std::vector<double>> matrix)
+    : CoordinateTransform(dimension, std::move(source_point), std::move(target_point), seed),
+      matrix_(std::move(matrix)) {
+    require_dimension(source_point_, dimension_, "rotation transform source point");
+    require_dimension(target_point_, dimension_, "rotation transform target point");
+    require_matrix_shape(matrix_, dimension_, dimension_, "rotation transform matrix");
 }
 
 void RotationTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
@@ -118,6 +153,7 @@ TransformSpec RotationTransform::spec() const {
     spec.seed = static_cast<int>(seed_);
     spec.source_point = source_point_;
     spec.target_point = target_point_;
+    spec.matrix = matrix_;
     return spec;
 }
 
@@ -131,6 +167,19 @@ AffineTransform::AffineTransform(
     require_dimension(target_point_, dimension_, "affine transform target point");
     std::mt19937_64 rng(mix_seed(seed_));
     matrix_ = random_affine_matrix(rng, dimension_);
+}
+
+AffineTransform::AffineTransform(
+    int dimension,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed,
+    std::vector<std::vector<double>> matrix)
+    : CoordinateTransform(dimension, std::move(source_point), std::move(target_point), seed),
+      matrix_(std::move(matrix)) {
+    require_dimension(source_point_, dimension_, "affine transform source point");
+    require_dimension(target_point_, dimension_, "affine transform target point");
+    require_matrix_shape(matrix_, dimension_, dimension_, "affine transform matrix");
 }
 
 void AffineTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
@@ -165,6 +214,7 @@ TransformSpec AffineTransform::spec() const {
     spec.seed = static_cast<int>(seed_);
     spec.source_point = source_point_;
     spec.target_point = target_point_;
+    spec.matrix = matrix_;
     return spec;
 }
 
@@ -185,6 +235,27 @@ BlockRotationTransform::BlockRotationTransform(
     }
     std::mt19937_64 rng(mix_seed(seed_));
     matrix_ = random_rotation_matrix(rng, static_cast<int>(selected_indices_.size()));
+}
+
+BlockRotationTransform::BlockRotationTransform(
+    int dimension,
+    std::vector<int> selected_indices,
+    std::vector<double> source_point,
+    std::vector<double> target_point,
+    std::uint64_t seed,
+    std::vector<std::vector<double>> matrix)
+    : CoordinateTransform(dimension, std::move(source_point), std::move(target_point), seed),
+      selected_indices_(std::move(selected_indices)),
+      matrix_(std::move(matrix)) {
+    require(dimension_ > 0, "block rotation transform dimension must be positive");
+    require(!selected_indices_.empty(), "block rotation transform needs at least one selected index");
+    require_dimension(source_point_, dimension_, "block rotation source point");
+    require_dimension(target_point_, dimension_, "block rotation target point");
+    for (int idx : selected_indices_) {
+        require(idx >= 0 && idx < dimension_, "block rotation selected index out of range");
+    }
+    const int block_size = static_cast<int>(selected_indices_.size());
+    require_matrix_shape(matrix_, block_size, block_size, "block rotation transform matrix");
 }
 
 void BlockRotationTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
@@ -221,6 +292,7 @@ TransformSpec BlockRotationTransform::spec() const {
     spec.selected_indices = selected_indices_;
     spec.source_point = source_point_;
     spec.target_point = target_point_;
+    spec.matrix = matrix_;
     return spec;
 }
 

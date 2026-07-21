@@ -83,13 +83,38 @@ std::shared_ptr<CoordinateTransform> make_coordinate_transform(const TransformSp
         return std::make_shared<IdentityTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
     }
     if (kind == "rotation" || kind == "rot") {
+        if (!spec.matrix.empty()) {
+            return std::make_shared<RotationTransform>(
+                spec.dimension,
+                spec.source_point,
+                spec.target_point,
+                seed,
+                spec.matrix);
+        }
         return std::make_shared<RotationTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
     }
     if (kind == "affine" || kind == "aff") {
+        if (!spec.matrix.empty()) {
+            return std::make_shared<AffineTransform>(
+                spec.dimension,
+                spec.source_point,
+                spec.target_point,
+                seed,
+                spec.matrix);
+        }
         return std::make_shared<AffineTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
     }
     if (kind == "blockrotation" || kind == "blockrot" || kind == "brot") {
         require(!spec.selected_indices.empty(), "block rotation transform needs selected indices");
+        if (!spec.matrix.empty()) {
+            return std::make_shared<BlockRotationTransform>(
+                spec.dimension,
+                spec.selected_indices,
+                spec.source_point,
+                spec.target_point,
+                seed,
+                spec.matrix);
+        }
         return std::make_shared<BlockRotationTransform>(
             spec.dimension,
             spec.selected_indices,

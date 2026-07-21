@@ -108,6 +108,14 @@ class BenchmarkSuite:
         """Alias for :meth:`evaluate`."""
         return self._suite(index, points)
 
+    def export_manifest(self, path):
+        """Write the suite spec and all generated function specs to a YAML file."""
+        self._suite.export_manifest(str(path))
+
+    def export_spec(self, path):
+        """Alias for :meth:`export_manifest`."""
+        self._suite.export_spec(str(path))
+
     def __len__(self):
         return len(self._suite)
 

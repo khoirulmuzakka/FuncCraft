@@ -10,12 +10,16 @@
  */
 
 #include "core.h"
+#include "function_spec.h"
+#include "suite_spec.h"
 
 #include <cstdint>
 #include <random>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <yaml-cpp/yaml.h>
 
 namespace FuncCraft {
 namespace detail {
@@ -88,6 +92,18 @@ std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, in
  * @brief Generate a random affine transform matrix.
  */
 std::vector<std::vector<double>> random_affine_matrix(std::mt19937_64& rng, int dimension);
+/**
+ * @brief Convert a generated function spec to a YAML node.
+ */
+YAML::Node function_spec_to_yaml(const FunctionSpec& spec);
+/**
+ * @brief Convert a suite spec to a YAML node.
+ */
+YAML::Node suite_spec_to_yaml(const SuiteSpec& spec);
+/**
+ * @brief Write a YAML node to disk.
+ */
+void write_yaml_file(const std::string& path, const YAML::Node& node);
 
 } // namespace detail
 } // namespace FuncCraft

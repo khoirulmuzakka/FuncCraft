@@ -56,6 +56,9 @@ PYBIND11_MODULE(_funccraft, m) {
         .def("__call__", [](const FuncCraft::BasicF& self, const std::vector<std::vector<double>>& X) {
             return self(X);
         }, py::arg("points"))
+        .def("evaluate", [](const FuncCraft::BasicF& self, const std::vector<double>& x) {
+            return self.evaluate(x);
+        }, py::arg("point"))
         .def_readonly("name", &FuncCraft::BasicF::name)
         .def_readonly("dimension", &FuncCraft::BasicF::dimension)
         .def_property_readonly("default_domain", &FuncCraft::BasicF::default_domain)
@@ -94,7 +97,8 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("selected_indices", &FuncCraft::TransformSpec::selected_indices)
         .def_readwrite("source_point", &FuncCraft::TransformSpec::source_point)
         .def_readwrite("target_point", &FuncCraft::TransformSpec::target_point)
-        .def_readwrite("parameters", &FuncCraft::TransformSpec::parameters);
+        .def_readwrite("parameters", &FuncCraft::TransformSpec::parameters)
+        .def_readwrite("matrix", &FuncCraft::TransformSpec::matrix);
 
     py::class_<FuncCraft::ValueTransformSpec>(m, "ValueTransformSpec")
         .def(py::init<>())
@@ -171,11 +175,18 @@ PYBIND11_MODULE(_funccraft, m) {
         .def("__call__", [](const FuncCraft::BenchmarkFunction& self, const std::vector<std::vector<double>>& X) {
             return self(X);
         }, py::arg("points"))
+        .def("evaluate", [](const FuncCraft::BenchmarkFunction& self, const std::vector<std::vector<double>>& X) {
+            return self(X);
+        }, py::arg("points"))
         .def_property_readonly("domain", &FuncCraft::BenchmarkFunction::domain, py::return_value_policy::reference_internal)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkFunction::dimension)
         .def_property_readonly("lambda", &FuncCraft::BenchmarkFunction::lambda)
         .def_property_readonly("scale", &FuncCraft::BenchmarkFunction::lambda)
+        .def_property_readonly("bias", &FuncCraft::BenchmarkFunction::bias)
         .def_property_readonly("spec", &FuncCraft::BenchmarkFunction::spec, py::return_value_policy::reference_internal)
+        .def("export_spec", [](const FuncCraft::BenchmarkFunction& self, const std::string& path) {
+            self.export_spec(path);
+        }, py::arg("path"))
         .def("__repr__", [](const FuncCraft::BenchmarkFunction& self) {
             return "BenchmarkFunction(dimension=" + std::to_string(self.dimension())
                 + ", label='" + self.spec().function_class_label
@@ -198,6 +209,12 @@ PYBIND11_MODULE(_funccraft, m) {
             return self(index, X);
         }, py::arg("index"), py::arg("points"))
         .def_property_readonly("spec", &FuncCraft::BenchmarkSuite::spec, py::return_value_policy::reference_internal)
+        .def("export_manifest", [](const FuncCraft::BenchmarkSuite& self, const std::string& path) {
+            self.export_manifest(path);
+        }, py::arg("path"))
+        .def("export_spec", [](const FuncCraft::BenchmarkSuite& self, const std::string& path) {
+            self.export_spec(path);
+        }, py::arg("path"))
         .def("__repr__", [](const FuncCraft::BenchmarkSuite& self) {
             return "BenchmarkSuite(size=" + std::to_string(self.size())
                 + ", dimension=" + std::to_string(self.dimension()) + ")";

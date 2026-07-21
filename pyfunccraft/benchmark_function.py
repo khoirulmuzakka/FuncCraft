@@ -68,6 +68,11 @@ class BenchmarkFunction:
         return self._function.scale
 
     @property
+    def bias(self):
+        """Return the runtime additive bias applied after scaling."""
+        return self._function.bias
+
+    @property
     def spec(self):
         """Return the normalized function specification used to build it."""
         return self._spec
@@ -82,6 +87,14 @@ class BenchmarkFunction:
             dimension.
         """
         return self._function(points)
+
+    def evaluate(self, points):
+        """Evaluate a batch of candidate points."""
+        return self._function.evaluate(points)
+
+    def export_spec(self, path):
+        """Write the complete function reproducibility spec to a YAML file."""
+        self._function.export_spec(str(path))
 
     def __repr__(self):
         return (

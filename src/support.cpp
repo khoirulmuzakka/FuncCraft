@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <sstream>
@@ -219,6 +220,145 @@ std::vector<std::vector<double>> random_affine_matrix(std::mt19937_64& rng, int 
         }
     }
     return matrix;
+}
+
+YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
+    auto double_vector = [](const std::vector<double>& values) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (double value : values) {
+            node.push_back(value);
+        }
+        return node;
+    };
+    auto int_vector = [](const std::vector<int>& values) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (int value : values) {
+            node.push_back(value);
+        }
+        return node;
+    };
+    auto string_vector = [](const std::vector<std::string>& values) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (const std::string& value : values) {
+            node.push_back(value);
+        }
+        return node;
+    };
+    auto double_matrix = [&double_vector](const std::vector<std::vector<double>>& values) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (const auto& row : values) {
+            node.push_back(double_vector(row));
+        }
+        return node;
+    };
+    auto transform_spec = [&](const TransformSpec& transform) {
+        YAML::Node node;
+        node["kind"] = transform.kind;
+        node["dimension"] = transform.dimension;
+        node["seed"] = transform.seed;
+        node["selected_indices"] = int_vector(transform.selected_indices);
+        node["source_point"] = double_vector(transform.source_point);
+        node["target_point"] = double_vector(transform.target_point);
+        node["parameters"] = double_vector(transform.parameters);
+        node["matrix"] = double_matrix(transform.matrix);
+        return node;
+    };
+    auto value_transform_spec = [&double_vector](const ValueTransformSpec& transform) {
+        YAML::Node node;
+        node["kind"] = transform.kind;
+        node["seed"] = transform.seed;
+        node["parameters"] = double_vector(transform.parameters);
+        return node;
+    };
+    auto composition_spec = [&](const CompositionSpec& composition) {
+        YAML::Node node;
+        node["kind"] = composition.kind;
+        node["seed"] = composition.seed;
+        node["parameters"] = double_vector(composition.parameters);
+        node["centers"] = double_matrix(composition.centers);
+        node["offsets"] = double_vector(composition.offsets);
+        node["weights"] = double_vector(composition.weights);
+        return node;
+    };
+
+    YAML::Node components(YAML::NodeType::Sequence);
+    for (const ComponentSpec& component : spec.component_specs) {
+        YAML::Node node;
+        node["base_function"] = component.base_function;
+        node["component_dimension"] = component.component_dimension;
+        node["coordinate_transform"] = transform_spec(component.coordinate_transform);
+        node["value_transform"] = value_transform_spec(component.value_transform);
+        node["seed"] = component.seed;
+        components.push_back(node);
+    }
+
+    YAML::Node node;
+    node["dimension"] = spec.dimension;
+    node["lower_bound"] = double_vector(spec.lower_bound);
+    node["upper_bound"] = double_vector(spec.upper_bound);
+    node["component_specs"] = components;
+    node["composition_spec"] = composition_spec(spec.composition_spec);
+    node["seed"] = spec.seed;
+    node["function_class_label"] = spec.function_class_label;
+    node["known_global_minimizer"] = double_vector(spec.known_global_minimizer);
+    node["known_global_value"] = spec.known_global_value;
+    node["parameters"] = string_vector(spec.parameters);
+    return node;
+}
+
+YAML::Node suite_spec_to_yaml(const SuiteSpec& spec) {
+    auto int_vector = [](const std::vector<int>& values) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (int value : values) {
+            node.push_back(value);
+        }
+        return node;
+    };
+    auto double_vector = [](const std::vector<double>& values) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (double value : values) {
+            node.push_back(value);
+        }
+        return node;
+    };
+    auto choice_vector = [&double_vector](const std::vector<ChoiceSpec>& choices) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (const ChoiceSpec& choice : choices) {
+            YAML::Node item;
+            item["kind"] = choice.kind;
+            item["probability"] = choice.probability;
+            item["parameters"] = double_vector(choice.parameters);
+            node.push_back(item);
+        }
+        return node;
+    };
+
+    YAML::Node node;
+    node["supported_dimensions"] = spec.supported_dimensions;
+    node["base_functions"] = int_vector(spec.base_functions);
+    node["base_function_coord_transforms"] = choice_vector(spec.base_function_coord_transforms);
+    node["coord_transforms"] = choice_vector(spec.coord_transforms);
+    node["value_transforms"] = choice_vector(spec.value_transforms);
+    node["composition_functions"] = choice_vector(spec.composition_functions);
+    node["base_functions_for_compositions"] = int_vector(spec.base_functions_for_compositions);
+    node["max_components"] = spec.max_components;
+    node["requested_number_of_functions"] = spec.requested_number_of_functions;
+    node["max_number_of_functions"] = spec.max_number_of_functions;
+    node["master_seed"] = spec.master_seed;
+    node["lower_bound"] = spec.lower_bound;
+    node["upper_bound"] = spec.upper_bound;
+    node["f_opt"] = spec.f_opt;
+    node["suite_label"] = spec.suite_label;
+    return node;
+}
+
+void write_yaml_file(const std::string& path, const YAML::Node& node) {
+    std::ofstream out(path);
+    if (!out) {
+        throw std::runtime_error("failed to open YAML output file: " + path);
+    }
+    out << node;
+    out << '\n';
 }
 
 } // namespace detail

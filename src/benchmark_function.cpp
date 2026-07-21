@@ -162,8 +162,26 @@ double BenchmarkFunction::lambda() const {
     return lambda_;
 }
 
+double BenchmarkFunction::bias() const {
+    return bias_;
+}
+
 const FunctionSpec& BenchmarkFunction::spec() const {
     return spec_;
+}
+
+YAML::Node BenchmarkFunction::export_spec() const {
+    YAML::Node node;
+    node["format"] = "funccraft.benchmark_function";
+    node["format_version"] = 1;
+    node["function_spec"] = detail::function_spec_to_yaml(spec_);
+    node["runtime"]["lambda"] = lambda_;
+    node["runtime"]["bias"] = bias_;
+    return node;
+}
+
+void BenchmarkFunction::export_spec(const std::string& path) const {
+    detail::write_yaml_file(path, export_spec());
 }
 
 } // namespace FuncCraft

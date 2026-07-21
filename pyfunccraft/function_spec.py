@@ -49,31 +49,38 @@ def _default_composition_base_functions():
 
 def _default_base_function_coord_transforms():
     return [
-        ChoiceSpec("rotation", 0.3),
-        ChoiceSpec("affine", 0.7),
+        ChoiceSpec("none", 0.25),
+        ChoiceSpec("rotation", 0.25),
+        ChoiceSpec("affine", 0.25),
+        ChoiceSpec("blockrotation", 0.25),
     ]
 
 
 def _default_coord_transforms():
     return [
-        ChoiceSpec("rotation", 0.3),
-        ChoiceSpec("affine", 0.3),
-        ChoiceSpec("blockrotation", 0.4),
+        ChoiceSpec("none", 0.25),
+        ChoiceSpec("rotation", 0.25),
+        ChoiceSpec("affine", 0.25),
+        ChoiceSpec("blockrotation", 0.25),
     ]
 
 
 def _default_value_transforms():
     return [
-        ChoiceSpec("osc", 0.8),
-        ChoiceSpec("power", 0.2),
+        ChoiceSpec("none", 0.25),
+        ChoiceSpec("coszero", 0.25),
+        ChoiceSpec("osc", 0.25),
+        ChoiceSpec("power", 0.25),
     ]
 
 
 def _default_composition_functions():
     return [
-        ChoiceSpec("cpmlwell", 0.25),
-        ChoiceSpec("cpmsum", 0.25),
-        ChoiceSpec("dpmsoftmax", 0.5, [0.01, 1.0, 0.01]),
+        ChoiceSpec("cpmsum", 0.20),
+        ChoiceSpec("cpmlwell", 0.20),
+        ChoiceSpec("cpmpmean", 0.20),
+        ChoiceSpec("dpmsoftmax", 0.20),
+        ChoiceSpec("dpmbgsoftmax", 0.20),
     ]
 
 
@@ -313,9 +320,10 @@ class TransformSpec(SpecMapping):
         ("source_point", []),
         ("target_point", []),
         ("parameters", []),
+        ("matrix", []),
     )
 
-    def __init__(self, kind="", dimension=0, seed=0, selected_indices=None, source_point=None, target_point=None, parameters=None):
+    def __init__(self, kind="", dimension=0, seed=0, selected_indices=None, source_point=None, target_point=None, parameters=None, matrix=None):
         super().__init__()
         self.kind = kind
         self.dimension = dimension
@@ -324,6 +332,7 @@ class TransformSpec(SpecMapping):
         self.source_point = _copy_list(source_point)
         self.target_point = _copy_list(target_point)
         self.parameters = _copy_list(parameters)
+        self.matrix = [_copy_list(row) for row in (matrix or [])]
 
     @classmethod
     def from_cpp(cls, native):
@@ -335,6 +344,7 @@ class TransformSpec(SpecMapping):
             source_point=_copy_list(native.source_point),
             target_point=_copy_list(native.target_point),
             parameters=_copy_list(native.parameters),
+            matrix=[_copy_list(row) for row in native.matrix],
         )
 
     @classmethod
@@ -347,6 +357,7 @@ class TransformSpec(SpecMapping):
             source_point=_copy_list(data.get("source_point", [])),
             target_point=_copy_list(data.get("target_point", [])),
             parameters=_copy_list(data.get("parameters", [])),
+            matrix=[_copy_list(row) for row in data.get("matrix", [])],
         )
 
     def to_cpp(self):
@@ -358,6 +369,7 @@ class TransformSpec(SpecMapping):
         native.source_point = _copy_list(self.source_point)
         native.target_point = _copy_list(self.target_point)
         native.parameters = _copy_list(self.parameters)
+        native.matrix = [_copy_list(row) for row in self.matrix]
         return native
 
 

@@ -1493,7 +1493,7 @@ Smooth approximate alternatives include distance-based softmax weights,
 \begin{equation}
 	\label{eqs:weights_softmax}
 	w_i(x)=
-	\frac{\exp(-\alpha\|x-\tilde x_i\|^2)}
+	\frac{\exp(-\alpha\|x-\tilde x_i\|^2) 
 	{\sum_{j=1}^m \exp(-\alpha\|x-\tilde x_j\|^2)},
 \end{equation}
 inverse-distance weights of the form

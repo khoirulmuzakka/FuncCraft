@@ -21,6 +21,8 @@
 #include <utility>
 #include <vector>
 
+#include <yaml-cpp/yaml.h>
+
 namespace FuncCraft {
 
 /**
@@ -75,6 +77,22 @@ public:
      * @brief Return the normalized suite specification used to build this suite.
      */
     const SuiteSpec& spec() const;
+    /**
+     * @brief Export the suite spec and every generated function spec as a YAML node.
+     */
+    YAML::Node export_manifest() const;
+    /**
+     * @brief Export the suite manifest to a YAML file.
+     */
+    void export_manifest(const std::string& path) const;
+    /**
+     * @brief Alias for export_manifest().
+     */
+    YAML::Node export_spec() const;
+    /**
+     * @brief Alias for export_manifest(path).
+     */
+    void export_spec(const std::string& path) const;
 
 private:
     struct FunctionBlueprint {

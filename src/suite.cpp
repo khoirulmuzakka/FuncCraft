@@ -376,46 +376,56 @@ std::vector<double> equal_weights(int count) {
     return std::vector<double>(static_cast<std::size_t>(count), 1.0);
 }
 
-std::vector<double> random_point_in_domain(std::mt19937_64& rng, const Domain& domain) {
-    std::vector<double> x(static_cast<std::size_t>(domain.dimension()), 0.0);
+Domain centered_scaled_domain(const Domain& domain, double factor) {
+    require(factor > 0.0 && factor <= 1.0, "domain scale factor must be in (0, 1]");
+    Domain scaled = domain;
     for (int i = 0; i < domain.dimension(); ++i) {
         const auto idx = static_cast<std::size_t>(i);
-        x[idx] = domain.lower[idx] + (domain.upper[idx] - domain.lower[idx]) * uniform01(rng);
+        const double center = 0.5 * (domain.lower[idx] + domain.upper[idx]);
+        const double half_width = 0.5 * (domain.upper[idx] - domain.lower[idx]) * factor;
+        scaled.lower[idx] = center - half_width;
+        scaled.upper[idx] = center + half_width;
     }
-    return x;
+    return scaled;
 }
 
-std::vector<double> random_point_in_shrunk_domain(std::mt19937_64& rng, const Domain& domain, double factor = 0.7) {
-    require(factor > 0.0 && factor <= 1.0, "shrink factor must be in (0, 1]");
-    std::vector<double> x(static_cast<std::size_t>(domain.dimension()), 0.0);
-    for (int i = 0; i < domain.dimension(); ++i) {
-        const auto idx = static_cast<std::size_t>(i);
-        const double lower = domain.lower[idx] * factor;
-        const double upper = domain.upper[idx] * factor;
-        x[idx] = lower + (upper - lower) * uniform01(rng);
-    }
-    return x;
-}
-
-std::vector<double> random_point_in_domain_away_from_origin(
+std::vector<std::vector<double>> latin_hypercube_points_in_domain(
     std::mt19937_64& rng,
     const Domain& domain,
-    double min_norm) {
-    for (int attempt = 0; attempt < 1000; ++attempt) {
-        auto x = random_point_in_domain(rng, domain);
-        double norm_sq = 0.0;
-        for (double value : x) {
-            norm_sq += value * value;
-        }
-        if (std::sqrt(norm_sq) >= min_norm) {
-            return x;
+    int count) {
+    require(count >= 0, "latin hypercube sample count must be nonnegative");
+    require(domain.dimension() > 0, "latin hypercube domain dimension must be positive");
+
+    std::vector<std::vector<double>> points(
+        static_cast<std::size_t>(count),
+        std::vector<double>(static_cast<std::size_t>(domain.dimension()), 0.0));
+    if (count == 0) {
+        return points;
+    }
+
+    std::vector<int> strata(static_cast<std::size_t>(count), 0);
+    for (int i = 0; i < count; ++i) {
+        strata[static_cast<std::size_t>(i)] = i;
+    }
+
+    for (int d = 0; d < domain.dimension(); ++d) {
+        stable_shuffle(strata, rng);
+        const auto dim = static_cast<std::size_t>(d);
+        const double lo = domain.lower[dim];
+        const double hi = domain.upper[dim];
+        for (int i = 0; i < count; ++i) {
+            const double t = (static_cast<double>(strata[static_cast<std::size_t>(i)]) + uniform01(rng))
+                / static_cast<double>(count);
+            points[static_cast<std::size_t>(i)][dim] = lo + (hi - lo) * t;
         }
     }
-    auto x = random_point_in_domain(rng, domain);
-    if (!x.empty() && std::fabs(x.front()) < min_norm) {
-        x.front() = domain.upper.front() >= min_norm ? min_norm : domain.upper.front();
-    }
-    return x;
+
+    return points;
+}
+
+std::vector<std::vector<double>> latin_hypercube_centers(std::mt19937_64& rng, const Domain& domain, int count) {
+    constexpr double kCenterDomainFraction = 0.8;
+    return latin_hypercube_points_in_domain(rng, centered_scaled_domain(domain, kCenterDomainFraction), count);
 }
 
 TransformSpec make_coordinate_transform_spec(
@@ -425,7 +435,6 @@ TransformSpec make_coordinate_transform_spec(
     const std::vector<double>& target_point,
     std::uint64_t seed,
     std::mt19937_64& rng,
-    bool allow_block_rotation,
     const std::vector<int>* selected_indices) {
     TransformSpec spec;
     spec.dimension = dimension;
@@ -445,7 +454,7 @@ TransformSpec make_coordinate_transform_spec(
         spec.kind = "affine";
         return spec;
     }
-    if ((choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation") && allow_block_rotation) {
+    if (choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation") {
         require(dimension > 1, "block rotation requires dimension greater than one");
         if (selected_indices != nullptr) {
             require(!selected_indices->empty(), "block rotation selected indices must not be empty");
@@ -456,7 +465,7 @@ TransformSpec make_coordinate_transform_spec(
             }
             return spec;
         }
-        const int selected_size = dimension == 2 ? 1 : uniform_int(rng, 2, dimension - 1);
+        const int selected_size = uniform_int(rng, 1, dimension);
         std::set<int> indices;
         while (static_cast<int>(indices.size()) < selected_size) {
             indices.insert(uniform_int(rng, 0, dimension - 1));
@@ -538,32 +547,38 @@ CompositionSpec make_composition_spec(
 
 std::vector<ChoiceSpec> default_base_transform_choices() {
     return {
-        make_choice_spec("rotation", 0.5),
-        make_choice_spec("affine", 0.5),
+        make_choice_spec("none", 0.25),
+        make_choice_spec("rotation", 0.25),
+        make_choice_spec("affine", 0.25),
+        make_choice_spec("blockrotation", 0.25),
     };
 }
 
 std::vector<ChoiceSpec> default_coord_transform_choices() {
     return {
-        make_choice_spec("rotation", 0.35),
-        make_choice_spec("affine", 0.35),
-        make_choice_spec("blockrotation", 0.30),
+        make_choice_spec("none", 0.25),
+        make_choice_spec("rotation", 0.25),
+        make_choice_spec("affine", 0.25),
+        make_choice_spec("blockrotation", 0.25),
     };
 }
 
 std::vector<ChoiceSpec> default_value_transform_choices() {
     return {
-        make_choice_spec("coszero", 0.34),
-        make_choice_spec("osc", 0.33),
-        make_choice_spec("power", 0.33),
+        make_choice_spec("none", 0.25),
+        make_choice_spec("coszero", 0.25),
+        make_choice_spec("osc", 0.25),
+        make_choice_spec("power", 0.25),
     };
 }
 
 std::vector<ChoiceSpec> default_composition_choices() {
     return {
-        make_choice_spec("cpmsum", 0.34),
-        make_choice_spec("cpmlwell", 0.33),
-        make_choice_spec("dpmsoftmax", 0.33),
+        make_choice_spec("cpmsum", 0.20),
+        make_choice_spec("cpmlwell", 0.20),
+        make_choice_spec("cpmpmean", 0.20),
+        make_choice_spec("dpmsoftmax", 0.20),
+        make_choice_spec("dpmbgsoftmax", 0.20),
     };
 }
 
@@ -582,36 +597,84 @@ std::vector<BasicFunctionId> sample_base_functions(
     return selected;
 }
 
-std::vector<std::vector<int>> partition_indices(int dimension, int parts, std::mt19937_64& rng) {
-    require(dimension > 0, "partition dimension must be positive");
-    require(parts > 0, "partition parts must be positive");
-    require(parts <= dimension, "partition parts must not exceed dimension");
+bool is_block_rotation_choice(const ChoiceSpec& choice) {
+    return choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation";
+}
 
-    std::vector<int> indices(static_cast<std::size_t>(dimension));
+bool is_deceptive_composition_choice(const ChoiceSpec& choice) {
+    const std::string kind = normalize_token(choice.kind);
+    return kind == "dpm"
+        || kind == "dpmsoftmax"
+        || kind == "softmax"
+        || kind == "dpmbgsoftmax"
+        || kind == "dpm-bgsoftmax"
+        || kind == "dpm_bgsoftmax"
+        || kind == "bgsoftmax";
+}
+
+std::vector<int> full_dimension_indices(int dimension) {
+    require(dimension > 0, "dimension must be positive");
+    std::vector<int> indices(static_cast<std::size_t>(dimension), 0);
     for (int i = 0; i < dimension; ++i) {
         indices[static_cast<std::size_t>(i)] = i;
     }
-    stable_shuffle(indices, rng);
+    return indices;
+}
 
-    std::vector<std::vector<int>> blocks;
-    blocks.reserve(static_cast<std::size_t>(parts));
+std::vector<int> random_nonempty_subspace(int dimension, std::mt19937_64& rng) {
+    require(dimension > 0, "subspace dimension must be positive");
 
-    const int base_size = dimension / parts;
-    const int remainder = dimension % parts;
-    std::size_t offset = 0;
-    for (int i = 0; i < parts; ++i) {
-        const int block_size = base_size + (i < remainder ? 1 : 0);
-        require(block_size > 0, "partition block size must be positive");
-        std::vector<int> block;
-        block.reserve(static_cast<std::size_t>(block_size));
-        for (int j = 0; j < block_size; ++j) {
-            block.push_back(indices[offset + static_cast<std::size_t>(j)]);
-        }
-        offset += static_cast<std::size_t>(block_size);
-        std::sort(block.begin(), block.end());
-        blocks.push_back(std::move(block));
+    const int selected_size = dimension == 1 ? 1 : uniform_int(rng, 1, dimension);
+    std::set<int> indices;
+    while (static_cast<int>(indices.size()) < selected_size) {
+        indices.insert(uniform_int(rng, 0, dimension - 1));
     }
-    return blocks;
+    return {indices.begin(), indices.end()};
+}
+
+std::vector<std::vector<int>> covering_block_subspaces(int dimension, int count, std::mt19937_64& rng) {
+    require(dimension > 0, "subspace dimension must be positive");
+    require(count > 0, "subspace count must be positive");
+
+    std::vector<std::vector<int>> subspaces(static_cast<std::size_t>(count));
+    for (int d = 0; d < dimension; ++d) {
+        const int subspace = uniform_int(rng, 0, count - 1);
+        subspaces[static_cast<std::size_t>(subspace)].push_back(d);
+    }
+
+    for (auto& indices : subspaces) {
+        if (indices.empty()) {
+            indices = random_nonempty_subspace(dimension, rng);
+        }
+        std::sort(indices.begin(), indices.end());
+        indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+    }
+
+    return subspaces;
+}
+
+std::vector<std::vector<int>> block_rotation_subspaces(
+    const std::vector<ChoiceSpec>& coord_choices,
+    int dimension,
+    std::mt19937_64& rng) {
+    const bool all_block_rotation = std::all_of(coord_choices.begin(), coord_choices.end(), is_block_rotation_choice);
+    const int block_count = static_cast<int>(std::count_if(coord_choices.begin(), coord_choices.end(), is_block_rotation_choice));
+    std::vector<std::vector<int>> generated = all_block_rotation
+        ? covering_block_subspaces(dimension, block_count, rng)
+        : std::vector<std::vector<int>>{};
+
+    std::vector<std::vector<int>> per_component(coord_choices.size());
+    int block_index = 0;
+    for (std::size_t i = 0; i < coord_choices.size(); ++i) {
+        if (!is_block_rotation_choice(coord_choices[i])) {
+            continue;
+        }
+        per_component[i] = all_block_rotation
+            ? generated[static_cast<std::size_t>(block_index)]
+            : random_nonempty_subspace(dimension, rng);
+        ++block_index;
+    }
+    return per_component;
 }
 
 std::uint64_t saturating_add(std::uint64_t a, std::uint64_t b) {
@@ -716,19 +779,6 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         const ChoiceSpec& comp_choice = choose_weighted(composition_choices, rng);
         const int max_components = spec_.max_components;
         const int component_count = uniform_int(rng, 2, max_components);
-        std::vector<ChoiceSpec> coord_choices_for_function = coord_choices;
-        if (component_count > dimension_) {
-            coord_choices_for_function.erase(
-                std::remove_if(
-                    coord_choices_for_function.begin(),
-                    coord_choices_for_function.end(),
-                    [](const ChoiceSpec& choice) {
-                        return choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation";
-                    }),
-                coord_choices_for_function.end());
-        }
-        require(!coord_choices_for_function.empty(), "suite spec leaves no valid coordinate transforms for this dimension and component count");
-
         FunctionBlueprint blueprint;
         blueprint.composed = true;
         blueprint.component_count = component_count;
@@ -736,7 +786,7 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         blueprint.coord_transform_choices.reserve(static_cast<std::size_t>(component_count));
         blueprint.value_transform_choices.reserve(static_cast<std::size_t>(component_count));
         for (int i = 0; i < component_count; ++i) {
-            blueprint.coord_transform_choices.push_back(choose_weighted(coord_choices_for_function, rng));
+            blueprint.coord_transform_choices.push_back(choose_weighted(coord_choices, rng));
             blueprint.value_transform_choices.push_back(choose_weighted(value_choices, rng));
         }
         blueprint.composition_choice = comp_choice;
@@ -749,7 +799,7 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
     spec_.max_number_of_functions = static_cast<int>(blueprints_.size());
     function_cache_.resize(blueprints_.size());
     std::cout << "BenchmarkSuite generated. Requested functions: " << requested_count
-              << ", theoretical max functions: " << theoretical_max_number_of_functions_
+              << ", theoretical max functions: " << std::scientific << static_cast<long double>(theoretical_max_number_of_functions_) << std::defaultfloat
               << ", generated functions: " << max_number_of_functions()
               << ", dimension: " << dimension_ << '\n';
 }
@@ -780,11 +830,14 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
     std::mt19937_64 rng(mix_seed(blueprint.seed ^ static_cast<std::uint64_t>(dimension_)));
 
     if (!blueprint.composed) {
-        const auto x_star = random_point_in_shrunk_domain(rng, domain, 0.7);
+        const auto x_star = latin_hypercube_centers(rng, domain, 1).front();
         builder.known_global_minimizer(x_star);
         builder.parameter("suite_role", "base");
 
         const std::vector<double> target = x_star;
+        const std::vector<int> full_subspace = is_block_rotation_choice(blueprint.base_transform_choice)
+            ? full_dimension_indices(dimension_)
+            : std::vector<int>{};
         builder.add_component(
             blueprint.base_function,
             dimension_,
@@ -796,45 +849,40 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
                     target,
                     blueprint.seed,
                     rng,
-                    false,
-                    nullptr)),
+                    is_block_rotation_choice(blueprint.base_transform_choice) ? &full_subspace : nullptr)),
             std::make_shared<IdentityValueTransform>())
             .composition(std::make_shared<SingleComponentComposition>());
 
         return BenchmarkFunction(builder.build_spec());
     }
 
-    const std::string composition_kind = normalize_token(blueprint.composition_choice.kind);
-    const bool dpm_mode = composition_kind == "dpmsoftmax"
-        || composition_kind == "dpm"
-        || composition_kind == "softmax"
-        || composition_kind == "dpmbgsoftmax"
-        || composition_kind == "dpm-bgsoftmax"
-        || composition_kind == "dpm_bgsoftmax"
-        || composition_kind == "bgsoftmax";
-    const auto x_star = dpm_mode
-        ? random_point_in_domain_away_from_origin(rng, Domain(dimension_, spec_.lower_bound * 0.7, spec_.upper_bound * 0.7), 5.0)
-        : random_point_in_shrunk_domain(rng, domain, 0.7);
+    const bool dpm_mode = is_deceptive_composition_choice(blueprint.composition_choice);
+    const int random_center_count = dpm_mode
+        ? 1 + std::max(0, blueprint.component_count - 2)
+        : 1;
+    const std::vector<std::vector<double>> random_centers = latin_hypercube_centers(rng, domain, random_center_count);
+    const auto x_star = random_centers.front();
     std::vector<std::vector<double>> centers(static_cast<std::size_t>(blueprint.component_count), x_star);
     std::vector<double> offsets(static_cast<std::size_t>(blueprint.component_count), 0.0);
     const bool uses_block_rotation = std::any_of(
         blueprint.coord_transform_choices.begin(),
         blueprint.coord_transform_choices.end(),
-        [](const ChoiceSpec& choice) {
-            return choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation";
-        });
-    std::vector<std::vector<int>> block_partitions;
-    if (uses_block_rotation) {
-        require(blueprint.component_count <= dimension_, "block rotation composition requires dimension at least the number of components");
-        block_partitions = partition_indices(dimension_, blueprint.component_count, rng);
+        is_block_rotation_choice);
+    std::vector<std::vector<int>> block_subspaces = uses_block_rotation
+        ? block_rotation_subspaces(blueprint.coord_transform_choices, dimension_, rng)
+        : std::vector<std::vector<int>>(static_cast<std::size_t>(blueprint.component_count));
+    if (dpm_mode && is_block_rotation_choice(blueprint.coord_transform_choices.front())) {
+        block_subspaces.front() = full_dimension_indices(dimension_);
     }
     if (dpm_mode) {
         const double deceptive_step = 10.0 + 0.1 * spec_.f_opt;
+        int random_center_index = 1;
         for (int i = 1; i < blueprint.component_count; ++i) {
             if (i == 1) {
                 centers[static_cast<std::size_t>(i)] = std::vector<double>(static_cast<std::size_t>(dimension_), 0.0);
             } else {
-                centers[static_cast<std::size_t>(i)] = random_point_in_shrunk_domain(rng, domain, 0.7);
+                centers[static_cast<std::size_t>(i)] = random_centers[static_cast<std::size_t>(random_center_index)];
+                ++random_center_index;
             }
             offsets[static_cast<std::size_t>(i)] = deceptive_step * static_cast<double>(i);
         }
@@ -858,8 +906,9 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
                     target,
                     component_seed,
                     rng,
-                    true,
-                    uses_block_rotation ? &block_partitions[static_cast<std::size_t>(i)] : nullptr)),
+                    is_block_rotation_choice(blueprint.coord_transform_choices[static_cast<std::size_t>(i)])
+                        ? &block_subspaces[static_cast<std::size_t>(i)]
+                        : nullptr)),
             make_value_transform(
                 make_value_transform_spec(
                     blueprint.value_transform_choices[static_cast<std::size_t>(i)])));
@@ -907,6 +956,38 @@ std::vector<double> BenchmarkSuite::operator()(int index, const std::vector<std:
 
 const SuiteSpec& BenchmarkSuite::spec() const {
     return spec_;
+}
+
+YAML::Node BenchmarkSuite::export_manifest() const {
+    YAML::Node node;
+    node["format"] = "funccraft.benchmark_suite_manifest";
+    node["format_version"] = 1;
+    node["suite_spec"] = detail::suite_spec_to_yaml(spec_);
+    node["dimension"] = dimension_;
+    node["size"] = size();
+    node["max_number_of_functions"] = max_number_of_functions();
+    node["theoretical_max_number_of_functions"] = theoretical_max_number_of_functions_;
+
+    YAML::Node functions(YAML::NodeType::Sequence);
+    for (int i = 0; i < size(); ++i) {
+        YAML::Node entry = function(i).export_spec();
+        entry["index"] = i;
+        functions.push_back(entry);
+    }
+    node["functions"] = functions;
+    return node;
+}
+
+void BenchmarkSuite::export_manifest(const std::string& path) const {
+    detail::write_yaml_file(path, export_manifest());
+}
+
+YAML::Node BenchmarkSuite::export_spec() const {
+    return export_manifest();
+}
+
+void BenchmarkSuite::export_spec(const std::string& path) const {
+    export_manifest(path);
 }
 
 BenchmarkSuite make_benchmark_suite(SuiteSpec spec, int dimension) {
