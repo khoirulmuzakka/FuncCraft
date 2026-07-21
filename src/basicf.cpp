@@ -1,4 +1,5 @@
 #include "basicf.h"
+#include "core.h"
 
 #include <algorithm>
 #include <cmath>
@@ -49,6 +50,26 @@ void validate_dimension(int dimension) {
 
 double sqr(double x) {
     return x * x;
+}
+
+double sign_of(double x) {
+    if (x > 0.0) {
+        return 1.0;
+    }
+    if (x < 0.0) {
+        return -1.0;
+    }
+    return 0.0;
+}
+
+double osz_transform(double x) {
+    if (x == 0.0) {
+        return 0.0;
+    }
+    const double hat = std::log(std::fabs(x));
+    const double c1 = x > 0.0 ? 10.0 : 5.5;
+    const double c2 = x > 0.0 ? 7.9 : 3.1;
+    return sign_of(x) * std::exp(hat + 0.049 * (std::sin(c1 * hat) + std::sin(c2 * hat)));
 }
 
 double safe_pow_abs(double x, double exponent) {
@@ -175,11 +196,13 @@ double separable_rastrigin_eval(const double* x, int dimension) {
 double bueche_rastrigin_eval(const double* x, int dimension) {
     double sum = 10.0 * static_cast<double>(dimension);
     for (int i = 0; i < dimension; ++i) {
-        double xi = x[i];
-        if ((i % 2) == 0 && xi > 0.0) {
-            xi *= 10.0;
+        double zi = osz_transform(x[i]);
+        const double exponent = dimension > 1 ? 0.5 * static_cast<double>(i) / static_cast<double>(dimension - 1) : 0.0;
+        zi *= std::pow(10.0, exponent);
+        if ((i % 2) == 0 && zi > 0.0) {
+            zi *= 10.0;
         }
-        sum += sqr(xi) - 10.0 * std::cos(2.0 * kPi * xi);
+        sum += sqr(zi) - 10.0 * std::cos(2.0 * kPi * zi);
     }
     return sum;
 }
@@ -213,25 +236,21 @@ double step_ellipsoidal_eval(const double* x, int dimension) {
 }
 
 double step_rastrigin_eval(const double* x, int dimension) {
-    constexpr double scale = 5.12 / 100.0;
     double sum = 0.0;
     for (int i = 0; i < dimension; ++i) {
         double y = x[i];
         if (std::fabs(y) > 0.5) {
             y = std::floor(2.0 * y + 0.5) / 2.0;
         }
-        const double z = scale * y;
-        sum += sqr(z) - 10.0 * std::cos(2.0 * kPi * z) + 10.0;
+        sum += sqr(y) - 10.0 * std::cos(2.0 * kPi * y) + 10.0;
     }
     return sum;
 }
 
 double rastrigin_eval(const double* x, int dimension) {
-    constexpr double scale = 5.12 / 100.0;
-    double sum = 0.0;
+    double sum = 10.0 * static_cast<double>(dimension);
     for (int i = 0; i < dimension; ++i) {
-        const double z = scale * x[i];
-        sum += sqr(z) - 10.0 * std::cos(2.0 * kPi * z) + 10.0;
+        sum += sqr(x[i]) - 10.0 * std::cos(2.0 * kPi * x[i]);
     }
     return sum;
 }
@@ -381,11 +400,15 @@ double lunacek_bi_rastrigin_eval(const double* x, int dimension) {
     double sum2 = 0.0;
     double rastrigin = 0.0;
     for (int i = 0; i < dimension; ++i) {
-        const double y = 0.1 * x[i];
-        const double z = 2.0 * y;
-        sum1 += sqr(z);
-        sum2 += sqr(z + mu0 - mu1);
-        rastrigin += 10.0 * (1.0 - std::cos(2.0 * kPi * y));
+        const double sign = x[i] >= 0.0 ? 1.0 : -1.0;
+        const double hat = 2.0 * sign * x[i];
+        const double diff0 = hat - mu0;
+        const double diff1 = hat - mu1;
+        const double exponent = dimension > 1 ? 0.5 * static_cast<double>(i) / static_cast<double>(dimension - 1) : 0.0;
+        const double z = std::pow(100.0, exponent) * diff0;
+        sum1 += sqr(diff0);
+        sum2 += sqr(diff1);
+        rastrigin += 10.0 * (1.0 - std::cos(2.0 * kPi * z));
     }
     return std::min(sum1, d * static_cast<double>(dimension) + s * sum2) + rastrigin;
 }
@@ -414,14 +437,287 @@ double levy_eval(const double* x, int dimension) {
     return term1 + sum + term3;
 }
 
+double michalewicz_eval(const double* x, int dimension) {
+    constexpr double m = 10.0;
+    double sum = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        const double a = std::sin(static_cast<double>(i + 1) * x[i] * x[i] / kPi);
+        const double a2 = a * a;
+        // Use a nonnegative base for the even power to avoid libm edge cases on
+        // negative bases while preserving the standard Michalewicz formula.
+        sum += std::sin(x[i]) * std::pow(a2, m);
+    }
+    return -sum;
+}
+
+double michalewicz_gain(int index, double x) {
+    const double s1 = std::sin(x);
+    const double s2 = std::sin(static_cast<double>(index + 1) * x * x / kPi);
+    const double s2_sq = s2 * s2;
+    return s1 * std::pow(s2_sq, 10.0);
+}
+
+template <typename Func>
+double golden_section_maximize(Func&& f, double lo, double hi) {
+    constexpr double phi = 0.61803398874989484820;
+    constexpr int kIterations = 80;
+    double a = lo;
+    double b = hi;
+    double c = b - phi * (b - a);
+    double d = a + phi * (b - a);
+    double fc = f(c);
+    double fd = f(d);
+    for (int iter = 0; iter < kIterations; ++iter) {
+        if (fc < fd) {
+            a = c;
+            c = d;
+            fc = fd;
+            d = a + phi * (b - a);
+            fd = f(d);
+        } else {
+            b = d;
+            d = c;
+            fd = fc;
+            c = b - phi * (b - a);
+            fc = f(c);
+        }
+    }
+    return 0.5 * (a + b);
+}
+
+double michalewicz_coordinate_maximum(int index) {
+    constexpr int kCoarseSamples = 8192;
+    const double lower = 0.0;
+    const double upper = kPi;
+
+    double best_x = lower;
+    double best_value = -std::numeric_limits<double>::infinity();
+    for (int sample = 0; sample <= kCoarseSamples; ++sample) {
+        const double x = lower + (upper - lower) * static_cast<double>(sample) / static_cast<double>(kCoarseSamples);
+        const double value = michalewicz_gain(index, x);
+        if (value > best_value) {
+            best_value = value;
+            best_x = x;
+        }
+    }
+
+    const double step = (upper - lower) / static_cast<double>(kCoarseSamples);
+    const double left = std::max(lower, best_x - step);
+    const double right = std::min(upper, best_x + step);
+    return golden_section_maximize([index](double x) { return michalewicz_gain(index, x); }, left, right);
+}
+
+std::vector<double> michalewicz_reference_minimizer(int dimension) {
+    std::vector<double> x(static_cast<std::size_t>(dimension), 0.0);
+    for (int i = 0; i < dimension; ++i) {
+        x[static_cast<std::size_t>(i)] = michalewicz_coordinate_maximum(i);
+    }
+    return x;
+}
+
+double dixon_price_eval(const double* x, int dimension) {
+    double sum = sqr(x[0] - 1.0);
+    for (int i = 1; i < dimension; ++i) {
+        const double term = 2.0 * sqr(x[i]) - x[i - 1];
+        sum += static_cast<double>(i + 1) * sqr(term);
+    }
+    return sum;
+}
+
+double happy_cat_eval(const double* x, int dimension) {
+    double sum_sq = 0.0;
+    double sum_x = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        sum_sq += sqr(x[i]);
+        sum_x += x[i];
+    }
+    return std::pow(std::fabs(sum_sq - static_cast<double>(dimension)), 0.25)
+           + (0.5 * sum_sq + sum_x) / static_cast<double>(dimension)
+           + 0.5;
+}
+
+double hgbat_eval(const double* x, int dimension) {
+    double sum_sq = 0.0;
+    double sum_x = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        sum_sq += sqr(x[i]);
+        sum_x += x[i];
+    }
+    return std::sqrt(std::fabs(sum_sq * sum_sq - sum_x * sum_x))
+           + (0.5 * sum_sq + sum_x) / static_cast<double>(dimension)
+           + 0.5;
+}
+
+double hcf_eval(const double* x, int dimension) {
+    double sum_abs = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        sum_abs += std::fabs(x[i]);
+    }
+    return sum_abs * std::exp(sum_abs / static_cast<double>(dimension));
+}
+
+double grie_rosen_eval(const double* x, int dimension) {
+    double sum = 1.0;
+    for (int i = 0; i < dimension - 1; ++i) {
+        sum += 100.0 * sqr(x[i + 1] - sqr(x[i])) + sqr(1.0 - x[i]);
+    }
+    return sum;
+}
+
+double schaffer_f6_eval(const double* x, int dimension) {
+    if (dimension <= 1) {
+        return 0.0;
+    }
+    double sum = 0.0;
+    for (int i = 0; i < dimension - 1; ++i) {
+        const double term1 = sqr(x[i]) + sqr(x[i + 1]);
+        const double sin_term = std::sin(std::sqrt(term1));
+        const double denom_term = sqr(1.0 + 0.001 * term1);
+        sum += 0.5 + (sqr(sin_term) - 0.5) / denom_term;
+    }
+    return sum;
+}
+
+double step_eval(const double* x, int dimension) {
+    double sum = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        const double y = std::floor(x[i] + 0.5);
+        sum += y * y;
+    }
+    return sum;
+}
+
+double quartic_eval(const double* x, int dimension) {
+    double sum = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        sum += static_cast<double>(i + 1) * std::pow(x[i], 4.0);
+    }
+    return sum;
+}
+
+double brown_eval(const double* x, int dimension) {
+    if (dimension <= 1) {
+        return 0.0;
+    }
+    double sum = 0.0;
+    for (int i = 0; i < dimension - 1; ++i) {
+        const double xi2 = sqr(x[i]);
+        const double xj2 = sqr(x[i + 1]);
+        const double term1 = safe_pow_abs(xi2, xj2 + 1.0);
+        const double term2 = safe_pow_abs(xj2, xi2 + 1.0);
+        if (!std::isfinite(term1) || !std::isfinite(term2)) {
+            return std::numeric_limits<double>::max();
+        }
+        if (sum > std::numeric_limits<double>::max() - term1 - term2) {
+            return std::numeric_limits<double>::max();
+        }
+        sum += term1 + term2;
+    }
+    return sum;
+}
+
+double exponential_eval(const double* x, int dimension) {
+    double sum_sq = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        sum_sq += sqr(x[i]);
+    }
+    return -std::exp(-0.5 * sum_sq);
+}
+
+double styblinski_tang_eval(const double* x, int dimension) {
+    double sum = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        const double xi = x[i];
+        sum += std::pow(xi, 4.0) - 16.0 * sqr(xi) + 5.0 * xi;
+    }
+    return 0.5 * sum;
+}
+
+double sum_squares_eval(const double* x, int dimension) {
+    double sum = 0.0;
+    for (int i = 0; i < dimension; ++i) {
+        sum += static_cast<double>(i + 1) * sqr(x[i]);
+    }
+    return sum;
+}
+
 std::uint64_t seed_for(BasicFunctionId id, int dimension) {
     return 0x9E3779B97F4A7C15ULL ^ (static_cast<std::uint64_t>(dimension) << 32)
            ^ static_cast<std::uint64_t>(static_cast<int>(id) + 1);
 }
 
 std::vector<double> x_opt_for(BasicFunctionId id, int dimension) {
-    (void)id;
-    return std::vector<double>(static_cast<std::size_t>(dimension), 0.0);
+    switch (id) {
+    case BasicFunctionId::Rosenbrock:
+    case BasicFunctionId::GriewankRosenbrock:
+        return std::vector<double>(static_cast<std::size_t>(dimension), 0.0);
+    case BasicFunctionId::GrieRosen:
+        return std::vector<double>(static_cast<std::size_t>(dimension), 1.0);
+    case BasicFunctionId::DixonPrice: {
+        std::vector<double> x(static_cast<std::size_t>(dimension), 0.0);
+        if (dimension > 0) {
+            x[0] = 1.0;
+        }
+        for (int i = 1; i < dimension; ++i) {
+            const double exponent = (std::pow(2.0, static_cast<double>(i + 1)) - 2.0)
+                / std::pow(2.0, static_cast<double>(i + 1));
+            x[static_cast<std::size_t>(i)] = std::pow(2.0, -exponent);
+        }
+        return x;
+    }
+    case BasicFunctionId::HappyCat:
+    case BasicFunctionId::HGBat:
+        return std::vector<double>(static_cast<std::size_t>(dimension), -1.0);
+    case BasicFunctionId::StyblinskiTang:
+        return std::vector<double>(static_cast<std::size_t>(dimension), -2.903534);
+    case BasicFunctionId::Michalewicz:
+        return michalewicz_reference_minimizer(dimension);
+    case BasicFunctionId::LunacekBiRastrigin: {
+        std::vector<double> x(static_cast<std::size_t>(dimension), 1.25);
+        for (int i = 1; i < dimension; ++i) {
+            if ((i % 2) == 1) {
+                x[static_cast<std::size_t>(i)] = -1.25;
+            }
+        }
+        return x;
+    }
+    default:
+        return std::vector<double>(static_cast<std::size_t>(dimension), 0.0);
+    }
+}
+
+double f_opt_for(BasicFunctionId id, int dimension) {
+    switch (id) {
+    case BasicFunctionId::Exponential:
+        return -1.0;
+    case BasicFunctionId::Michalewicz:
+        return michalewicz_eval(michalewicz_reference_minimizer(dimension).data(), dimension);
+    case BasicFunctionId::GrieRosen:
+        return 1.0;
+    case BasicFunctionId::StyblinskiTang:
+        return -39.16616570377142 * static_cast<double>(dimension);
+    default:
+        return 0.0;
+    }
+}
+
+Domain default_domain_for(BasicFunctionId id, int dimension) {
+    if (id == BasicFunctionId::Ackley) {
+        return Domain(dimension, -50.0, 50.0);
+    }
+    if (id == BasicFunctionId::BuecheRastrigin
+        || id == BasicFunctionId::Schwefel
+        || id == BasicFunctionId::Weierstrass
+        || id == BasicFunctionId::SharpRidge
+        || id == BasicFunctionId::Katsuura) {
+        return Domain(dimension, -50.0, 50.0);
+    }
+    if (id == BasicFunctionId::Griewank
+        || id == BasicFunctionId::GriewankRosenbrock
+        || id == BasicFunctionId::Levy) {
+        return Domain(dimension, -20.0, 20.0);
+    }
+    return Domain(dimension, -5.0, 5.0);
 }
 
 bool basic_is_multimodal(BasicFunctionId id) {
@@ -440,6 +736,10 @@ bool basic_is_multimodal(BasicFunctionId id) {
     case BasicFunctionId::Katsuura:
     case BasicFunctionId::LunacekBiRastrigin:
     case BasicFunctionId::Levy:
+    case BasicFunctionId::Michalewicz:
+    case BasicFunctionId::GrieRosen:
+    case BasicFunctionId::SchafferF6:
+    case BasicFunctionId::StyblinskiTang:
         return true;
     default:
         return false;
@@ -494,6 +794,36 @@ std::string properties_for(BasicFunctionId id) {
         return "Basic function, Zakharov, unimodal, non-separable, polynomial coupling.";
     case BasicFunctionId::Levy:
         return "Basic function, Levy, multimodal, non-separable, periodic structure.";
+    case BasicFunctionId::Michalewicz:
+        return "Basic function, Michalewicz, multimodal, non-separable, many sharp local minima.";
+    case BasicFunctionId::DixonPrice:
+        return "Basic function, Dixon-Price, unimodal, non-separable, curved valley.";
+    case BasicFunctionId::BentCigar:
+        return "Basic function, Bent Cigar, unimodal, separable, extreme ill-conditioning.";
+    case BasicFunctionId::Discus:
+        return "Basic function, Discus, unimodal, separable, extreme axis scaling.";
+    case BasicFunctionId::HappyCat:
+        return "Basic function, HappyCat, multimodal, non-separable, flat ridge structure.";
+    case BasicFunctionId::HGBat:
+        return "Basic function, HGBat, multimodal, non-separable, flat ridge structure.";
+    case BasicFunctionId::HCF:
+        return "Basic function, HCF, unimodal, separable, exponential growth with L1 norm.";
+    case BasicFunctionId::GrieRosen:
+        return "Basic function, Griewank-Rosenbrock, multimodal, non-separable, Rosenbrock-style coupling.";
+    case BasicFunctionId::SchafferF6:
+        return "Basic function, Schaffer F6, multimodal, non-separable, pairwise radial coupling.";
+    case BasicFunctionId::Step:
+        return "Basic function, Step, unimodal, separable, piecewise constant.";
+    case BasicFunctionId::Quartic:
+        return "Basic function, Quartic, unimodal, separable, degree-4 polynomial.";
+    case BasicFunctionId::Brown:
+        return "Basic function, Brown, unimodal, non-separable, exponential pairwise coupling.";
+    case BasicFunctionId::Exponential:
+        return "Basic function, Exponential, unimodal, separable, smooth basin.";
+    case BasicFunctionId::StyblinskiTang:
+        return "Basic function, Styblinski-Tang, multimodal, separable, many local minima.";
+    case BasicFunctionId::SumSquares:
+        return "Basic function, Sum Squares, unimodal, separable, increasing coordinate weights.";
     default:
         return "Basic function.";
     }
@@ -507,9 +837,13 @@ BasicF::BasicF(BasicFunctionId id, int dim)
     name = to_string(id);
     dimension = dim;
     x_opt = x_opt_for(id, dim);
-    f_opt = 0.0;
+    f_opt = f_opt_for(id, dim);
     properties = properties_for(id);
     initialize_state();
+}
+
+Domain BasicF::default_domain() const {
+    return default_domain_for(id_, dimension);
 }
 
 void BasicF::initialize_state() {
@@ -595,6 +929,36 @@ double BasicF::evaluate_impl(const double* x) const {
         return zakharov_eval(x, dimension);
     case BasicFunctionId::Levy:
         return levy_eval(x, dimension);
+    case BasicFunctionId::Michalewicz:
+        return michalewicz_eval(x, dimension);
+    case BasicFunctionId::DixonPrice:
+        return dixon_price_eval(x, dimension);
+    case BasicFunctionId::BentCigar:
+        return bent_cigar_eval(x, dimension);
+    case BasicFunctionId::Discus:
+        return discus_eval(x, dimension);
+    case BasicFunctionId::HappyCat:
+        return happy_cat_eval(x, dimension);
+    case BasicFunctionId::HGBat:
+        return hgbat_eval(x, dimension);
+    case BasicFunctionId::HCF:
+        return hcf_eval(x, dimension);
+    case BasicFunctionId::GrieRosen:
+        return grie_rosen_eval(x, dimension);
+    case BasicFunctionId::SchafferF6:
+        return schaffer_f6_eval(x, dimension);
+    case BasicFunctionId::Step:
+        return step_eval(x, dimension);
+    case BasicFunctionId::Quartic:
+        return quartic_eval(x, dimension);
+    case BasicFunctionId::Brown:
+        return brown_eval(x, dimension);
+    case BasicFunctionId::Exponential:
+        return exponential_eval(x, dimension);
+    case BasicFunctionId::StyblinskiTang:
+        return styblinski_tang_eval(x, dimension);
+    case BasicFunctionId::SumSquares:
+        return sum_squares_eval(x, dimension);
     default:
         throw std::invalid_argument("unsupported basic function id");
     }
@@ -665,6 +1029,36 @@ std::string to_string(BasicFunctionId id) {
         return "Zakharov";
     case BasicFunctionId::Levy:
         return "Levy";
+    case BasicFunctionId::Michalewicz:
+        return "Michalewicz";
+    case BasicFunctionId::DixonPrice:
+        return "DixonPrice";
+    case BasicFunctionId::BentCigar:
+        return "BentCigar";
+    case BasicFunctionId::Discus:
+        return "Discus";
+    case BasicFunctionId::HappyCat:
+        return "HappyCat";
+    case BasicFunctionId::HGBat:
+        return "HGBat";
+    case BasicFunctionId::HCF:
+        return "HCF";
+    case BasicFunctionId::GrieRosen:
+        return "GrieRosen";
+    case BasicFunctionId::SchafferF6:
+        return "SchafferF6";
+    case BasicFunctionId::Step:
+        return "Step";
+    case BasicFunctionId::Quartic:
+        return "Quartic";
+    case BasicFunctionId::Brown:
+        return "Brown";
+    case BasicFunctionId::Exponential:
+        return "Exponential";
+    case BasicFunctionId::StyblinskiTang:
+        return "StyblinskiTang";
+    case BasicFunctionId::SumSquares:
+        return "SumSquares";
     default:
         throw std::invalid_argument("unknown basic function id");
     }
@@ -706,6 +1100,21 @@ std::vector<BasicFunctionId> list_basic_functions() {
         BasicFunctionId::LunacekBiRastrigin,
         BasicFunctionId::Zakharov,
         BasicFunctionId::Levy,
+        BasicFunctionId::Michalewicz,
+        BasicFunctionId::DixonPrice,
+        BasicFunctionId::BentCigar,
+        BasicFunctionId::Discus,
+        BasicFunctionId::HappyCat,
+        BasicFunctionId::HGBat,
+        BasicFunctionId::HCF,
+        BasicFunctionId::GrieRosen,
+        BasicFunctionId::SchafferF6,
+        BasicFunctionId::Step,
+        BasicFunctionId::Quartic,
+        BasicFunctionId::Brown,
+        BasicFunctionId::Exponential,
+        BasicFunctionId::StyblinskiTang,
+        BasicFunctionId::SumSquares,
     };
 }
 

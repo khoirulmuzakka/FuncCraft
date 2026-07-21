@@ -42,6 +42,8 @@ double estimate_lambda(const ComposedFunction& raw_function, const Domain& domai
     constexpr std::size_t kBatchSize = 64;
     constexpr std::size_t kMaxAttempts = kTargetSamples * 8;
     constexpr double kTargetScale = 1.0e5;
+    constexpr double kMinRepresentativeScale = 1.0e-12;
+    constexpr double kMaxLambda = 1.0e8;
 
     std::mt19937_64 rng(detail::mix_seed(seed ^ 0xD1CEB00B5EEDULL));
     std::vector<double> values;
@@ -75,10 +77,10 @@ double estimate_lambda(const ComposedFunction& raw_function, const Domain& domai
     }
 
     const double q90 = percentile(std::move(values), 0.9);
-    if (!std::isfinite(q90) || q90 <= 0.0) {
+    if (!std::isfinite(q90) || q90 <= kMinRepresentativeScale) {
         return 1.0;
     }
-    return kTargetScale / q90;
+    return std::min(kTargetScale / q90, kMaxLambda);
 }
 
 double saturating_apply_scale_and_bias(double raw_value, double lambda, double bias) {

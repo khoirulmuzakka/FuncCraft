@@ -17,6 +17,8 @@
 
 namespace FuncCraft {
 
+struct Domain;
+
 enum class BasicFunctionId {
     /// Sphere function.
     Sphere,
@@ -66,6 +68,36 @@ enum class BasicFunctionId {
     Zakharov,
     /// Levy function.
     Levy,
+    /// Michalewicz function.
+    Michalewicz,
+    /// Dixon-Price function.
+    DixonPrice,
+    /// Bent cigar function.
+    BentCigar,
+    /// Discus function.
+    Discus,
+    /// HappyCat function.
+    HappyCat,
+    /// HGBat function.
+    HGBat,
+    /// HCF function.
+    HCF,
+    /// Griewank-Rosenbrock function.
+    GrieRosen,
+    /// Schaffer F6 function.
+    SchafferF6,
+    /// Step function.
+    Step,
+    /// Quartic function.
+    Quartic,
+    /// Brown function.
+    Brown = 36,
+    /// Exponential function.
+    Exponential,
+    /// Styblinski-Tang function.
+    StyblinskiTang,
+    /// Sum squares function.
+    SumSquares,
 };
 
 /**
@@ -74,6 +106,7 @@ enum class BasicFunctionId {
  * A `BasicF` is a normalized primitive benchmark landscape. All built-in basic
  * functions are exposed in primitive coordinates:
  * - `dimension` is the requested problem dimension;
+ * - `default_domain` is the canonical plotting/evaluation box for the primitive;
  * - `x_opt` stores the global optimum of the implemented primitive;
  * - `f_opt` stores the primitive minimum value;
  * - `properties` is a human-readable summary of the landscape.
@@ -108,6 +141,11 @@ public:
     std::vector<double> x_opt;
     double f_opt = 0.0;
     std::string properties;
+
+    /**
+     * @brief Return the canonical domain recommended for plotting this primitive.
+     */
+    Domain default_domain() const;
 
 private:
     struct PeakData {

@@ -298,10 +298,14 @@ ComposedFunction FunctionBuilder::build() const {
 
     auto components = std::make_shared<std::vector<RuntimeComponent>>();
     components->reserve(built_spec.component_specs.size());
+    const Domain domain = domain_;
     for (const ComponentSpec& component_spec : built_spec.component_specs) {
+        const auto primitive = make_basic_function(component_spec.base_function, component_spec.component_dimension);
+        TransformSpec transform_spec = component_spec.coordinate_transform;
+        transform_spec.target_point = detail::map_point_from_default_domain(primitive->x_opt, domain);
         components->push_back(RuntimeComponent{
-            make_basic_function(component_spec.base_function, component_spec.component_dimension),
-            make_coordinate_transform(component_spec.coordinate_transform),
+            std::move(primitive),
+            make_coordinate_transform(std::move(transform_spec)),
             make_value_transform(component_spec.value_transform),
         });
     }
@@ -312,7 +316,7 @@ ComposedFunction FunctionBuilder::build() const {
     const int dimension = built_spec.dimension;
     const double penalty = std::numeric_limits<double>::infinity();
 
-    return [components, composition, dimension, penalty](const std::vector<std::vector<double>>& X) {
+    return [components, composition, dimension, penalty, domain](const std::vector<std::vector<double>>& X) {
         std::vector<double> values;
         values.reserve(X.size());
         for (const auto& x : X) {
@@ -322,12 +326,24 @@ ComposedFunction FunctionBuilder::build() const {
             bool invalid = false;
             for (const auto& component : *components) {
                 const auto transformed = component.coordinate_transform->apply(x);
-                const double raw_value = (*component.basic_function)(std::vector<std::vector<double>>{transformed}).front();
+                const auto normalized = detail::map_point_to_default_domain(transformed, domain);
+                const double raw_value = (*component.basic_function)(std::vector<std::vector<double>>{normalized}).front();
                 if (!std::isfinite(raw_value)) {
                     invalid = true;
                     break;
                 }
-                const double transformed_value = component.value_transform->apply(raw_value);
+                // Value transforms are defined on nonnegative inputs.
+                // Shift by the primitive optimum so negative-valued base functions
+                // remain valid.
+                double shifted_value = raw_value - component.basic_function->f_opt;
+                if (shifted_value < 0.0 && shifted_value >= -1.0e-12) {
+                    shifted_value = 0.0;
+                }
+                if (shifted_value < 0.0) {
+                    invalid = true;
+                    break;
+                }
+                const double transformed_value = component.value_transform->apply(shifted_value);
                 if (!std::isfinite(transformed_value)) {
                     invalid = true;
                     break;

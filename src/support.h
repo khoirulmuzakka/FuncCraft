@@ -31,6 +31,19 @@ void require(bool condition, const std::string& message);
  */
 void require_dimension(const std::vector<double>& x, int dimension, const std::string& name);
 /**
+ * @brief Map one point from a suite domain into the default primitive box.
+ *
+ * The default primitive box is `[-5, 5]` on every axis.
+ */
+std::vector<double> map_point_to_default_domain(const std::vector<double>& point, const Domain& domain);
+/**
+ * @brief Map one point from the default primitive box back into a suite domain.
+ *
+ * This is the inverse of `map_point_to_default_domain()` for axis-aligned
+ * rectangular domains.
+ */
+std::vector<double> map_point_from_default_domain(const std::vector<double>& point, const Domain& domain);
+/**
  * @brief Compute squared Euclidean distance.
  */
 double squared_distance(const std::vector<double>& a, const std::vector<double>& b);

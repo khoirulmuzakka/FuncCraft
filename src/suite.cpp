@@ -775,7 +775,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         builder.known_global_minimizer(x_star);
         builder.parameter("suite_role", "base");
 
-        const std::vector<double> zero(static_cast<std::size_t>(dimension_), 0.0);
+        const std::vector<double> target = x_star;
         builder.add_component(
             blueprint.base_function,
             dimension_,
@@ -784,7 +784,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
                     blueprint.base_transform_choice,
                     dimension_,
                     x_star,
-                    zero,
+                    target,
                     blueprint.seed,
                     rng,
                     false,
@@ -801,7 +801,6 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
     const auto x_star = dpm_mode
         ? random_point_in_domain_away_from_origin(rng, Domain(dimension_, spec_.lower_bound * 0.7, spec_.upper_bound * 0.7), 5.0)
         : random_point_in_shrunk_domain(rng, domain, 0.7);
-
     std::vector<std::vector<double>> centers(static_cast<std::size_t>(blueprint.component_count), x_star);
     std::vector<double> offsets(static_cast<std::size_t>(blueprint.component_count), 0.0);
     const bool uses_block_rotation = std::any_of(
@@ -830,9 +829,9 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
     builder.known_global_minimizer(x_star);
     builder.parameter("suite_role", "composed");
 
-    const std::vector<double> zero(static_cast<std::size_t>(dimension_), 0.0);
     for (int i = 0; i < blueprint.component_count; ++i) {
         const std::vector<double>& source = centers[static_cast<std::size_t>(i)];
+        const std::vector<double> target = x_star;
         const std::uint64_t component_seed = mix_seed(blueprint.seed + static_cast<std::uint64_t>(i) + 1ULL);
         builder.add_component(
             blueprint.component_bases[static_cast<std::size_t>(i)],
@@ -842,7 +841,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
                     blueprint.coord_transform_choices[static_cast<std::size_t>(i)],
                     dimension_,
                     source,
-                    zero,
+                    target,
                     component_seed,
                     rng,
                     true,
