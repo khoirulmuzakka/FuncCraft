@@ -48,8 +48,6 @@ enum class BasicFunctionId {
     Schwefel,
     /// Sharp ridge function.
     SharpRidge,
-    /// Different powers function.
-    DifferentPowers,
     /// Weierstrass function.
     Weierstrass,
     /// Schaffer F7 function.
@@ -90,14 +88,10 @@ enum class BasicFunctionId {
     Step,
     /// Quartic function.
     Quartic,
-    /// Brown function.
-    Brown = 36,
     /// Exponential function.
     Exponential,
     /// Styblinski-Tang function.
     StyblinskiTang,
-    /// Sum squares function.
-    SumSquares,
 };
 
 /**

@@ -1484,24 +1484,25 @@ must be zero. Normalization,
 	\sum_{i=1}^m w_i(x)=1,
 \]
 is useful for controlling scale, but it is not required for the minimum
-arguments above. If the weights are normalized, then \(\psi(x,z)\) defines a local
-or spatially varying blend of the shifted component objectives. 
+arguments above. However, since the weights $w_i(x)$ are typically distance-based, all unnormalized weights may approach zero when the distances to the prescribed points become large, causing the weighted composition to degenerate toward a trivial value. Normalization prevents this behavior by ensuring that the relative contributions of the component objectives remain nontrivial throughout the domain. If the weights are normalized, then \(\psi(x,z)\) defines a local or spatially varying blend of the shifted component objectives. 
 
 Several choices for $w_i(x)$ are possible. Compactly supported bump functions can enforce
 exact local selection, because one can set \(w_i=1\) on a small neighborhood of
 \(\tilde x_i\) and smoothly taper it to zero outside a larger neighborhood.
 Smooth approximate alternatives include distance-based softmax weights,
-\[
+\begin{equation}
+	\label{eqs:weights_softmax}
 	w_i(x)=
 	\frac{\exp(-\alpha\|x-\tilde x_i\|^2)}
 	{\sum_{j=1}^m \exp(-\alpha\|x-\tilde x_j\|^2)},
-\]
+\end{equation}
 inverse-distance weights of the form
-\[
-	w_i(x)=
+\begin{equation}
+	\label{eqs:weights_invpower}
+		w_i(x)=
 	\frac{(\|x-\tilde x_i\|^2+\epsilon)^{-p}}
 	{\sum_{j=1}^m(\|x-\tilde x_j\|^2+\epsilon)^{-p}},
-\]
+\end{equation}
 logistic gates for two-component transitions, and normalized
 partition-of-unity weights \(w_i(x)=\eta_i(x)/\sum_j\eta_j(x)\) built from
 nonnegative smooth basis functions \(\eta_i\). These smooth weights are easy to
@@ -1514,6 +1515,10 @@ These transition regions are not neutral, because the derivative of \(f\)
 contains terms involving \((z_i(x)+b_i)\nabla w_i(x)\); consequently, the
 choice of weights can itself create additional stationary points between
 prescribed basins.
+
+
+
+
 
 Figure~\ref{fig:deceptive-weighted-composition-3d} illustrates the construction
 on \([-100,100]^2\) using three different pairs of base functions:

@@ -43,6 +43,8 @@ std::string to_string(CompositionClass cls) {
         return "CPM-LWELL";
     case CompositionClass::DeceptivePointSoftmax:
         return "DPM-SOFTMAX";
+    case CompositionClass::DeceptivePointBgSoftmax:
+        return "DPM-BGSOFTMAX";
     default:
         return "UNKNOWN";
     }

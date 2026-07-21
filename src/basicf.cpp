@@ -296,22 +296,6 @@ double sharp_ridge_eval(const double* x, int dimension) {
     return sqr(x[0]) + 100.0 * std::sqrt(tail);
 }
 
-double different_powers_eval(const double* x, int dimension) {
-    double sum = 0.0;
-    for (int i = 0; i < dimension; ++i) {
-        const double exponent = 2.0 + 4.0 * static_cast<double>(i) / std::max(1, dimension - 1);
-        const double term = safe_pow_abs(x[i], exponent);
-        if (!std::isfinite(term)) {
-            return std::numeric_limits<double>::max();
-        }
-        if (sum > std::numeric_limits<double>::max() - term) {
-            return std::numeric_limits<double>::max();
-        }
-        sum += term;
-    }
-    return std::sqrt(sum);
-}
-
 double schaffer_f7_cec_eval(const double* x, int dimension) {
     if (dimension <= 1) {
         return 0.0;
@@ -595,27 +579,6 @@ double quartic_eval(const double* x, int dimension) {
     return sum;
 }
 
-double brown_eval(const double* x, int dimension) {
-    if (dimension <= 1) {
-        return 0.0;
-    }
-    double sum = 0.0;
-    for (int i = 0; i < dimension - 1; ++i) {
-        const double xi2 = sqr(x[i]);
-        const double xj2 = sqr(x[i + 1]);
-        const double term1 = safe_pow_abs(xi2, xj2 + 1.0);
-        const double term2 = safe_pow_abs(xj2, xi2 + 1.0);
-        if (!std::isfinite(term1) || !std::isfinite(term2)) {
-            return std::numeric_limits<double>::max();
-        }
-        if (sum > std::numeric_limits<double>::max() - term1 - term2) {
-            return std::numeric_limits<double>::max();
-        }
-        sum += term1 + term2;
-    }
-    return sum;
-}
-
 double exponential_eval(const double* x, int dimension) {
     double sum_sq = 0.0;
     for (int i = 0; i < dimension; ++i) {
@@ -631,14 +594,6 @@ double styblinski_tang_eval(const double* x, int dimension) {
         sum += std::pow(xi, 4.0) - 16.0 * sqr(xi) + 5.0 * xi;
     }
     return 0.5 * sum;
-}
-
-double sum_squares_eval(const double* x, int dimension) {
-    double sum = 0.0;
-    for (int i = 0; i < dimension; ++i) {
-        sum += static_cast<double>(i + 1) * sqr(x[i]);
-    }
-    return sum;
 }
 
 std::uint64_t seed_for(BasicFunctionId id, int dimension) {
@@ -703,7 +658,7 @@ double f_opt_for(BasicFunctionId id, int dimension) {
 
 Domain default_domain_for(BasicFunctionId id, int dimension) {
     if (id == BasicFunctionId::Ackley) {
-        return Domain(dimension, -50.0, 50.0);
+        return Domain(dimension, -100.0, 100.0);
     }
     if (id == BasicFunctionId::BuecheRastrigin
         || id == BasicFunctionId::Schwefel
@@ -717,6 +672,13 @@ Domain default_domain_for(BasicFunctionId id, int dimension) {
         || id == BasicFunctionId::Levy) {
         return Domain(dimension, -20.0, 20.0);
     }
+    if (id == BasicFunctionId::Quartic) {
+        return Domain(dimension, -50.0, 50.0);
+    }
+
+    if (id == BasicFunctionId::HGBat) {
+        return Domain(dimension, -2, 1.0);
+    } 
     return Domain(dimension, -5.0, 5.0);
 }
 
@@ -776,8 +738,6 @@ std::string properties_for(BasicFunctionId id) {
         return "Basic function, Schwefel, multimodal, separable, deceptive and rugged.";
     case BasicFunctionId::SharpRidge:
         return "Basic function, Sharp Ridge, unimodal, non-separable, ridge-shaped valley.";
-    case BasicFunctionId::DifferentPowers:
-        return "Basic function, Different Powers, unimodal, separable, heterogeneous coordinate exponents.";
     case BasicFunctionId::Weierstrass:
         return "Basic function, Weierstrass, multimodal, non-separable when externally rotated, fractal ruggedness.";
     case BasicFunctionId::SchafferF7:
@@ -816,14 +776,10 @@ std::string properties_for(BasicFunctionId id) {
         return "Basic function, Step, unimodal, separable, piecewise constant.";
     case BasicFunctionId::Quartic:
         return "Basic function, Quartic, unimodal, separable, degree-4 polynomial.";
-    case BasicFunctionId::Brown:
-        return "Basic function, Brown, unimodal, non-separable, exponential pairwise coupling.";
     case BasicFunctionId::Exponential:
         return "Basic function, Exponential, unimodal, separable, smooth basin.";
     case BasicFunctionId::StyblinskiTang:
         return "Basic function, Styblinski-Tang, multimodal, separable, many local minima.";
-    case BasicFunctionId::SumSquares:
-        return "Basic function, Sum Squares, unimodal, separable, increasing coordinate weights.";
     default:
         return "Basic function.";
     }
@@ -853,9 +809,12 @@ void BasicF::initialize_state() {
     }
 
     const int peak_count = 21;
+    const Domain domain = default_domain_for(id_, dimension);
+    const double domain_center = 0.5 * (domain.lower[0] + domain.upper[0]);
+    const double domain_half_width = 0.5 * (domain.upper[0] - domain.lower[0]);
     peaks_.resize(static_cast<std::size_t>(peak_count));
-    peaks_[0].center.assign(static_cast<std::size_t>(dimension), 0.0);
-    peaks_[0].weight = 10.0;
+    peaks_[0].center.assign(static_cast<std::size_t>(dimension), domain_center);
+    peaks_[0].weight = 250.0;
 
     std::mt19937_64 rng(seed_for(id_, dimension));
 
@@ -863,9 +822,9 @@ void BasicF::initialize_state() {
         auto& peak = peaks_[static_cast<std::size_t>(i)];
         peak.center.resize(static_cast<std::size_t>(dimension));
         for (double& c : peak.center) {
-            c = static_cast<double>(uniform_int(rng, -45, 45)) / 10.0;
+            c = uniform_real(rng, domain_center - 0.7 * domain_half_width, domain_center + 0.7 * domain_half_width);
         }
-        peak.weight = static_cast<double>(uniform_int(rng, 11, 99)) / 10.0;
+        peak.weight = uniform_real(rng, 80.0, 300.0);
     }
 }
 
@@ -899,8 +858,6 @@ double BasicF::evaluate_impl(const double* x) const {
         return schwefel_eval(x, dimension);
     case BasicFunctionId::SharpRidge:
         return sharp_ridge_eval(x, dimension);
-    case BasicFunctionId::DifferentPowers:
-        return different_powers_eval(x, dimension);
     case BasicFunctionId::Weierstrass:
         return weierstrass_eval(x, dimension);
     case BasicFunctionId::SchafferF7:
@@ -951,14 +908,10 @@ double BasicF::evaluate_impl(const double* x) const {
         return step_eval(x, dimension);
     case BasicFunctionId::Quartic:
         return quartic_eval(x, dimension);
-    case BasicFunctionId::Brown:
-        return brown_eval(x, dimension);
     case BasicFunctionId::Exponential:
         return exponential_eval(x, dimension);
     case BasicFunctionId::StyblinskiTang:
         return styblinski_tang_eval(x, dimension);
-    case BasicFunctionId::SumSquares:
-        return sum_squares_eval(x, dimension);
     default:
         throw std::invalid_argument("unsupported basic function id");
     }
@@ -1009,8 +962,6 @@ std::string to_string(BasicFunctionId id) {
         return "Schwefel";
     case BasicFunctionId::SharpRidge:
         return "SharpRidge";
-    case BasicFunctionId::DifferentPowers:
-        return "DifferentPowers";
     case BasicFunctionId::Weierstrass:
         return "Weierstrass";
     case BasicFunctionId::SchafferF7:
@@ -1051,14 +1002,10 @@ std::string to_string(BasicFunctionId id) {
         return "Step";
     case BasicFunctionId::Quartic:
         return "Quartic";
-    case BasicFunctionId::Brown:
-        return "Brown";
     case BasicFunctionId::Exponential:
         return "Exponential";
     case BasicFunctionId::StyblinskiTang:
         return "StyblinskiTang";
-    case BasicFunctionId::SumSquares:
-        return "SumSquares";
     default:
         throw std::invalid_argument("unknown basic function id");
     }
@@ -1090,7 +1037,6 @@ std::vector<BasicFunctionId> list_basic_functions() {
         BasicFunctionId::Griewank,
         BasicFunctionId::Schwefel,
         BasicFunctionId::SharpRidge,
-        BasicFunctionId::DifferentPowers,
         BasicFunctionId::Weierstrass,
         BasicFunctionId::SchafferF7,
         BasicFunctionId::SchafferF7Cond1000,
@@ -1111,10 +1057,8 @@ std::vector<BasicFunctionId> list_basic_functions() {
         BasicFunctionId::SchafferF6,
         BasicFunctionId::Step,
         BasicFunctionId::Quartic,
-        BasicFunctionId::Brown,
         BasicFunctionId::Exponential,
         BasicFunctionId::StyblinskiTang,
-        BasicFunctionId::SumSquares,
     };
 }
 

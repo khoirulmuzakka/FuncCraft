@@ -40,7 +40,7 @@ def _copy_list(values):
 
 
 def _default_base_functions():
-    return list(range(43))
+    return list(range(36))
 
 
 def _default_composition_base_functions():

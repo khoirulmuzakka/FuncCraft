@@ -1,4 +1,7 @@
 # Base-function registry:
+# Some unimodal landscapes are very similar; this registry intentionally keeps
+# the full set here, but note the overlap among:
+# DixonPrice, Discus, BentCigar, Ellipsoidal.
 # 0: Sphere
 # 1: Ellipsoidal
 # 2: SumDifferentPowers
@@ -13,37 +16,34 @@
 # 11: Griewank
 # 12: Schwefel
 # 13: SharpRidge
-# 14: DifferentPowers
-# 15: Weierstrass
-# 16: SchafferF7
-# 17: SchafferF7Cond1000
-# 18: GriewankRosenbrock
-# 19: Gallagher21
-# 20: Katsuura
-# 21: LunacekBiRastrigin
-# 22: Zakharov
-# 23: Levy
-# 24: Michalewicz
-# 25: DixonPrice
-# 26: BentCigar
-# 27: Discus
-# 28: HappyCat
-# 29: HGBat
-# 30: HCF
-# 31: GrieRosen
-# 32: SchafferF6
-# 33: Step
-# 34: Quartic
-# 36: Brown
-# 37: Exponential
-# 38: StyblinskiTang
-# 39: SumSquares
+# 14: Weierstrass
+# 15: SchafferF7
+# 16: SchafferF7Cond1000
+# 17: GriewankRosenbrock
+# 18: Gallagher21
+# 19: Katsuura
+# 20: LunacekBiRastrigin
+# 21: Zakharov
+# 22: Levy
+# 23: Michalewicz
+# 24: DixonPrice
+# 25: BentCigar
+# 26: Discus
+# 27: HappyCat
+# 28: HGBat
+# 29: HCF
+# 30: GrieRosen
+# 31: SchafferF6
+# 32: Step
+# 33: Quartic
+# 34: Exponential
+# 35: StyblinskiTang
 # Multimodal ids:
-# 3, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 23, 24, 31, 32, 38
+# 3, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 22, 23, 30, 31, 35
 # Unimodal ids:
-# 0, 1, 2, 4, 5, 6, 8, 13, 14, 22, 25, 26, 27, 28, 29, 30, 33, 34, 36, 37, 39
+# 0, 1, 2, 4, 5, 6, 8, 13, 21, 24, 25, 26, 27, 28, 29, 32, 33, 34
 supported_dimensions: any
-base_functions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 39]
+base_functions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
 base_function_coord_transforms:
   - kind: rotation
     probability: 1.0
@@ -63,10 +63,13 @@ coord_transforms:
     parameters: []
 value_transforms:
   - kind: osc
-    probability: 0.8
+    probability: 0.3
     parameters: []
   - kind: power
-    probability: 0.2
+    probability: 0.3
+    parameters: []
+  - kind: none
+    probability: 0.4
     parameters: []
 composition_functions:
   - kind: cpmlwell
@@ -76,10 +79,15 @@ composition_functions:
     probability: 0.05
     parameters: []
   - kind: dpmsoftmax
-    probability: 0.7
-    # parameters = [sharpness, background_strength, background_sharpness]
-    parameters: [0.01, 1.0, 0.01]
-base_functions_for_compositions: [ 3, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 23, 31, 32, 38, 37, 0,1,2,4]
+    probability: 0.25
+    # parameters = [sharpness]
+    parameters: [0.005]
+  - kind: dpmbgsoftmax
+    probability: 0.25
+    #parameters = [sharpness, background_strength, background_sharpness]
+    parameters : [0.01, 1.0, 0.01]
+
+base_functions_for_compositions: [3, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 22, 28, 30, 31, 35, 34, 0, 1, 4, 8, 27]
 max_components: 10
 requested_number_of_functions: 1000
 master_seed: 1

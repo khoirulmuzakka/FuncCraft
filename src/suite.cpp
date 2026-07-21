@@ -520,6 +520,15 @@ CompositionSpec make_composition_spec(
         spec.centers = centers;
         spec.offsets = offsets;
         spec.parameters = choice.parameters.empty()
+            ? std::vector<double>{0.01}
+            : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == "dpm-bgsoftmax" || choice.kind == "dpm_bgsoftmax" || choice.kind == "dpmbgsoftmax" || choice.kind == "bgsoftmax") {
+        spec.kind = "deceptive_bg_softmax";
+        spec.centers = centers;
+        spec.offsets = offsets;
+        spec.parameters = choice.parameters.empty()
             ? std::vector<double>{0.01, 1.0, 0.01}
             : choice.parameters;
         return spec;
@@ -795,9 +804,14 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         return BenchmarkFunction(builder.build_spec());
     }
 
-    const bool dpm_mode = normalize_token(blueprint.composition_choice.kind) == "dpmsoftmax"
-        || normalize_token(blueprint.composition_choice.kind) == "dpm"
-        || normalize_token(blueprint.composition_choice.kind) == "softmax";
+    const std::string composition_kind = normalize_token(blueprint.composition_choice.kind);
+    const bool dpm_mode = composition_kind == "dpmsoftmax"
+        || composition_kind == "dpm"
+        || composition_kind == "softmax"
+        || composition_kind == "dpmbgsoftmax"
+        || composition_kind == "dpm-bgsoftmax"
+        || composition_kind == "dpm_bgsoftmax"
+        || composition_kind == "bgsoftmax";
     const auto x_star = dpm_mode
         ? random_point_in_domain_away_from_origin(rng, Domain(dimension_, spec_.lower_bound * 0.7, spec_.upper_bound * 0.7), 5.0)
         : random_point_in_shrunk_domain(rng, domain, 0.7);

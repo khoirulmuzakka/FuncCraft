@@ -27,7 +27,6 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("Griewank", FuncCraft::BasicFunctionId::Griewank)
         .value("Schwefel", FuncCraft::BasicFunctionId::Schwefel)
         .value("SharpRidge", FuncCraft::BasicFunctionId::SharpRidge)
-        .value("DifferentPowers", FuncCraft::BasicFunctionId::DifferentPowers)
         .value("Weierstrass", FuncCraft::BasicFunctionId::Weierstrass)
         .value("SchafferF7", FuncCraft::BasicFunctionId::SchafferF7)
         .value("SchafferF7Cond1000", FuncCraft::BasicFunctionId::SchafferF7Cond1000)
@@ -48,10 +47,8 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("SchafferF6", FuncCraft::BasicFunctionId::SchafferF6)
         .value("Step", FuncCraft::BasicFunctionId::Step)
         .value("Quartic", FuncCraft::BasicFunctionId::Quartic)
-        .value("Brown", FuncCraft::BasicFunctionId::Brown)
         .value("Exponential", FuncCraft::BasicFunctionId::Exponential)
         .value("StyblinskiTang", FuncCraft::BasicFunctionId::StyblinskiTang)
-        .value("SumSquares", FuncCraft::BasicFunctionId::SumSquares)
         .export_values();
 
     py::class_<FuncCraft::BasicF>(m, "BasicF")

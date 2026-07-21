@@ -116,13 +116,36 @@ private:
 /**
  * @brief Softmax-based deceptive composition.
  *
- * The output is computed by a smooth selective softmax blend, augmented by a
- * smooth background gate that stays small near each prescribed local basin but
- * remains positive away from all basins.
+ * The output is computed by a smooth selective softmax blend. The softmax
+ * distance is normalized by the ambient dimension to keep the scale stable
+ * across low- and high-dimensional settings.
  */
 class DeceptiveSoftmaxComposition final : public DeceptivePointComposition {
 public:
     DeceptiveSoftmaxComposition(
+        std::vector<std::vector<double>> centers,
+        std::vector<double> offsets,
+        double sharpness = 0.01);
+    CompositionClass composition_class() const override;
+
+private:
+    double deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
+    CompositionSpec spec() const override;
+    std::vector<std::vector<double>> centers_;
+    std::vector<double> offsets_;
+    double sharpness_ = 0.01;
+};
+
+/**
+ * @brief Background-aware softmax deceptive composition.
+ *
+ * This variant keeps the same selective softmax core as
+ * `DeceptiveSoftmaxComposition`, but adds a smooth background weight that can
+ * blend components when the point is far from all designated centers.
+ */
+class DeceptiveBgSoftmaxComposition final : public DeceptivePointComposition {
+public:
+    DeceptiveBgSoftmaxComposition(
         std::vector<std::vector<double>> centers,
         std::vector<double> offsets,
         double sharpness = 0.01,

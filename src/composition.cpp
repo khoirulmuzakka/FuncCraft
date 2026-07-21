@@ -143,19 +143,13 @@ CompositionSpec LevelWellComposition::spec() const {
 DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
     std::vector<std::vector<double>> centers,
     std::vector<double> offsets,
-    double sharpness,
-    double background_strength,
-    double background_sharpness)
+    double sharpness)
     : centers_(std::move(centers)),
       offsets_(std::move(offsets)),
-      sharpness_(sharpness),
-      background_strength_(background_strength),
-      background_sharpness_(background_sharpness) {
+      sharpness_(sharpness) {
     require(!centers_.empty(), "deceptive softmax needs at least one center");
     require(centers_.size() == offsets_.size(), "deceptive offsets must match centers");
     require(sharpness_ >= 0.0, "softmax sharpness must be nonnegative");
-    require(background_strength_ >= 0.0, "background strength must be nonnegative");
-    require(background_sharpness_ >= 0.0, "background sharpness must be nonnegative");
     const std::size_t dimension = centers_.front().size();
     for (const auto& center : centers_) {
         require(center.size() == dimension, "deceptive centers must have common dimension");
@@ -168,28 +162,24 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
 
     std::vector<double> logits(centers_.size(), 0.0);
     double max_logit = -std::numeric_limits<double>::infinity();
+    const double dim = static_cast<double>(centers_.front().size());
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        logits[i] = -sharpness_ * squared_distance(x, centers_[i]);
+        logits[i] = -sharpness_ * squared_distance(x, centers_[i]) / dim;
         max_logit = std::max(max_logit, logits[i]);
     }
 
-    double min_distance = std::numeric_limits<double>::infinity();
-    for (std::size_t i = 0; i < centers_.size(); ++i) {
-        min_distance = std::min(min_distance, std::sqrt(squared_distance(x, centers_[i])));
-    }
-    const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance));
     const double optimum_distance = std::sqrt(squared_distance(x, centers_.front()));
-    const double selective_mask = 1.0 - std::exp(-background_sharpness_ * optimum_distance * optimum_distance);
+    const double selective_mask = 1.0 - std::exp(-(optimum_distance * optimum_distance) / dim);
 
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp(logits[i] - max_logit);
+        double w = std::exp(logits[i]-max_logit);
         if (i > 0) {
             w *= selective_mask;
         }
-        numerator += (w + background) * (z[i] + offsets_[i]);
-        denominator += w + background;
+        numerator += w * (z[i] + offsets_[i]);
+        denominator += w;
     }
     return numerator / denominator;
 }
@@ -201,6 +191,74 @@ CompositionClass DeceptiveSoftmaxComposition::composition_class() const {
 CompositionSpec DeceptiveSoftmaxComposition::spec() const {
     CompositionSpec spec;
     spec.kind = "deceptive_softmax";
+    spec.centers = centers_;
+    spec.offsets = offsets_;
+    spec.parameters = {sharpness_};
+    return spec;
+}
+
+DeceptiveBgSoftmaxComposition::DeceptiveBgSoftmaxComposition(
+    std::vector<std::vector<double>> centers,
+    std::vector<double> offsets,
+    double sharpness,
+    double background_strength,
+    double background_sharpness)
+    : centers_(std::move(centers)),
+      offsets_(std::move(offsets)),
+      sharpness_(sharpness),
+      background_strength_(background_strength),
+      background_sharpness_(background_sharpness) {
+    require(!centers_.empty(), "deceptive bg softmax needs at least one center");
+    require(centers_.size() == offsets_.size(), "deceptive bg offsets must match centers");
+    require(sharpness_ >= 0.0, "softmax sharpness must be nonnegative");
+    require(background_strength_ >= 0.0, "background strength must be nonnegative");
+    require(background_sharpness_ >= 0.0, "background sharpness must be nonnegative");
+    const std::size_t dimension = centers_.front().size();
+    for (const auto& center : centers_) {
+        require(center.size() == dimension, "deceptive bg centers must have common dimension");
+    }
+}
+
+double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const {
+    require(z.size() == centers_.size(), "deceptive bg component size mismatch");
+    require(x.size() == centers_.front().size(), "deceptive bg point dimension mismatch");
+
+    std::vector<double> logits(centers_.size(), 0.0);
+    double max_logit = -std::numeric_limits<double>::infinity();
+    const double dim = static_cast<double>(centers_.front().size());
+    for (std::size_t i = 0; i < centers_.size(); ++i) {
+        logits[i] = -sharpness_ * squared_distance(x, centers_[i]) / dim;
+        max_logit = std::max(max_logit, logits[i]);
+    }
+
+    double min_distance = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < centers_.size(); ++i) {
+        min_distance = std::min(min_distance, std::sqrt(squared_distance(x, centers_[i])));
+    }
+    const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance/dim));
+    const double optimum_distance = std::sqrt(squared_distance(x, centers_.front()));
+    const double selective_mask = 1.0 - std::exp(-(optimum_distance * optimum_distance) / dim);
+
+    double numerator = 0.0;
+    double denominator = 0.0;
+    for (std::size_t i = 0; i < centers_.size(); ++i) {
+        double w = std::exp(logits[i]-max_logit);
+        if (i > 0) {
+            w *= selective_mask;
+        }
+        numerator += (w + background) * (z[i] + offsets_[i]);
+        denominator += w + background;
+    }
+    return numerator / denominator;
+}
+
+CompositionClass DeceptiveBgSoftmaxComposition::composition_class() const {
+    return CompositionClass::DeceptivePointBgSoftmax;
+}
+
+CompositionSpec DeceptiveBgSoftmaxComposition::spec() const {
+    CompositionSpec spec;
+    spec.kind = "deceptive_bg_softmax";
     spec.centers = centers_;
     spec.offsets = offsets_;
     spec.parameters = {sharpness_, background_strength_, background_sharpness_};

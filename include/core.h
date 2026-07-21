@@ -28,6 +28,8 @@ enum class CompositionClass {
     CommonPointLevelWell,
     /// Deceptive softmax selection over multiple component centers.
     DeceptivePointSoftmax,
+    /// Deceptive softmax with a smooth background weight.
+    DeceptivePointBgSoftmax,
 };
 
 enum class ValueTransformClass {
