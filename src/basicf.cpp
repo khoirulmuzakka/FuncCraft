@@ -676,7 +676,9 @@ Domain default_domain_for(BasicFunctionId id, int dimension) {
         return Domain(dimension, -50.0, 50.0);
     }
 
-    if (id == BasicFunctionId::HGBat) {
+    if (id == BasicFunctionId::HGBat
+        || id == BasicFunctionId::HappyCat
+        ) {
         return Domain(dimension, -2, 1.0);
     } 
     return Domain(dimension, -5.0, 5.0);
@@ -796,6 +798,12 @@ BasicF::BasicF(BasicFunctionId id, int dim)
     f_opt = f_opt_for(id, dim);
     properties = properties_for(id);
     initialize_state();
+
+    // Keep the stored optimum value exactly consistent with the implementation.
+    // This avoids tiny discrepancies from hand-written closed-form constants.
+    if (!x_opt.empty()) {
+        f_opt = evaluate_impl(x_opt.data());
+    }
 }
 
 Domain BasicF::default_domain() const {

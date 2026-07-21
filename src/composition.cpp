@@ -164,12 +164,12 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
     double max_logit = -std::numeric_limits<double>::infinity();
     const double dim = static_cast<double>(centers_.front().size());
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        logits[i] = -sharpness_ * squared_distance(x, centers_[i]) / dim;
+        logits[i] = -sharpness_ * squared_distance(x, centers_[i]);
         max_logit = std::max(max_logit, logits[i]);
     }
 
     const double optimum_distance = std::sqrt(squared_distance(x, centers_.front()));
-    const double selective_mask = 1.0 - std::exp(-(optimum_distance * optimum_distance) / dim);
+    const double selective_mask = 1.0 - std::exp(-optimum_distance * optimum_distance);
 
     double numerator = 0.0;
     double denominator = 0.0;
@@ -225,9 +225,8 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
 
     std::vector<double> logits(centers_.size(), 0.0);
     double max_logit = -std::numeric_limits<double>::infinity();
-    const double dim = static_cast<double>(centers_.front().size());
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        logits[i] = -sharpness_ * squared_distance(x, centers_[i]) / dim;
+        logits[i] = -sharpness_ * squared_distance(x, centers_[i]);
         max_logit = std::max(max_logit, logits[i]);
     }
 
@@ -235,14 +234,14 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
     for (std::size_t i = 0; i < centers_.size(); ++i) {
         min_distance = std::min(min_distance, std::sqrt(squared_distance(x, centers_[i])));
     }
-    const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance/dim));
+    const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance));
     const double optimum_distance = std::sqrt(squared_distance(x, centers_.front()));
-    const double selective_mask = 1.0 - std::exp(-(optimum_distance * optimum_distance) / dim);
+    const double selective_mask = 1.0 - std::exp(-optimum_distance * optimum_distance);
 
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp(logits[i]-max_logit);
+        double w = std::exp(logits[i] - max_logit);
         if (i > 0) {
             w *= selective_mask;
         }
