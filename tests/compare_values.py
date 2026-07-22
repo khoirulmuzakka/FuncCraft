@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 DEFAULT_TOLERANCE = 1.0e-12
+DEFAULT_ABSOLUTE_TOLERANCE = 1.0e-9
 
 
 def read_table(path: Path):
@@ -33,7 +34,7 @@ def read_table(path: Path):
     return platform, rows
 
 
-def summarize_differences(tables, tolerance):
+def summarize_differences(tables, relative_tolerance, absolute_tolerance):
     platforms = [platform for platform, _ in tables]
     reference_indices = sorted(tables[0][1])
     failures = []
@@ -53,40 +54,61 @@ def summarize_differences(tables, tolerance):
                 )
 
         diffs = []
+        relative_diffs = []
+        allowed_tolerances = []
         for point_index in range(point_count):
             values = [row[point_index] for row in value_rows]
-            diffs.append(max(values) - min(values))
+            min_value = min(values)
+            max_value = max(values)
+            scale = max(abs(value) for value in values)
+            diff = max_value - min_value
+            diffs.append(diff)
+            relative_diffs.append(0.0 if scale == 0.0 else diff / scale)
+            allowed_tolerances.append(max(absolute_tolerance, relative_tolerance * scale))
 
         min_diff = min(diffs)
         median_diff = statistics.median(diffs)
         max_diff = max(diffs)
-        failed = max_diff > tolerance
+        max_relative_diff = max(relative_diffs)
+        max_allowed = max(allowed_tolerances)
+        failed = any(diff > allowed for diff, allowed in zip(diffs, allowed_tolerances))
         if failed:
             failures.append(function_index)
-        reports.append((function_index, min_diff, median_diff, max_diff, failed))
+        reports.append((function_index, min_diff, median_diff, max_diff, max_relative_diff, max_allowed, failed))
 
     return platforms, reports, failures
 
 
-def print_report(platforms, reports, failures, tolerance):
+def print_report(platforms, reports, failures, relative_tolerance, absolute_tolerance):
     print("FuncCraft Cross-Platform Value Comparison")
     print("=" * 48)
     print(f"Platforms: {', '.join(platforms)}")
-    print(f"Tolerance: {tolerance:.3e}")
+    print(f"Relative tolerance: {relative_tolerance:.3e}")
+    print(f"Absolute tolerance: {absolute_tolerance:.3e}")
     print(f"Functions: {len(reports)}")
     print()
-    print(f"{'Function':>8}  {'min_diff':>14}  {'median_diff':>14}  {'max_diff':>14}  Status")
-    print("-" * 72)
-    for function_index, min_diff, median_diff, max_diff, failed in reports:
+    print(
+        f"{'Function':>8}  "
+        f"{'min_abs':>14}  "
+        f"{'median_abs':>14}  "
+        f"{'max_abs':>14}  "
+        f"{'max_rel':>14}  "
+        f"{'max_allowed':>14}  "
+        "Status"
+    )
+    print("-" * 104)
+    for function_index, min_diff, median_diff, max_diff, max_relative_diff, max_allowed, failed in reports:
         status = "FAIL" if failed else "OK"
         print(
             f"F{function_index + 1:<7d}  "
             f"{min_diff:14.6e}  "
             f"{median_diff:14.6e}  "
             f"{max_diff:14.6e}  "
+            f"{max_relative_diff:14.6e}  "
+            f"{max_allowed:14.6e}  "
             f"{status}"
         )
-    print("-" * 72)
+    print("-" * 104)
     print(f"Failed functions: {len(failures)} / {len(reports)}")
     if failures:
         shown = ", ".join(f"F{index + 1}" for index in failures[:25])
@@ -97,15 +119,26 @@ def print_report(platforms, reports, failures, tolerance):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Compare FuncCraft value tables across platforms.")
     parser.add_argument("files", nargs="+", type=Path, help="values_<platform>.txt files")
-    parser.add_argument("--tolerance", type=float, default=DEFAULT_TOLERANCE)
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=DEFAULT_TOLERANCE,
+        help="relative tolerance used for cross-platform comparisons",
+    )
+    parser.add_argument(
+        "--absolute-tolerance",
+        type=float,
+        default=DEFAULT_ABSOLUTE_TOLERANCE,
+        help="absolute tolerance floor used near zero",
+    )
     args = parser.parse_args(argv)
 
     if len(args.files) < 2:
         parser.error("at least two value files are required")
 
     tables = [read_table(path) for path in args.files]
-    platforms, reports, failures = summarize_differences(tables, args.tolerance)
-    print_report(platforms, reports, failures, args.tolerance)
+    platforms, reports, failures = summarize_differences(tables, args.tolerance, args.absolute_tolerance)
+    print_report(platforms, reports, failures, args.tolerance, args.absolute_tolerance)
     return 1 if failures else 0
 
 

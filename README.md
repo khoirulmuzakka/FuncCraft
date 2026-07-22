@@ -447,8 +447,8 @@ The badges at the top of this README show the pass/fail state for the standard
 CI and wheel workflows: CI builds the C++ library, Python extension, and C++
 test binary on Linux, Windows, and macOS arm, runs C++ and Python round-trip
 tests, generates deterministic benchmark value tables on each platform, and
-compares them with a `1e-12` tolerance; the wheel workflow builds Python wheels
-and tests the installed wheel.
+compares them with a `1e-12` relative tolerance; the wheel workflow builds
+Python wheels and tests the installed wheel.
 
 ## Exported YAML
 
