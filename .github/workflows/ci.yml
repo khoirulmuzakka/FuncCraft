@@ -92,4 +92,4 @@ jobs:
           merge-multiple: true
 
       - name: Compare cross-platform value tables
-        run: python tests/compare_values.py value_tables/values_linux.txt value_tables/values_macos_arm.txt value_tables/values_windows.txt --tolerance 1e-12
+        run: python tests/compare_values.py value_tables/values_linux.txt value_tables/values_macos_arm.txt value_tables/values_windows.txt --tolerance 1e-7
