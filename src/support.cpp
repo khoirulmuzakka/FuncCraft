@@ -137,12 +137,21 @@ std::uint64_t mix_seed(std::uint64_t x) {
 }
 
 double uniform01(std::mt19937_64& rng) {
-    return std::generate_canonical<double, 53>(rng);
+    return static_cast<double>(rng() >> 11) * 0x1.0p-53;
 }
 
 int uniform_int(std::mt19937_64& rng, int lo, int hi) {
-    std::uniform_int_distribution<int> dist(lo, hi);
-    return dist(rng);
+    require(lo <= hi, "uniform_int lower bound must not exceed upper bound");
+    const auto span = static_cast<std::uint64_t>(
+        static_cast<std::int64_t>(hi) - static_cast<std::int64_t>(lo) + 1);
+    const std::uint64_t limit = std::numeric_limits<std::uint64_t>::max()
+        - (std::numeric_limits<std::uint64_t>::max() % span);
+
+    std::uint64_t value = rng();
+    while (value >= limit) {
+        value = rng();
+    }
+    return lo + static_cast<int>(value % span);
 }
 
 double normal01(std::mt19937_64& rng) {
