@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "funccraft"
 version = "0.1.0"
 description = "Python bindings for the FuncCraft benchmark-function generator."
-readme = "README.md"
+readme = "funccraft.md"
 requires-python = ">=3.9"
 authors = [
     { name = "Khoirul Faiq Muzakka", email = "khoirul.muzakka@gmail.com" }
