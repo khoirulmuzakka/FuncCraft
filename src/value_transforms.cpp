@@ -57,9 +57,9 @@ ValueTransformClass IdentityValueTransform::transform_class() const {
     return ValueTransformClass::None;
 }
 
-ValueTransformSpec IdentityValueTransform::spec() const {
+ValueTransformSpec IdentityValueTransform::export_spec() const {
     ValueTransformSpec spec;
-    spec.kind = "identity";
+    spec.kind = ValueTransformKind::None;
     spec.seed = 0;
     return spec;
 }
@@ -82,9 +82,9 @@ ValueTransformClass PowerValueTransform::transform_class() const {
     return ValueTransformClass::Power;
 }
 
-ValueTransformSpec PowerValueTransform::spec() const {
+ValueTransformSpec PowerValueTransform::export_spec() const {
     ValueTransformSpec spec;
-    spec.kind = "power";
+    spec.kind = ValueTransformKind::Power;
     spec.parameters = {alpha_, p_};
     return spec;
 }
@@ -107,9 +107,9 @@ ValueTransformClass OscillatoryValueTransform::transform_class() const {
     return ValueTransformClass::Oscillatory;
 }
 
-ValueTransformSpec OscillatoryValueTransform::spec() const {
+ValueTransformSpec OscillatoryValueTransform::export_spec() const {
     ValueTransformSpec spec;
-    spec.kind = "oscillatory";
+    spec.kind = ValueTransformKind::Oscillatory;
     spec.parameters = {epsilon_, alpha_};
     return spec;
 }
@@ -129,9 +129,9 @@ ValueTransformClass CosineZeroValueTransform::transform_class() const {
     return ValueTransformClass::CosineZero;
 }
 
-ValueTransformSpec CosineZeroValueTransform::spec() const {
+ValueTransformSpec CosineZeroValueTransform::export_spec() const {
     ValueTransformSpec spec;
-    spec.kind = "cosine_zero";
+    spec.kind = ValueTransformKind::CosineZero;
     spec.parameters = {alpha_};
     return spec;
 }

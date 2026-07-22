@@ -75,6 +75,32 @@ int uniform_int(std::mt19937_64& rng, int lo, int hi);
  * @brief Draw one standard normal random variate.
  */
 double normal01(std::mt19937_64& rng);
+/**
+ * @brief Normalize spec identifiers for matching.
+ *
+ * The normalization rule is intentionally simple: lower case and remove
+ * underscores, hyphens, and whitespace.
+ */
+std::string normalize_spec_name(const std::string& value);
+/**
+ * @brief Return the canonical coordinate-transform spec kind.
+ */
+std::string canonical_coordinate_transform_kind(const std::string& kind);
+/**
+ * @brief Return the canonical value-transform spec kind.
+ */
+std::string canonical_value_transform_kind(const std::string& kind);
+/**
+ * @brief Return the canonical composition spec kind.
+ */
+std::string canonical_composition_kind(const std::string& kind);
+CoordinateTransformKind parse_coordinate_transform_kind(const std::string& kind);
+ValueTransformKind parse_value_transform_kind(const std::string& kind);
+CompositionKind parse_composition_kind(const std::string& kind);
+CompositionMode composition_mode(CompositionKind kind);
+std::string to_spec_name(CoordinateTransformKind kind);
+std::string to_spec_name(ValueTransformKind kind);
+std::string to_spec_name(CompositionKind kind);
 
 template <typename T>
 void stable_shuffle(std::vector<T>& values, std::mt19937_64& rng) {

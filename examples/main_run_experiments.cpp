@@ -14,7 +14,7 @@ struct Config {
     int dimension = 10;
     int max_functions = 32;
     unsigned long long seed = 1;
-    double f_opt = 100.0;
+    double assigned_fopt = 100.0;
 };
 
 bool is_integer_arg(const char* text) {
@@ -36,7 +36,7 @@ Config parse_cli(int argc, char* argv[]) {
     if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
     if (argc > arg_index + 1) config.max_functions = std::max(1, std::atoi(argv[arg_index + 1]));
     if (argc > arg_index + 2) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 2], nullptr, 10));
-    if (argc > arg_index + 3) config.f_opt = std::atof(argv[arg_index + 3]);
+    if (argc > arg_index + 3) config.assigned_fopt = std::atof(argv[arg_index + 3]);
     return config;
 }
 
@@ -45,7 +45,7 @@ FuncCraft::SuiteSpec make_spec(const Config& config) {
     spec.supported_dimensions = std::to_string(config.dimension);
     spec.requested_number_of_functions = config.max_functions;
     spec.master_seed = config.seed;
-    spec.f_opt = config.f_opt;
+    spec.assigned_fopt = config.assigned_fopt;
     spec.suite_label = "run_experiments";
     return spec;
 }
@@ -55,13 +55,13 @@ void write_manifest(
     const FuncCraft::BenchmarkSuite& suite,
     int function_count) {
     std::ofstream out(path);
-    out << "idx label known_global_value\n";
+    out << "idx label assigned_fopt\n";
     for (int i = 0; i < function_count; ++i) {
         const auto function = suite.function(i);
         const auto& spec = function.spec();
         out << i << ' '
-            << spec.function_class_label << ' '
-            << std::scientific << std::setprecision(16) << spec.known_global_value
+            << spec.label << ' '
+            << std::scientific << std::setprecision(16) << spec.assigned_fopt
             << '\n';
     }
 }
@@ -83,13 +83,13 @@ int main(int argc, char* argv[]) {
 
         write_manifest(manifest_path, suite, function_count);
 
-        std::cout << "Usage: run_experiments [out_dir] [dimension] [max_functions] [seed] [f_opt]\n";
+        std::cout << "Usage: run_experiments [out_dir] [dimension] [max_functions] [seed] [assigned_fopt]\n";
         std::cout << "Suite generated. size=" << suite.size()
                   << ", max_number_of_functions=" << suite.max_number_of_functions()
                   << ", dimension=" << suite.dimension()
                   << ", requested_functions=" << config.max_functions
                   << ", seed=" << config.seed
-                  << ", f_opt=" << std::scientific << config.f_opt << "\n";
+                  << ", assigned_fopt=" << std::scientific << config.assigned_fopt << "\n";
         std::cout << "Manifest written to: " << manifest_path.string() << "\n";
 
         return 0;

@@ -54,7 +54,7 @@ std::vector<std::vector<double>> candidate_points(const FuncCraft::BenchmarkFunc
         pattern[static_cast<std::size_t>(i)] = (i % 2 == 0) ? 0.25 : -0.75;
     }
     return {
-        function.spec().known_global_minimizer,
+        function.spec().assigned_xopt,
         std::vector<double>(static_cast<std::size_t>(dimension), 0.0),
         pattern,
     };
@@ -69,10 +69,10 @@ void check_optima() {
 
     for (int i = 0; i < suite.size(); ++i) {
         const FuncCraft::BenchmarkFunction& function = suite.function(i);
-        const double value = function({function.spec().known_global_minimizer}).front();
+        const double value = function({function.spec().assigned_xopt}).front();
         require_close(
             value,
-            function.spec().known_global_value,
+            function.spec().assigned_fopt,
             20.0,
             "optimum mismatch for function " + std::to_string(i));
     }
@@ -92,6 +92,72 @@ FuncCraft::BenchmarkSuite make_cross_platform_suite() {
     FuncCraft::SuiteSpec spec = FuncCraft::load_suite_spec_yaml(suite_yaml.string());
     spec.requested_number_of_functions = kCrossPlatformFunctionCount;
     return FuncCraft::BenchmarkSuite(spec, kCrossPlatformDimension);
+}
+
+FuncCraft::FunctionSpec make_alias_function_spec(FuncCraft::CompositionKind composition_kind) {
+    FuncCraft::FunctionSpec spec;
+    spec.dimension = 2;
+    spec.domain.dimension = 2;
+    spec.domain.lower_bound = {-10.0, -10.0};
+    spec.domain.upper_bound = {10.0, 10.0};
+    spec.seed = 7;
+    spec.assigned_xopt = {0.0, 0.0};
+    spec.assigned_fopt = 0.0;
+
+    for (int i = 0; i < 2; ++i) {
+        FuncCraft::ComponentSpec component;
+        component.base_function = FuncCraft::BasicFunctionId::Sphere;
+        component.component_dimension = 2;
+        component.seed = 11 + i;
+        component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::None;
+        component.coordinate_transform.dimension = 2;
+        component.coordinate_transform.assigned_xopt = {static_cast<double>(i), 0.0};
+        component.coordinate_transform.base_xopt = {0.0, 0.0};
+        component.value_transform.kind = FuncCraft::ValueTransformKind::None;
+        component.f_bias = 10.0 * static_cast<double>(i);
+        spec.components.push_back(component);
+    }
+
+    spec.composition.kind = composition_kind;
+    spec.composition.parameters = {0.01, 1.0, 0.01};
+    return spec;
+}
+
+void check_composition_kind_aliases() {
+    const std::vector<FuncCraft::CompositionKind> choices = {
+        FuncCraft::CompositionKind::DpmSoftmax,
+        FuncCraft::CompositionKind::DpmBgSoftmax,
+    };
+
+    for (FuncCraft::CompositionKind choice : choices) {
+        const FuncCraft::BenchmarkFunction function(make_alias_function_spec(choice));
+        require(
+            function.spec().composition.kind == choice,
+            "composition kind did not roundtrip");
+        const std::vector<double> values = function({{0.0, 0.0}, {1.0, 0.0}});
+        require(values.size() == 2, "composition evaluation failed");
+    }
+
+    FuncCraft::SuiteSpec suite_spec;
+    FuncCraft::CompositionChoice composition_choice;
+    composition_choice.kind = FuncCraft::CompositionKind::DpmBgSoftmax;
+    composition_choice.probability = 1.0;
+    composition_choice.parameters = {0.01, 1.0, 0.01};
+    suite_spec.compositions = {composition_choice};
+    suite_spec.requested_number_of_functions = 40;
+    suite_spec.max_components = 3;
+    suite_spec.master_seed = 19;
+
+    const FuncCraft::BenchmarkSuite suite(suite_spec, 2);
+    bool found_composed_function = false;
+    for (int i = 0; i < suite.size(); ++i) {
+        const FuncCraft::CompositionKind kind = suite.function(i).spec().composition.kind;
+        if (kind == FuncCraft::CompositionKind::DpmBgSoftmax) {
+            found_composed_function = true;
+            break;
+        }
+    }
+    require(found_composed_function, "suite composition choice did not generate DPM bg softmax functions");
 }
 
 std::vector<std::vector<double>> sample_cross_platform_points(const FuncCraft::Domain& domain, int function_index) {
@@ -174,6 +240,7 @@ int run_tests() {
     std::filesystem::create_directories(temp);
 
     check_optima();
+    check_composition_kind_aliases();
     check_function_yaml_roundtrip(temp / "function.yaml");
     check_suite_yaml_roundtrip(temp / "suite.yaml");
 

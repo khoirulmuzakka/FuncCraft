@@ -99,10 +99,10 @@ private:
         bool composed = false;
         BasicFunctionId base_function = BasicFunctionId::Sphere;
         std::vector<BasicFunctionId> component_bases;
-        ChoiceSpec base_transform_choice;
-        std::vector<ChoiceSpec> coord_transform_choices;
-        std::vector<ChoiceSpec> value_transform_choices;
-        ChoiceSpec composition_choice;
+        CoordinateTransformChoice coordinate_transform_choice;
+        std::vector<CoordinateTransformChoice> coordinate_transform_choices;
+        std::vector<ValueTransformChoice> value_transform_choices;
+        CompositionChoice composition_choice;
         int component_count = 1;
         std::uint64_t seed = 0;
     };

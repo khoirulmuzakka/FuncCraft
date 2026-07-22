@@ -3,132 +3,214 @@
 
 /**
  * @file function_spec.h
- * @brief Plain-data specification types for benchmark generation.
+ * @brief Specification types for FuncCraft benchmark functions.
  *
- * These types are intentionally serializable-friendly and contain only
- * primitive data such as strings, integers, and numeric vectors.
+ * Specs describe both what the user wants to build and what was actually
+ * materialized for reproducibility:
+ * - which primitive components are used;
+ * - where component minima are assigned in the generated/search coordinates;
+ * - which coordinate/value transforms and composition family are requested;
+ * - which optimum location/value should be controlled by construction.
+ * - concrete transform matrices and primitive-coordinate base xopt when known.
  */
 
+#include "core.h"
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace FuncCraft {
 
 /**
- * @brief Serializable description of a coordinate transform.
+ * @brief Canonical public names used when serializing specs.
  *
- * This structure is intentionally plain data. It is suitable for JSON/YAML
- * export and should not depend on runtime transform classes.
- *
- * Expected conventions:
- * - `kind` identifies the transform family, such as `rotation`, `affine`, or `block_rotation`.
- * - `dimension` is the full ambient dimension of the input and output vectors.
- * - `seed` controls deterministic transform generation.
- * - `selected_indices` is used by block/subspace transforms and is interpreted as 0-based indices.
- * - `source_point` and `target_point` are full-length vectors with size `dimension`.
- *   Linear transforms use the convention
- *   `T(x) = target_point + matrix * (x - source_point)`: `source_point` is
- *   the desired minimizer in generated/search coordinates, while
- *   `target_point` is the corresponding primitive-coordinate minimizer,
- *   which must be the base function's `x_opt` by construction.
- * - `parameters` stores extra scalar parameters for transform families that need them.
- * - `matrix` stores the concrete linear transform used at runtime when the
- *   transform family has one.
+ * Parsers should be permissive by lowercasing and removing spaces, hyphens,
+ * and underscores before matching. Exporters should write these canonical
+ * names.
  */
-struct TransformSpec {
-    std::string kind;
-    int dimension = 0;
-    int seed = 0;
-    std::vector<int> selected_indices;
-    std::vector<double> source_point;
-    std::vector<double> target_point;
-    std::vector<double> parameters;
-    std::vector<std::vector<double>> matrix;
-};
+namespace spec_name {
+inline constexpr const char* None = "none";
+
+inline constexpr const char* CoordinateRotation = "rotation";
+inline constexpr const char* CoordinateAffine = "affine";
+inline constexpr const char* CoordinateBlockRotation = "block-rotation";
+
+inline constexpr const char* ValuePower = "power";
+inline constexpr const char* ValueOscillatory = "oscillatory";
+inline constexpr const char* ValueCosineZero = "cosine-zero";
+
+inline constexpr const char* CpmWeightedSum = "cpm-wsum";
+inline constexpr const char* CpmPowerMean = "cpm-power-mean";
+inline constexpr const char* CpmLevelWell = "cpm-level-well";
+inline constexpr const char* DpmSoftmax = "dpm-softmax";
+inline constexpr const char* DpmBgSoftmax = "dpm-bgsoftmax";
+} // namespace spec_name
 
 /**
- * @brief Serializable description of a 1D value transform.
- *
- * The transform is applied to the scalar output of a base function before
- * composition. The `kind` field selects the family, while `parameters`
- * stores any family-specific scalars in order.
+ * @brief Axis-aligned search domain requested by the user.
  */
-struct ValueTransformSpec {
-    std::string kind;
-    int seed = 0;
-    std::vector<double> parameters;
-};
-
-/**
- * @brief Serializable description of one benchmark component.
- *
- * A component combines one base function with one coordinate transform and
- * one value transform. The `component_dimension` records the dimension of the
- * transformed point passed to the base function.
- */
-struct ComponentSpec {
-    std::string base_function;
-    int component_dimension = 0;
-    TransformSpec coordinate_transform;
-    ValueTransformSpec value_transform;
-    int seed = 0;
-};
-
-/**
- * @brief Serializable description of the composition rule.
- *
- * The `kind` field selects the composition family. The remaining fields are
- * family-specific payloads:
- * - `parameters` for scalar parameters such as exponents or sharpness values;
- * - `centers` and `offsets` for deceptive multi-point compositions;
- * - `weights` for weighted aggregation families.
- *
- * The composition spec is still plain data, so it can be loaded from or saved
- * to text formats without constructing runtime objects.
- */
-struct CompositionSpec {
-    std::string kind;
-    int seed = 0;
-    std::vector<double> parameters;
-    std::vector<std::vector<double>> centers;
-    std::vector<double> offsets;
-    std::vector<double> weights;
-};
-
-/**
- * @brief Top-level plain-data specification for a generated benchmark function.
- *
- * This is the format consumed by `BenchmarkFunction`. It fully describes the
- * function using only serializable primitives and nested spec records.
- * Builder helpers convert this spec into runtime objects, while the spec
- * itself remains safe to serialize to YAML or JSON.
- *
- * Relevant descriptive fields that used to live in a separate metadata record
- * are stored directly here:
- * - `function_class_label` identifies the composed function family. It is
- *   optional on input and is typically populated by the builder after
- *   normalization.
- * - `known_global_minimizer` stores the known optimizer when available.
- * - `known_global_value` stores the corresponding function value.
- * - `parameters` stores extra string tags such as `key=value` pairs.
- */
-struct FunctionSpec {
+struct DomainSpec {
     int dimension = 0;
     std::vector<double> lower_bound;
     std::vector<double> upper_bound;
-    std::vector<ComponentSpec> component_specs;
-    CompositionSpec composition_spec;
-    int seed = 0;
-    /**
-     * @brief Human-readable class label for the composed function.
-     *
-     * This is a plain string, suitable for serialization and printing. A
-     * builder may leave it empty on input and fill it in after construction.
-     */
-    std::string function_class_label;
-    std::vector<double> known_global_minimizer;
-    double known_global_value = 0.0;
-    std::vector<std::string> parameters;
+};
+
+/**
+ * @brief High-level coordinate-transform family.
+ */
+enum class CoordinateTransformKind {
+    None,
+    Rotation,
+    Affine,
+    BlockRotation,
+};
+
+/**
+ * @brief High-level value-transform family.
+ */
+enum class ValueTransformKind {
+    None,
+    Power,
+    Oscillatory,
+    CosineZero,
+};
+
+/**
+ * @brief High-level composition mode.
+ *
+ * `None` is used for the one-component case. CPM and DPM are the two
+ * multi-component composition modes.
+ */
+enum class CompositionMode {
+    None,
+    CPM,
+    DPM,
+};
+
+/**
+ * @brief Concrete composition family.
+ *
+ * There is no "single component" family. A function with one component uses
+ * no composition.
+ */
+enum class CompositionKind {
+    None,
+    CpmWeightedSum,
+    CpmPowerMean,
+    CpmLevelWell,
+    DpmSoftmax,
+    DpmBgSoftmax,
+};
+
+/**
+ * @brief Coordinate-transform request/materialization for one component.
+ *
+ * `assigned_xopt` is the desired component optimizer in the generated/search
+ * coordinates. `base_xopt` is the primitive-coordinate optimizer, determined
+ * from the selected base function's `x_opt` during materialization.
+ *
+ * `selected_indices` is only meaningful for block rotation. If it is empty,
+ * suite generation may choose the subspace. `matrix` is empty until the
+ * concrete linear transform is generated or loaded.
+ */
+struct CoordinateTransformSpec {
+    CoordinateTransformKind kind = CoordinateTransformKind::None;
+    int dimension = 0;
+    std::vector<double> assigned_xopt;
+    std::vector<double> base_xopt;
+    std::vector<int> selected_indices;
+    std::vector<double> parameters;
+    std::vector<std::vector<double>> matrix;
+    std::uint64_t seed = 0;
+};
+
+/**
+ * @brief User-facing value-transform request for one component.
+ *
+ * Parameter conventions:
+ * - `Power`: `parameters[0] = alpha`, `parameters[1] = p`.
+ * - `Oscillatory`: `parameters[0] = epsilon`, `parameters[1] = alpha`.
+ * - `CosineZero`: `parameters[0] = alpha`.
+ */
+struct ValueTransformSpec {
+    ValueTransformKind kind = ValueTransformKind::None;
+    std::vector<double> parameters;
+    std::uint64_t seed = 0;
+};
+
+/**
+ * @brief User-facing component request.
+ *
+ * A component is one primitive benchmark function plus one coordinate transform
+ * and one value transform. `component_dimension` is optional for full-space
+ * transforms and explicit for subspace/block use.
+ */
+struct ComponentSpec {
+    BasicFunctionId base_function = BasicFunctionId::Sphere;
+    int component_dimension = 0;
+    CoordinateTransformSpec coordinate_transform;
+    ValueTransformSpec value_transform;
+    double f_bias = 0.0;
+    std::uint64_t seed = 0;
+};
+
+/**
+ * @brief User-facing composition request.
+ *
+ * Supported families:
+ * - `None`: no composition for exactly one component.
+ * - `CpmWeightedSum`: common-point weighted-sum composition.
+ * - `CpmPowerMean`: common-point weighted power mean.
+ * - `CpmLevelWell`: common-point level-well composition.
+ * - `DpmSoftmax`: deceptive-point softmax composition.
+ * - `DpmBgSoftmax`: deceptive-point softmax with a smooth background term.
+ *
+ * `weights` are intentionally not part of this public spec. Weight policy is
+ * owned by the composition implementation. If user-configurable weights become
+ * necessary, add an explicit high-level weight policy instead of exposing the
+ * runtime vector directly.
+ *
+ * Parameter conventions:
+ * - `CpmPowerMean`: `parameters[0] = p`.
+ * - `CpmLevelWell`: `parameters[0] = epsilon`, `parameters[1] = alpha`.
+ * - `DpmSoftmax`: `parameters[0] = sharpness`.
+ * - `DpmBgSoftmax`: `parameters[0] = sharpness`,
+ *   `parameters[1] = background_strength`,
+ *   `parameters[2] = background_sharpness`.
+ *
+ * DPM families use each component coordinate transform's `assigned_xopt` as
+ * the component center and each component's `f_bias` as the deceptive value
+ * offset.
+ */
+struct CompositionSpec {
+    CompositionKind kind = CompositionKind::None;
+    std::vector<double> parameters;
+    std::uint64_t seed = 0;
+};
+
+/**
+ * @brief Public high-level specification for one benchmark function.
+ *
+ * This is the object a user should write by hand, construct from Python, or
+ * provide in a concise YAML file. It intentionally omits runtime-only details
+ * such as generated matrices and primitive target points.
+ *
+ * `assigned_xopt` and `assigned_fopt` control the constructed optimum location
+ * and value. `scale_factor = std::nullopt` means the builder should determine
+ * a scale factor internally.
+ */
+struct FunctionSpec {
+    int dimension = 0;
+    DomainSpec domain;
+    std::vector<ComponentSpec> components;
+    CompositionSpec composition;
+    std::vector<double> assigned_xopt;
+    double assigned_fopt = 0.0;
+    std::optional<double> scale_factor = std::nullopt;
+    std::uint64_t seed = 0;
+    std::string label;
+    std::vector<std::string> metadata;
 };
 
 } // namespace FuncCraft

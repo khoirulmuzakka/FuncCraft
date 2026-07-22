@@ -19,6 +19,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -52,13 +53,17 @@ public:
      */
     FunctionBuilder& seed(unsigned long long seed);
     /**
-     * @brief Set the known global minimizer.
+     * @brief Set the assigned global minimizer in search coordinates.
      */
-    FunctionBuilder& known_global_minimizer(std::vector<double> x_star);
+    FunctionBuilder& assigned_xopt(std::vector<double> x_opt);
     /**
-     * @brief Set the known global value.
+     * @brief Set the assigned global optimum value.
      */
-    FunctionBuilder& known_global_value(double f_star);
+    FunctionBuilder& assigned_fopt(double f_opt);
+    /**
+     * @brief Set the requested scale factor. Leave unset for internal estimation.
+     */
+    FunctionBuilder& scale_factor(std::optional<double> scale_factor);
     /**
      * @brief Add one primitive component to the composed function.
      */
@@ -66,7 +71,8 @@ public:
         BasicFunctionId id,
         int component_dimension,
         std::shared_ptr<CoordinateTransform> coordinate_transform,
-        std::shared_ptr<ValueTransform> value_transform);
+        std::shared_ptr<ValueTransform> value_transform,
+        double f_bias = 0.0);
     /**
      * @brief Set the composition rule for all accumulated components.
      */
@@ -83,8 +89,8 @@ public:
     /**
      * @brief Materialize the plain-data specification accumulated so far.
      *
-     * The returned spec includes a normalized `function_class_label` and the
-     * known global optimum fields captured by the builder.
+     * The returned spec includes the public construction request captured by
+     * the builder.
      */
     FunctionSpec build_spec() const;
     /**
@@ -95,8 +101,9 @@ public:
 private:
     Domain domain_;
     unsigned long long seed_ = 0;
-    std::vector<double> x_star_;
-    double f_star_ = 0.0;
+    std::vector<double> assigned_xopt_;
+    double assigned_fopt_ = 0.0;
+    std::optional<double> scale_factor_;
     std::vector<ComponentSpec> component_specs_;
     std::shared_ptr<CompositionFunction> composition_;
     FunctionClass function_class_;
@@ -128,10 +135,10 @@ std::map<std::string, std::string> parse_parameters(const std::vector<std::strin
 /**
  * @brief Create a runtime coordinate transform from a plain transform spec.
  *
- * The spec must provide the full ambient dimension, source point, target
- * point, and any family-specific indices or parameters.
+ * The spec must provide the full ambient dimension, assigned xopt, base xopt,
+ * and any family-specific indices or parameters.
  */
-std::shared_ptr<CoordinateTransform> make_coordinate_transform(const TransformSpec& spec);
+std::shared_ptr<CoordinateTransform> make_coordinate_transform(const CoordinateTransformSpec& spec);
 /**
  * @brief Create a runtime value transform from a plain value-transform spec.
  *

@@ -7,15 +7,11 @@ benchmark instance.
 """
 
 from . import _funccraft
-from .spec import Domain, FunctionSpec
+from .spec import DomainSpec, FunctionSpec, function_spec
 
 
 def _as_native_function_spec(spec):
-    if isinstance(spec, FunctionSpec):
-        return spec.to_cpp()
-    if isinstance(spec, dict):
-        return FunctionSpec.from_dict(spec).to_cpp()
-    return spec
+    return function_spec(spec)
 
 
 def make_benchmark_function(spec):
@@ -24,8 +20,8 @@ def make_benchmark_function(spec):
 
 
 def load_function_spec_yaml(path):
-    """Load a :class:`FunctionSpec` from a YAML file."""
-    return FunctionSpec.from_cpp(_funccraft.load_function_spec_yaml(str(path)))
+    """Load a native :class:`FunctionSpec` from a YAML file."""
+    return _funccraft.load_function_spec_yaml(str(path))
 
 
 def make_benchmark_function_from_yaml(path):
@@ -52,15 +48,19 @@ class BenchmarkFunction:
     def __init__(self, spec):
         if isinstance(spec, _funccraft.BenchmarkFunction):
             self._function = spec
-            self._spec = FunctionSpec.from_cpp(self._function.spec)
+            self._spec = self._function.spec
         else:
             self._function = _funccraft.BenchmarkFunction(_as_native_function_spec(spec))
-            self._spec = FunctionSpec.from_cpp(self._function.spec)
+            self._spec = self._function.spec
 
     @property
     def domain(self):
         """Return the search domain of this function."""
-        return Domain.from_cpp(self._function.domain)
+        domain = DomainSpec()
+        domain.dimension = self._function.domain.dimension
+        domain.lower_bound = list(self._function.domain.lower)
+        domain.upper_bound = list(self._function.domain.upper)
+        return domain
 
     @property
     def dimension(self):
@@ -68,19 +68,19 @@ class BenchmarkFunction:
         return self._function.dimension
 
     @property
+    def scale_factor(self):
+        """Return the runtime scale factor used to normalize values."""
+        return self._function.scale_factor
+
+    @property
     def scale(self):
-        """Return the runtime lambda used to normalize composed values."""
-        return self._function.scale
+        """Alias for :attr:`scale_factor`."""
+        return self.scale_factor
 
     @property
-    def lambda_(self):
-        """Alias for :attr:`scale`."""
-        return self._function.scale
-
-    @property
-    def bias(self):
-        """Return the runtime additive bias applied after scaling."""
-        return self._function.bias
+    def assigned_fopt(self):
+        """Return the assigned optimum value."""
+        return self._function.assigned_fopt
 
     @property
     def spec(self):
@@ -110,14 +110,14 @@ class BenchmarkFunction:
         return (
             "BenchmarkFunction("
             f"dimension={self.dimension}, "
-            f"label='{self.spec.function_class_label}', "
-            f"scale={self.scale})"
+            f"label='{self.spec.label}', "
+            f"scale_factor={self.scale_factor})"
         )
 
 
 __all__ = [
     "BenchmarkFunction",
-    "Domain",
+    "DomainSpec",
     "FunctionSpec",
     "load_function_spec_yaml",
     "make_benchmark_function",

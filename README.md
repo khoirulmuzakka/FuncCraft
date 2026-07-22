@@ -13,8 +13,8 @@ location of the constructed function's known minimum.
 The library separates benchmark construction into primitive functions,
 coordinate transforms, value transforms, and composition rules. A generated
 function can be exported as YAML and rebuilt later with the same parameters,
-including transform matrices, selected subspaces, centers, offsets, scale, and
-bias.
+including transform matrices, selected subspaces, component optimum locations,
+component biases, and scale factors.
 
 ## Generating Mechanism
 
@@ -23,7 +23,7 @@ FuncCraft follows the composition framework described in
 assembled as
 
 ```text
-f(x) = psi(x, phi_1(g_1(T_1(x))), ..., phi_m(g_m(T_m(x))))
+f(x) = psi(phi_1(g_1(T_1(x))), ..., phi_m(g_m(T_m(x))))
 ```
 
 where:
@@ -38,18 +38,18 @@ where:
 For the implemented linear coordinate transforms, the convention is:
 
 ```text
-T(x) = target_point + M * (x - source_point)
+T(x) = base_xopt + M * (x - assigned_xopt)
 ```
 
-Here `source_point` is the desired minimum location in the generated/search
-coordinates. `target_point` is the corresponding minimum location in the
-primitive coordinates, which must be the base function's `x_opt` by
-construction. This lets the suite place a generated optimum at `source_point`
+Here `assigned_xopt` is the desired minimum location in the generated/search
+coordinates. `base_xopt` is the corresponding minimum location in the
+primitive coordinates, which must be the selected base function's `x_opt` by
+construction. This lets the suite place a generated optimum at `assigned_xopt`
 while evaluating the primitive at its own optimum.
 
 The usual suite generator chooses these ingredients from weighted
-`ChoiceSpec` lists, places the global optimum and deceptive centers
-deterministically from the suite seed, and then materializes a
+choice lists, places the global optimum and deceptive centers deterministically
+from the suite seed, and then materializes a
 `FunctionSpec`. A `FunctionSpec` is the reproducibility record: it is the data
 used to build a `BenchmarkFunction`, and it is also what is exported to YAML.
 
@@ -79,13 +79,13 @@ Value transforms:
 
 Composition functions:
 
-- `single_component` / `single`: one transformed primitive component.
-- `weighted_sum` / `sum` / `cpm`: common-point weighted sum.
-- `power_mean` / `powermean`: common-point power-mean aggregation.
-- `level_well` / `levelwell` / `lvlwell`: common-point level-well
+- `none` / `identity`: no composition for a one-component function.
+- `cpm-wsum` / `cpmsum` / `weighted_sum`: common-point weighted sum.
+- `cpm-power-mean` / `cpmpmean` / `power_mean`: common-point power-mean aggregation.
+- `cpm-level-well` / `cpmlwell` / `level_well`: common-point level-well
   composition.
-- `deceptive_softmax` / `dpm`: deceptive multi-point softmax composition.
-- `deceptive_bg_softmax` / `dpmbgsoftmax`: deceptive softmax with a background
+- `dpm-softmax` / `dpmsoftmax` / `dpm`: deceptive multi-point softmax composition.
+- `dpm-bgsoftmax` / `dpmbgsoftmax`: deceptive softmax with a background
   component.
 
 The default suite choices are in `include/suite_spec.h` and
@@ -159,7 +159,7 @@ All benchmark evaluations are batched. A function receives a
 `std::vector<std::vector<double>>`, where each inner vector is one point, and
 returns one value per point.
 
-Create one composed benchmark function from a plain `FunctionSpec`:
+Create one composed benchmark function from a `FunctionSpec`:
 
 ```cpp
 #include "benchmark.h"
@@ -177,50 +177,50 @@ int main() {
     std::uniform_real_distribution<double> uniform(-4.0, 4.0);
     std::vector<double> x_star = {uniform(rng), uniform(rng)};
 
-    TransformSpec identity;
-    identity.kind = "identity";
-    identity.dimension = 2;
-    identity.source_point = x_star;
-    identity.target_point = sphere_base.x_opt;
+    CoordinateTransformSpec sphere_transform;
+    sphere_transform.kind = CoordinateTransformKind::None;
+    sphere_transform.dimension = 2;
+    sphere_transform.assigned_xopt = x_star;
+    sphere_transform.base_xopt = sphere_base.x_opt;
 
-    TransformSpec rotation;
-    rotation.kind = "rotation";
-    rotation.dimension = 2;
-    rotation.seed = 17;
-    rotation.source_point = x_star;
-    rotation.target_point = rastrigin_base.x_opt;
+    CoordinateTransformSpec rastrigin_transform;
+    rastrigin_transform.kind = CoordinateTransformKind::Rotation;
+    rastrigin_transform.dimension = 2;
+    rastrigin_transform.seed = 17;
+    rastrigin_transform.assigned_xopt = x_star;
+    rastrigin_transform.base_xopt = rastrigin_base.x_opt;
 
     ValueTransformSpec no_value_transform;
-    no_value_transform.kind = "identity";
+    no_value_transform.kind = ValueTransformKind::None;
 
     ValueTransformSpec power;
-    power.kind = "power";
+    power.kind = ValueTransformKind::Power;
     power.parameters = {1.25, 1.0};
 
     ComponentSpec sphere;
-    sphere.base_function = "Sphere";
+    sphere.base_function = BasicFunctionId::Sphere;
     sphere.component_dimension = 2;
-    sphere.coordinate_transform = identity;
+    sphere.coordinate_transform = sphere_transform;
     sphere.value_transform = no_value_transform;
 
     ComponentSpec rastrigin;
-    rastrigin.base_function = "Rastrigin";
+    rastrigin.base_function = BasicFunctionId::Rastrigin;
     rastrigin.component_dimension = 2;
-    rastrigin.coordinate_transform = rotation;
+    rastrigin.coordinate_transform = rastrigin_transform;
     rastrigin.value_transform = power;
 
     CompositionSpec composition;
-    composition.kind = "weighted_sum";
-    composition.weights = {0.5, 0.5};
+    composition.kind = CompositionKind::CpmWeightedSum;
 
     FunctionSpec spec;
     spec.dimension = 2;
-    spec.lower_bound = {-5.0, -5.0};
-    spec.upper_bound = {5.0, 5.0};
-    spec.component_specs = {sphere, rastrigin};
-    spec.composition_spec = composition;
-    spec.known_global_minimizer = x_star;
-    spec.known_global_value = 0.0;
+    spec.domain.dimension = 2;
+    spec.domain.lower_bound = {-5.0, -5.0};
+    spec.domain.upper_bound = {5.0, 5.0};
+    spec.components = {sphere, rastrigin};
+    spec.composition = composition;
+    spec.assigned_xopt = x_star;
+    spec.assigned_fopt = 0.0;
 
     BenchmarkFunction f(spec);
     std::vector<double> values = f({x_star, {1.0, 1.0}});
@@ -255,8 +255,9 @@ int main() {
         std::vector<double> values = f(points);
 
         const FunctionSpec& f_spec = f.spec();
-        const std::vector<double>& x_star = f_spec.known_global_minimizer;
-        const double f_star = f_spec.known_global_value;
+        const std::vector<double>& x_star = f_spec.assigned_xopt;
+        const double f_star = f_spec.assigned_fopt;
+        const std::string& label = f_spec.label;
     }
 
     suite.export_manifest("suite_manifest.yaml");
@@ -283,7 +284,7 @@ Minimize a suite function in C++ with Minion:
 int main() {
     FuncCraft::SuiteSpec spec =
         FuncCraft::load_suite_spec_yaml("BenchmarkSuites/default_suite.yaml");
-    spec.requested_number_of_functions = 10;
+    spec.requested_number_of_functions = 40;
 
     FuncCraft::BenchmarkSuite suite(spec, 10);
     const FuncCraft::BenchmarkFunction& f = suite.function(0);
@@ -322,6 +323,10 @@ int main() {
 All benchmark evaluations are batched. Pass a list of points, such as
 `[[0.0] * dimension, [1.0] * dimension]`, rather than one flat point vector.
 
+The Python package exposes the native C++ spec objects, plus small `make_*`
+factory helpers so users do not need to know pybind constructor details. The
+factories return native specs, not a separate Python spec model.
+
 Create one composed benchmark function:
 
 ```python
@@ -330,12 +335,13 @@ from funccraft import (
     BasicF,
     BasicFunctionId,
     BenchmarkFunction,
-    ComponentSpec,
-    CompositionSpec,
-    FunctionSpec,
-    TransformSpec,
-    ValueTransformSpec,
-    load_function_spec_yaml,
+    make_benchmark_function_from_yaml,
+    make_component,
+    make_composition,
+    make_coordinate_transform,
+    make_domain,
+    make_function_spec,
+    make_value_transform,
 )
 
 sphere_base = BasicF(BasicFunctionId.Sphere, 2)
@@ -344,49 +350,44 @@ rastrigin_base = BasicF(BasicFunctionId.Rastrigin, 2)
 rng = np.random.default_rng(1)
 x_star = rng.uniform(-4.0, 4.0, size=2).tolist()
 
-identity = TransformSpec(
-    kind="identity",
+spec = make_function_spec(
     dimension=2,
-    source_point=x_star,
-    target_point=list(sphere_base.x_opt),
-)
-
-rotation = TransformSpec(
-    kind="rotation",
-    dimension=2,
-    seed=17,
-    source_point=x_star,
-    target_point=list(rastrigin_base.x_opt),
-)
-
-spec = FunctionSpec(
-    dimension=2,
-    lower_bound=[-5.0, -5.0],
-    upper_bound=[5.0, 5.0],
-    component_specs=[
-        ComponentSpec(
+    domain=make_domain(2, -5.0, 5.0),
+    components=[
+        make_component(
             base_function="Sphere",
             component_dimension=2,
-            coordinate_transform=identity,
-            value_transform=ValueTransformSpec(kind="identity"),
+            coordinate_transform=make_coordinate_transform(
+                kind="none",
+                dimension=2,
+                assigned_xopt=x_star,
+                base_xopt=sphere_base.x_opt,
+            ),
+            value_transform=make_value_transform("none"),
         ),
-        ComponentSpec(
+        make_component(
             base_function="Rastrigin",
             component_dimension=2,
-            coordinate_transform=rotation,
-            value_transform=ValueTransformSpec(kind="power", parameters=[1.25, 1.0]),
+            coordinate_transform=make_coordinate_transform(
+                kind="rotation",
+                dimension=2,
+                assigned_xopt=x_star,
+                base_xopt=rastrigin_base.x_opt,
+                seed=17,
+            ),
+            value_transform=make_value_transform("power", parameters=[1.25, 1.0]),
         ),
     ],
-    composition_spec=CompositionSpec(kind="weighted_sum", weights=[0.5, 0.5]),
-    known_global_minimizer=x_star,
-    known_global_value=0.0,
+    composition=make_composition("cpm-wsum"),
+    assigned_xopt=x_star,
+    assigned_fopt=0.0,
 )
 
 f = BenchmarkFunction(spec)
 before = f.evaluate([x_star, [1.0, 1.0]])
 
 f.export_spec("function.yaml")
-same_f = BenchmarkFunction(load_function_spec_yaml("function.yaml"))
+same_f = make_benchmark_function_from_yaml("function.yaml")
 after = same_f.evaluate([x_star, [1.0, 1.0]])
 assert before == after
 ```
@@ -407,11 +408,59 @@ for i in range(suite.size):
     f = suite.function(i)
     values = f.evaluate(points)
 
-    x_star = f.spec.known_global_minimizer
-    f_star = f.spec.known_global_value
-    label = f.spec.function_class_label
+    x_star = f.spec.assigned_xopt
+    f_star = f.spec.assigned_fopt
+    label = f.spec.label
 
 suite.export_manifest("suite_manifest.yaml")
+```
+
+You can also construct a suite spec directly in Python:
+
+```python
+from funccraft import (
+    BenchmarkSuite,
+    make_composition_choice,
+    make_coordinate_transform_choice,
+    make_suite_spec,
+    make_value_transform_choice,
+)
+
+suite_spec = make_suite_spec(
+    requested_number_of_functions=500,
+    max_components=4,
+    master_seed=1,
+    compositions=[
+        make_composition_choice("dpm-bgsoftmax", 0.5, [0.01, 1.0, 0.01]),
+        make_composition_choice("dpm-softmax", 0.5, [0.01]),
+    ],
+    coordinate_transforms=[
+        make_coordinate_transform_choice("rotation", 0.5),
+        make_coordinate_transform_choice("block-rotation", 0.5),
+    ],
+    value_transforms=[
+        make_value_transform_choice("none", 0.5),
+        make_value_transform_choice("oscillatory", 0.5, [0.1, 1.0]),
+    ],
+)
+
+suite = BenchmarkSuite(suite_spec, 10)
+```
+
+For compact scripts, nested dictionaries with the same current field names are
+accepted anywhere a function or suite spec is expected:
+
+```python
+suite = BenchmarkSuite(
+    {
+        "requested_number_of_functions": 100,
+        "max_components": 4,
+        "compositions": [
+            {"kind": "DPM BG Softmax", "probability": 1.0, "parameters": [0.01, 1.0, 0.01]},
+        ],
+    },
+    10,
+)
 ```
 
 Minimize one generated function with SciPy:
@@ -422,7 +471,7 @@ from scipy.optimize import minimize
 from funccraft import BenchmarkSuite, load_suite_spec_yaml
 
 suite_spec = load_suite_spec_yaml("BenchmarkSuites/default_suite.yaml")
-suite_spec.requested_number_of_functions = 10
+suite_spec.requested_number_of_functions = 40
 
 suite = BenchmarkSuite(suite_spec, 10)
 f = suite.function(0)
@@ -438,8 +487,7 @@ result = minimize(objective, x0, method="L-BFGS-B", bounds=bounds)
 print(result.fun, result.x)
 ```
 
-The Python spec classes are dict-like. You can use attribute access
-(`spec.master_seed`) or mapping access (`spec["master_seed"]`).
+For a broader notebook walkthrough, see `examples/Create_functions.ipynb`.
 
 ## CI Status
 
@@ -457,12 +505,14 @@ one complete function spec. The exported YAML contains:
 
 - dimension and bounds;
 - component base functions;
-- coordinate transform kind, seed, selected indices, source and target points,
+- coordinate transform kind, seed, selected indices, `assigned_xopt`, `base_xopt`,
   parameters, and generated matrix when applicable;
 - value transform kind, seed, and parameters;
-- composition kind, seed, weights, centers, offsets, and parameters;
-- known global minimizer and known global value;
-- runtime normalization values under `runtime.lambda` and `runtime.bias`.
+- each component's `f_bias`;
+- composition kind, seed, and parameters;
+- function-level `assigned_xopt` and `assigned_fopt`;
+- `scale_factor` when it has been materialized or explicitly set;
+- label and metadata.
 
 `BenchmarkSuite::export_manifest()` and `BenchmarkSuite.export_manifest()` write
 the suite spec plus every generated function spec. This is the right export

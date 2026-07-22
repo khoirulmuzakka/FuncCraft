@@ -6,8 +6,22 @@
 #include <pybind11/stl.h>
 
 #include <string>
+#include <utility>
 
 namespace py = pybind11;
+
+namespace {
+
+template <typename Choice>
+void bind_choice(py::module_& m, const char* name) {
+    py::class_<Choice>(m, name)
+        .def(py::init<>())
+        .def_readwrite("kind", &Choice::kind)
+        .def_readwrite("probability", &Choice::probability)
+        .def_readwrite("parameters", &Choice::parameters);
+}
+
+} // namespace
 
 PYBIND11_MODULE(_funccraft, m) {
     m.doc() = "FuncCraft Python bindings for benchmark suites";
@@ -51,6 +65,29 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("StyblinskiTang", FuncCraft::BasicFunctionId::StyblinskiTang)
         .export_values();
 
+    py::enum_<FuncCraft::CoordinateTransformKind>(m, "CoordinateTransformKind")
+        .value("None", FuncCraft::CoordinateTransformKind::None)
+        .value("Rotation", FuncCraft::CoordinateTransformKind::Rotation)
+        .value("Affine", FuncCraft::CoordinateTransformKind::Affine)
+        .value("BlockRotation", FuncCraft::CoordinateTransformKind::BlockRotation)
+        .export_values();
+
+    py::enum_<FuncCraft::ValueTransformKind>(m, "ValueTransformKind")
+        .value("None", FuncCraft::ValueTransformKind::None)
+        .value("Power", FuncCraft::ValueTransformKind::Power)
+        .value("Oscillatory", FuncCraft::ValueTransformKind::Oscillatory)
+        .value("CosineZero", FuncCraft::ValueTransformKind::CosineZero)
+        .export_values();
+
+    py::enum_<FuncCraft::CompositionKind>(m, "CompositionKind")
+        .value("None", FuncCraft::CompositionKind::None)
+        .value("CpmWeightedSum", FuncCraft::CompositionKind::CpmWeightedSum)
+        .value("CpmPowerMean", FuncCraft::CompositionKind::CpmPowerMean)
+        .value("CpmLevelWell", FuncCraft::CompositionKind::CpmLevelWell)
+        .value("DpmSoftmax", FuncCraft::CompositionKind::DpmSoftmax)
+        .value("DpmBgSoftmax", FuncCraft::CompositionKind::DpmBgSoftmax)
+        .export_values();
+
     py::class_<FuncCraft::BasicF>(m, "BasicF")
         .def(py::init<FuncCraft::BasicFunctionId, int>(), py::arg("id"), py::arg("dimension"))
         .def("__call__", [](const FuncCraft::BasicF& self, const std::vector<std::vector<double>>& X) {
@@ -64,47 +101,36 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_property_readonly("default_domain", &FuncCraft::BasicF::default_domain)
         .def_readonly("x_opt", &FuncCraft::BasicF::x_opt)
         .def_readonly("f_opt", &FuncCraft::BasicF::f_opt)
-        .def_readonly("properties", &FuncCraft::BasicF::properties)
-        .def("__repr__", [](const FuncCraft::BasicF& self) {
-            return "BasicF(name='" + self.name
-                + "', dimension=" + std::to_string(self.dimension) + ")";
-        });
+        .def_readonly("properties", &FuncCraft::BasicF::properties);
 
     py::class_<FuncCraft::Domain>(m, "Domain")
         .def(py::init<int, double, double>(), py::arg("dimension") = 0, py::arg("lower_bound") = -100.0, py::arg("upper_bound") = 100.0)
         .def_readwrite("lower", &FuncCraft::Domain::lower)
         .def_readwrite("upper", &FuncCraft::Domain::upper)
-        .def_property_readonly("dimension", &FuncCraft::Domain::dimension)
-        .def("__repr__", [](const FuncCraft::Domain& self) {
-            return "Domain(dimension=" + std::to_string(self.dimension()) + ")";
-        });
+        .def_property_readonly("dimension", &FuncCraft::Domain::dimension);
 
-    py::class_<FuncCraft::ChoiceSpec>(m, "ChoiceSpec")
+    py::class_<FuncCraft::DomainSpec>(m, "DomainSpec")
         .def(py::init<>())
-        .def_readwrite("kind", &FuncCraft::ChoiceSpec::kind)
-        .def_readwrite("probability", &FuncCraft::ChoiceSpec::probability)
-        .def_readwrite("parameters", &FuncCraft::ChoiceSpec::parameters)
-        .def("__repr__", [](const FuncCraft::ChoiceSpec& self) {
-            return "ChoiceSpec(kind='" + self.kind
-                + "', probability=" + std::to_string(self.probability) + ")";
-        });
+        .def_readwrite("dimension", &FuncCraft::DomainSpec::dimension)
+        .def_readwrite("lower_bound", &FuncCraft::DomainSpec::lower_bound)
+        .def_readwrite("upper_bound", &FuncCraft::DomainSpec::upper_bound);
 
-    py::class_<FuncCraft::TransformSpec>(m, "TransformSpec")
+    py::class_<FuncCraft::CoordinateTransformSpec>(m, "CoordinateTransformSpec")
         .def(py::init<>())
-        .def_readwrite("kind", &FuncCraft::TransformSpec::kind)
-        .def_readwrite("dimension", &FuncCraft::TransformSpec::dimension)
-        .def_readwrite("seed", &FuncCraft::TransformSpec::seed)
-        .def_readwrite("selected_indices", &FuncCraft::TransformSpec::selected_indices)
-        .def_readwrite("source_point", &FuncCraft::TransformSpec::source_point)
-        .def_readwrite("target_point", &FuncCraft::TransformSpec::target_point)
-        .def_readwrite("parameters", &FuncCraft::TransformSpec::parameters)
-        .def_readwrite("matrix", &FuncCraft::TransformSpec::matrix);
+        .def_readwrite("kind", &FuncCraft::CoordinateTransformSpec::kind)
+        .def_readwrite("dimension", &FuncCraft::CoordinateTransformSpec::dimension)
+        .def_readwrite("assigned_xopt", &FuncCraft::CoordinateTransformSpec::assigned_xopt)
+        .def_readwrite("base_xopt", &FuncCraft::CoordinateTransformSpec::base_xopt)
+        .def_readwrite("selected_indices", &FuncCraft::CoordinateTransformSpec::selected_indices)
+        .def_readwrite("parameters", &FuncCraft::CoordinateTransformSpec::parameters)
+        .def_readwrite("matrix", &FuncCraft::CoordinateTransformSpec::matrix)
+        .def_readwrite("seed", &FuncCraft::CoordinateTransformSpec::seed);
 
     py::class_<FuncCraft::ValueTransformSpec>(m, "ValueTransformSpec")
         .def(py::init<>())
         .def_readwrite("kind", &FuncCraft::ValueTransformSpec::kind)
-        .def_readwrite("seed", &FuncCraft::ValueTransformSpec::seed)
-        .def_readwrite("parameters", &FuncCraft::ValueTransformSpec::parameters);
+        .def_readwrite("parameters", &FuncCraft::ValueTransformSpec::parameters)
+        .def_readwrite("seed", &FuncCraft::ValueTransformSpec::seed);
 
     py::class_<FuncCraft::ComponentSpec>(m, "ComponentSpec")
         .def(py::init<>())
@@ -112,63 +138,49 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("component_dimension", &FuncCraft::ComponentSpec::component_dimension)
         .def_readwrite("coordinate_transform", &FuncCraft::ComponentSpec::coordinate_transform)
         .def_readwrite("value_transform", &FuncCraft::ComponentSpec::value_transform)
+        .def_readwrite("f_bias", &FuncCraft::ComponentSpec::f_bias)
         .def_readwrite("seed", &FuncCraft::ComponentSpec::seed);
 
     py::class_<FuncCraft::CompositionSpec>(m, "CompositionSpec")
         .def(py::init<>())
         .def_readwrite("kind", &FuncCraft::CompositionSpec::kind)
-        .def_readwrite("seed", &FuncCraft::CompositionSpec::seed)
         .def_readwrite("parameters", &FuncCraft::CompositionSpec::parameters)
-        .def_readwrite("centers", &FuncCraft::CompositionSpec::centers)
-        .def_readwrite("offsets", &FuncCraft::CompositionSpec::offsets)
-        .def_readwrite("weights", &FuncCraft::CompositionSpec::weights);
+        .def_readwrite("seed", &FuncCraft::CompositionSpec::seed);
 
     py::class_<FuncCraft::FunctionSpec>(m, "FunctionSpec")
         .def(py::init<>())
         .def_readwrite("dimension", &FuncCraft::FunctionSpec::dimension)
-        .def_readwrite("lower_bound", &FuncCraft::FunctionSpec::lower_bound)
-        .def_readwrite("upper_bound", &FuncCraft::FunctionSpec::upper_bound)
-        .def_readwrite("component_specs", &FuncCraft::FunctionSpec::component_specs)
-        .def_readwrite("composition_spec", &FuncCraft::FunctionSpec::composition_spec)
+        .def_readwrite("domain", &FuncCraft::FunctionSpec::domain)
+        .def_readwrite("components", &FuncCraft::FunctionSpec::components)
+        .def_readwrite("composition", &FuncCraft::FunctionSpec::composition)
+        .def_readwrite("assigned_xopt", &FuncCraft::FunctionSpec::assigned_xopt)
+        .def_readwrite("assigned_fopt", &FuncCraft::FunctionSpec::assigned_fopt)
+        .def_readwrite("scale_factor", &FuncCraft::FunctionSpec::scale_factor)
         .def_readwrite("seed", &FuncCraft::FunctionSpec::seed)
-        .def_readwrite("function_class_label", &FuncCraft::FunctionSpec::function_class_label)
-        .def_readwrite("known_global_minimizer", &FuncCraft::FunctionSpec::known_global_minimizer)
-        .def_readwrite("known_global_value", &FuncCraft::FunctionSpec::known_global_value)
-        .def_readwrite("parameters", &FuncCraft::FunctionSpec::parameters)
-        .def("__repr__", [](const FuncCraft::FunctionSpec& self) {
-            return "FunctionSpec(dimension=" + std::to_string(self.dimension)
-                + ", seed=" + std::to_string(self.seed)
-                + ", label='" + self.function_class_label + "')";
-        });
+        .def_readwrite("label", &FuncCraft::FunctionSpec::label)
+        .def_readwrite("metadata", &FuncCraft::FunctionSpec::metadata);
+
+    bind_choice<FuncCraft::CoordinateTransformChoice>(m, "CoordinateTransformChoice");
+    bind_choice<FuncCraft::ValueTransformChoice>(m, "ValueTransformChoice");
+    bind_choice<FuncCraft::CompositionChoice>(m, "CompositionChoice");
 
     py::class_<FuncCraft::SuiteSpec>(m, "SuiteSpec")
         .def(py::init<>())
         .def_readwrite("supported_dimensions", &FuncCraft::SuiteSpec::supported_dimensions)
         .def_readwrite("base_functions", &FuncCraft::SuiteSpec::base_functions)
-        .def_readwrite("base_function_coord_transforms", &FuncCraft::SuiteSpec::base_function_coord_transforms)
-        .def_readwrite("coord_transforms", &FuncCraft::SuiteSpec::coord_transforms)
+        .def_readwrite("composition_base_functions", &FuncCraft::SuiteSpec::composition_base_functions)
+        .def_readwrite("coordinate_transforms", &FuncCraft::SuiteSpec::coordinate_transforms)
         .def_readwrite("value_transforms", &FuncCraft::SuiteSpec::value_transforms)
-        .def_readwrite("composition_functions", &FuncCraft::SuiteSpec::composition_functions)
-        .def_readwrite("base_functions_for_compositions", &FuncCraft::SuiteSpec::base_functions_for_compositions)
+        .def_readwrite("compositions", &FuncCraft::SuiteSpec::compositions)
         .def_readwrite("max_components", &FuncCraft::SuiteSpec::max_components)
         .def_readwrite("requested_number_of_functions", &FuncCraft::SuiteSpec::requested_number_of_functions)
         .def_readwrite("max_number_of_functions", &FuncCraft::SuiteSpec::max_number_of_functions)
         .def_readwrite("master_seed", &FuncCraft::SuiteSpec::master_seed)
         .def_readwrite("lower_bound", &FuncCraft::SuiteSpec::lower_bound)
         .def_readwrite("upper_bound", &FuncCraft::SuiteSpec::upper_bound)
-        .def_readwrite("f_opt", &FuncCraft::SuiteSpec::f_opt)
-        .def_readwrite("suite_label", &FuncCraft::SuiteSpec::suite_label)
-        .def("__repr__", [](const FuncCraft::SuiteSpec& self) {
-            return "SuiteSpec(supported_dimensions='" + self.supported_dimensions
-                + "', max_components=" + std::to_string(self.max_components)
-                + ", max_number_of_functions=" + std::to_string(self.max_number_of_functions)
-                + ", requested_number_of_functions=" + std::to_string(self.requested_number_of_functions)
-                + ", master_seed=" + std::to_string(self.master_seed)
-                + ", lower_bound=" + std::to_string(self.lower_bound)
-                + ", upper_bound=" + std::to_string(self.upper_bound)
-                + ", f_opt=" + std::to_string(self.f_opt)
-                + ", suite_label='" + self.suite_label + "')";
-        });
+        .def_readwrite("assigned_fopt", &FuncCraft::SuiteSpec::assigned_fopt)
+        .def_readwrite("xopt_domain_shrink_factor", &FuncCraft::SuiteSpec::xopt_domain_shrink_factor)
+        .def_readwrite("suite_label", &FuncCraft::SuiteSpec::suite_label);
 
     py::class_<FuncCraft::BenchmarkFunction>(m, "BenchmarkFunction")
         .def(py::init<FuncCraft::FunctionSpec>(), py::arg("spec"))
@@ -180,18 +192,12 @@ PYBIND11_MODULE(_funccraft, m) {
         }, py::arg("points"))
         .def_property_readonly("domain", &FuncCraft::BenchmarkFunction::domain, py::return_value_policy::reference_internal)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkFunction::dimension)
-        .def_property_readonly("lambda", &FuncCraft::BenchmarkFunction::lambda)
-        .def_property_readonly("scale", &FuncCraft::BenchmarkFunction::lambda)
-        .def_property_readonly("bias", &FuncCraft::BenchmarkFunction::bias)
+        .def_property_readonly("scale_factor", &FuncCraft::BenchmarkFunction::scale_factor)
+        .def_property_readonly("assigned_fopt", &FuncCraft::BenchmarkFunction::assigned_fopt)
         .def_property_readonly("spec", &FuncCraft::BenchmarkFunction::spec, py::return_value_policy::reference_internal)
         .def("export_spec", [](const FuncCraft::BenchmarkFunction& self, const std::string& path) {
             self.export_spec(path);
-        }, py::arg("path"))
-        .def("__repr__", [](const FuncCraft::BenchmarkFunction& self) {
-            return "BenchmarkFunction(dimension=" + std::to_string(self.dimension())
-                + ", label='" + self.spec().function_class_label
-                + "', lambda=" + std::to_string(self.lambda()) + ")";
-        });
+        }, py::arg("path"));
 
     py::class_<FuncCraft::BenchmarkSuite>(m, "BenchmarkSuite")
         .def(py::init<FuncCraft::SuiteSpec, int>(), py::arg("spec"), py::arg("dimension"))
@@ -214,11 +220,7 @@ PYBIND11_MODULE(_funccraft, m) {
         }, py::arg("path"))
         .def("export_spec", [](const FuncCraft::BenchmarkSuite& self, const std::string& path) {
             self.export_spec(path);
-        }, py::arg("path"))
-        .def("__repr__", [](const FuncCraft::BenchmarkSuite& self) {
-            return "BenchmarkSuite(size=" + std::to_string(self.size())
-                + ", dimension=" + std::to_string(self.dimension()) + ")";
-        });
+        }, py::arg("path"));
 
     m.def("make_benchmark_function", [](FuncCraft::FunctionSpec spec) {
         return FuncCraft::BenchmarkFunction(std::move(spec));

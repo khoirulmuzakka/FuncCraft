@@ -54,11 +54,11 @@ public:
     /**
      * @brief Return the runtime scale factor used to normalize composed values.
      */
-    double lambda() const;
+    double scale_factor() const;
     /**
-     * @brief Return the runtime additive bias applied after scaling.
+     * @brief Return the assigned optimum value applied after scaling.
      */
-    double bias() const;
+    double assigned_fopt() const;
     /**
      * @brief Return the complete specification used to build this function.
      *
@@ -78,8 +78,8 @@ public:
 private:
     FunctionSpec spec_;
     Domain domain_;
-    double lambda_ = 1.0;
-    double bias_ = 0.0;
+    double scale_factor_ = 1.0;
+    double assigned_fopt_ = 0.0;
     ComposedFunction function_;
 };
 

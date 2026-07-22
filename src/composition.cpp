@@ -46,18 +46,18 @@ double DeceptivePointComposition::raw_apply(const std::vector<double>& x, const 
     return deceptive_raw_apply(x, z);
 }
 
-double SingleComponentComposition::common_raw_apply(const std::vector<double>& z) const {
-    require(z.size() == 1, "single-component composition requires exactly one component");
+double NoneComposition::common_raw_apply(const std::vector<double>& z) const {
+    require(z.size() == 1, "no composition requires exactly one component");
     return z.front();
 }
 
-CompositionClass SingleComponentComposition::composition_class() const {
+CompositionClass NoneComposition::composition_class() const {
     return CompositionClass::None;
 }
 
-CompositionSpec SingleComponentComposition::spec() const {
+CompositionSpec NoneComposition::export_spec() const {
     CompositionSpec spec;
-    spec.kind = "single_component";
+    spec.kind = CompositionKind::None;
     return spec;
 }
 
@@ -81,10 +81,9 @@ CompositionClass WeightedSumComposition::composition_class() const {
     return CompositionClass::CommonPointWeightedSum;
 }
 
-CompositionSpec WeightedSumComposition::spec() const {
+CompositionSpec WeightedSumComposition::export_spec() const {
     CompositionSpec spec;
-    spec.kind = "weighted_sum";
-    spec.weights = weights_;
+    spec.kind = CompositionKind::CpmWeightedSum;
     return spec;
 }
 
@@ -117,10 +116,9 @@ CompositionClass PowerMeanComposition::composition_class() const {
     return CompositionClass::CommonPointPowerMean;
 }
 
-CompositionSpec PowerMeanComposition::spec() const {
+CompositionSpec PowerMeanComposition::export_spec() const {
     CompositionSpec spec;
-    spec.kind = "power_mean";
-    spec.weights = weights_;
+    spec.kind = CompositionKind::CpmPowerMean;
     spec.parameters = {p_};
     return spec;
 }
@@ -154,10 +152,9 @@ CompositionClass LevelWellComposition::composition_class() const {
     return CompositionClass::CommonPointLevelWell;
 }
 
-CompositionSpec LevelWellComposition::spec() const {
+CompositionSpec LevelWellComposition::export_spec() const {
     CompositionSpec spec;
-    spec.kind = "level_well";
-    spec.weights = weights_;
+    spec.kind = CompositionKind::CpmLevelWell;
     spec.parameters = {epsilon_, alpha_};
     return spec;
 }
@@ -207,11 +204,9 @@ CompositionClass DeceptiveSoftmaxComposition::composition_class() const {
     return CompositionClass::DeceptivePointSoftmax;
 }
 
-CompositionSpec DeceptiveSoftmaxComposition::spec() const {
+CompositionSpec DeceptiveSoftmaxComposition::export_spec() const {
     CompositionSpec spec;
-    spec.kind = "deceptive_softmax";
-    spec.centers = centers_;
-    spec.offsets = offsets_;
+    spec.kind = CompositionKind::DpmSoftmax;
     spec.parameters = {sharpness_};
     return spec;
 }
@@ -270,11 +265,9 @@ CompositionClass DeceptiveBgSoftmaxComposition::composition_class() const {
     return CompositionClass::DeceptivePointBgSoftmax;
 }
 
-CompositionSpec DeceptiveBgSoftmaxComposition::spec() const {
+CompositionSpec DeceptiveBgSoftmaxComposition::export_spec() const {
     CompositionSpec spec;
-    spec.kind = "deceptive_bg_softmax";
-    spec.centers = centers_;
-    spec.offsets = offsets_;
+    spec.kind = CompositionKind::DpmBgSoftmax;
     spec.parameters = {sharpness_, background_strength_, background_sharpness_};
     return spec;
 }

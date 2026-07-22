@@ -31,7 +31,7 @@ public:
      * @brief Return the transform family used by this object.
      */
     virtual ValueTransformClass transform_class() const = 0;
-    virtual ValueTransformSpec spec() const = 0;
+    virtual ValueTransformSpec export_spec() const = 0;
 
 protected:
     virtual double raw_apply(double u) const = 0;
@@ -45,7 +45,7 @@ protected:
 class IdentityValueTransform final : public ValueTransform {
 public:
     ValueTransformClass transform_class() const override;
-    ValueTransformSpec spec() const override;
+    ValueTransformSpec export_spec() const override;
 
 protected:
     double raw_apply(double u) const override;
@@ -60,7 +60,7 @@ class PowerValueTransform final : public ValueTransform {
 public:
     PowerValueTransform(double alpha = 1.0, double p = 1.0);
     ValueTransformClass transform_class() const override;
-    ValueTransformSpec spec() const override;
+    ValueTransformSpec export_spec() const override;
 
 protected:
     double raw_apply(double u) const override;
@@ -79,7 +79,7 @@ class OscillatoryValueTransform final : public ValueTransform {
 public:
     OscillatoryValueTransform(double epsilon = 0.1, double alpha = 1.0);
     ValueTransformClass transform_class() const override;
-    ValueTransformSpec spec() const override;
+    ValueTransformSpec export_spec() const override;
 
 protected:
     double raw_apply(double u) const override;
@@ -98,7 +98,7 @@ class CosineZeroValueTransform final : public ValueTransform {
 public:
     explicit CosineZeroValueTransform(double alpha = 1.0);
     ValueTransformClass transform_class() const override;
-    ValueTransformSpec spec() const override;
+    ValueTransformSpec export_spec() const override;
 
 protected:
     double raw_apply(double u) const override;

@@ -1,6 +1,7 @@
 #include "support.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -138,6 +139,148 @@ std::uint64_t mix_seed(std::uint64_t x) {
 
 double uniform01(std::mt19937_64& rng) {
     return static_cast<double>(rng() >> 11) * 0x1.0p-53;
+}
+
+std::string normalize_spec_name(const std::string& value) {
+    std::string normalized;
+    normalized.reserve(value.size());
+    for (unsigned char ch : value) {
+        if (ch == '_' || ch == '-' || std::isspace(ch)) {
+            continue;
+        }
+        normalized.push_back(static_cast<char>(std::tolower(ch)));
+    }
+    return normalized;
+}
+
+CoordinateTransformKind parse_coordinate_transform_kind(const std::string& kind) {
+    const std::string normalized = normalize_spec_name(kind);
+    if (normalized.empty() || normalized == "none" || normalized == "identity") {
+        return CoordinateTransformKind::None;
+    }
+    if (normalized == "rotation" || normalized == "rot") {
+        return CoordinateTransformKind::Rotation;
+    }
+    if (normalized == "affine" || normalized == "aff") {
+        return CoordinateTransformKind::Affine;
+    }
+    if (normalized == "blockrotation" || normalized == "blockrot" || normalized == "brot") {
+        return CoordinateTransformKind::BlockRotation;
+    }
+    throw std::invalid_argument("unknown coordinate transform kind: " + kind);
+}
+
+ValueTransformKind parse_value_transform_kind(const std::string& kind) {
+    const std::string normalized = normalize_spec_name(kind);
+    if (normalized.empty() || normalized == "none" || normalized == "identity") {
+        return ValueTransformKind::None;
+    }
+    if (normalized == "power") {
+        return ValueTransformKind::Power;
+    }
+    if (normalized == "oscillatory" || normalized == "osc") {
+        return ValueTransformKind::Oscillatory;
+    }
+    if (normalized == "cosinezero" || normalized == "coszero") {
+        return ValueTransformKind::CosineZero;
+    }
+    throw std::invalid_argument("unknown value transform kind: " + kind);
+}
+
+CompositionKind parse_composition_kind(const std::string& kind) {
+    const std::string normalized = normalize_spec_name(kind);
+    if (normalized.empty() || normalized == "none" || normalized == "identity") {
+        return CompositionKind::None;
+    }
+    if (normalized == "cpm" || normalized == "cpmwsum" || normalized == "weightedsum" || normalized == "sum" || normalized == "cpmsum") {
+        return CompositionKind::CpmWeightedSum;
+    }
+    if (normalized == "cpmpowermean" || normalized == "powermean" || normalized == "cpmpmean") {
+        return CompositionKind::CpmPowerMean;
+    }
+    if (normalized == "cpmlevelwell" || normalized == "levelwell" || normalized == "lwell" || normalized == "cpmlwell") {
+        return CompositionKind::CpmLevelWell;
+    }
+    if (normalized == "dpmsoftmax" || normalized == "dpm" || normalized == "softmax") {
+        return CompositionKind::DpmSoftmax;
+    }
+    if (normalized == "dpmbgsoftmax" || normalized == "dpmbg" || normalized == "bgsoftmax") {
+        return CompositionKind::DpmBgSoftmax;
+    }
+    throw std::invalid_argument("unknown composition kind: " + kind);
+}
+
+CompositionMode composition_mode(CompositionKind kind) {
+    switch (kind) {
+    case CompositionKind::None:
+        return CompositionMode::None;
+    case CompositionKind::CpmWeightedSum:
+    case CompositionKind::CpmPowerMean:
+    case CompositionKind::CpmLevelWell:
+        return CompositionMode::CPM;
+    case CompositionKind::DpmSoftmax:
+    case CompositionKind::DpmBgSoftmax:
+        return CompositionMode::DPM;
+    }
+    throw std::logic_error("unhandled composition kind");
+}
+
+std::string to_spec_name(CoordinateTransformKind kind) {
+    switch (kind) {
+    case CoordinateTransformKind::None:
+        return spec_name::None;
+    case CoordinateTransformKind::Rotation:
+        return spec_name::CoordinateRotation;
+    case CoordinateTransformKind::Affine:
+        return spec_name::CoordinateAffine;
+    case CoordinateTransformKind::BlockRotation:
+        return spec_name::CoordinateBlockRotation;
+    }
+    throw std::logic_error("unhandled coordinate transform kind");
+}
+
+std::string to_spec_name(ValueTransformKind kind) {
+    switch (kind) {
+    case ValueTransformKind::None:
+        return spec_name::None;
+    case ValueTransformKind::Power:
+        return spec_name::ValuePower;
+    case ValueTransformKind::Oscillatory:
+        return spec_name::ValueOscillatory;
+    case ValueTransformKind::CosineZero:
+        return spec_name::ValueCosineZero;
+    }
+    throw std::logic_error("unhandled value transform kind");
+}
+
+std::string to_spec_name(CompositionKind kind) {
+    switch (kind) {
+    case CompositionKind::None:
+        return spec_name::None;
+    case CompositionKind::CpmWeightedSum:
+        return spec_name::CpmWeightedSum;
+    case CompositionKind::CpmPowerMean:
+        return spec_name::CpmPowerMean;
+    case CompositionKind::CpmLevelWell:
+        return spec_name::CpmLevelWell;
+    case CompositionKind::DpmSoftmax:
+        return spec_name::DpmSoftmax;
+    case CompositionKind::DpmBgSoftmax:
+        return spec_name::DpmBgSoftmax;
+    }
+    throw std::logic_error("unhandled composition kind");
+}
+
+std::string canonical_coordinate_transform_kind(const std::string& kind) {
+    return to_spec_name(parse_coordinate_transform_kind(kind));
+}
+
+std::string canonical_value_transform_kind(const std::string& kind) {
+    return to_spec_name(parse_value_transform_kind(kind));
+}
+
+std::string canonical_composition_kind(const std::string& kind) {
+    return to_spec_name(parse_composition_kind(kind));
 }
 
 int uniform_int(std::mt19937_64& rng, int lo, int hi) {
@@ -291,17 +434,36 @@ std::vector<std::vector<double>> yaml_double_matrix(const YAML::Node& node, cons
     return values;
 }
 
-TransformSpec transform_spec_from_yaml(const YAML::Node& node) {
+BasicFunctionId yaml_basic_function_id(const YAML::Node& node) {
+    require(static_cast<bool>(node), "base_function is required");
+    if (node.IsScalar()) {
+        const std::string name = node.as<std::string>();
+        const std::string normalized = normalize_spec_name(name);
+        for (BasicFunctionId id : list_basic_functions()) {
+            if (normalize_spec_name(to_string(id)) == normalized) {
+                return id;
+            }
+        }
+        try {
+            return static_cast<BasicFunctionId>(node.as<int>());
+        } catch (const YAML::Exception&) {
+            throw std::invalid_argument("unknown base_function: " + name);
+        }
+    }
+    throw std::invalid_argument("base_function must be a string or integer");
+}
+
+CoordinateTransformSpec coordinate_transform_spec_from_yaml(const YAML::Node& node) {
     if (!node || !node.IsMap()) {
         throw std::invalid_argument("coordinate_transform must be a map");
     }
-    TransformSpec spec;
-    spec.kind = node["kind"] ? node["kind"].as<std::string>() : "";
+    CoordinateTransformSpec spec;
+    spec.kind = parse_coordinate_transform_kind(node["kind"] ? node["kind"].as<std::string>() : "");
     spec.dimension = node["dimension"] ? node["dimension"].as<int>() : 0;
-    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.selected_indices = yaml_int_vector(node["selected_indices"], "selected_indices");
-    spec.source_point = yaml_double_vector(node["source_point"], "source_point");
-    spec.target_point = yaml_double_vector(node["target_point"], "target_point");
+    spec.assigned_xopt = yaml_double_vector(node["assigned_xopt"], "assigned_xopt");
+    spec.base_xopt = yaml_double_vector(node["base_xopt"], "base_xopt");
     spec.parameters = yaml_double_vector(node["parameters"], "transform parameters");
     spec.matrix = yaml_double_matrix(node["matrix"], "matrix");
     return spec;
@@ -312,23 +474,23 @@ ValueTransformSpec value_transform_spec_from_yaml(const YAML::Node& node) {
         throw std::invalid_argument("value_transform must be a map");
     }
     ValueTransformSpec spec;
-    spec.kind = node["kind"] ? node["kind"].as<std::string>() : "";
-    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.kind = parse_value_transform_kind(node["kind"] ? node["kind"].as<std::string>() : "");
+    spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.parameters = yaml_double_vector(node["parameters"], "value transform parameters");
     return spec;
 }
 
 CompositionSpec composition_spec_from_yaml(const YAML::Node& node) {
-    if (!node || !node.IsMap()) {
+    if (!node || node.IsNull()) {
+        return {};
+    }
+    if (!node.IsMap()) {
         throw std::invalid_argument("composition_spec must be a map");
     }
     CompositionSpec spec;
-    spec.kind = node["kind"] ? node["kind"].as<std::string>() : "";
-    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.kind = parse_composition_kind(node["kind"] ? node["kind"].as<std::string>() : "");
+    spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.parameters = yaml_double_vector(node["parameters"], "composition parameters");
-    spec.centers = yaml_double_matrix(node["centers"], "centers");
-    spec.offsets = yaml_double_vector(node["offsets"], "offsets");
-    spec.weights = yaml_double_vector(node["weights"], "weights");
     return spec;
 }
 
@@ -337,17 +499,19 @@ ComponentSpec component_spec_from_yaml(const YAML::Node& node) {
         throw std::invalid_argument("component spec must be a map");
     }
     ComponentSpec spec;
-    spec.base_function = node["base_function"] ? node["base_function"].as<std::string>() : "";
+    spec.base_function = yaml_basic_function_id(node["base_function"]);
     spec.component_dimension = node["component_dimension"] ? node["component_dimension"].as<int>() : 0;
-    spec.coordinate_transform = transform_spec_from_yaml(node["coordinate_transform"]);
+    spec.coordinate_transform = coordinate_transform_spec_from_yaml(node["coordinate_transform"]);
     spec.value_transform = value_transform_spec_from_yaml(node["value_transform"]);
-    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.f_bias = node["f_bias"] ? node["f_bias"].as<double>() : 0.0;
+    spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     return spec;
 }
 
 YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
     auto double_vector = [](const std::vector<double>& values) {
         YAML::Node node(YAML::NodeType::Sequence);
+        node.SetStyle(YAML::EmitterStyle::Flow);
         for (double value : values) {
             node.push_back(value);
         }
@@ -355,6 +519,7 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
     };
     auto int_vector = [](const std::vector<int>& values) {
         YAML::Node node(YAML::NodeType::Sequence);
+        node.SetStyle(YAML::EmitterStyle::Flow);
         for (int value : values) {
             node.push_back(value);
         }
@@ -362,6 +527,7 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
     };
     auto string_vector = [](const std::vector<std::string>& values) {
         YAML::Node node(YAML::NodeType::Sequence);
+        node.SetStyle(YAML::EmitterStyle::Flow);
         for (const std::string& value : values) {
             node.push_back(value);
         }
@@ -374,58 +540,65 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
         }
         return node;
     };
-    auto transform_spec = [&](const TransformSpec& transform) {
+    auto domain_spec = [&double_vector](const DomainSpec& domain) {
         YAML::Node node;
-        node["kind"] = transform.kind;
+        node["dimension"] = domain.dimension;
+        node["lower_bound"] = double_vector(domain.lower_bound);
+        node["upper_bound"] = double_vector(domain.upper_bound);
+        return node;
+    };
+    auto transform_spec = [&](const CoordinateTransformSpec& transform) {
+        YAML::Node node;
+        node["kind"] = to_spec_name(transform.kind);
         node["dimension"] = transform.dimension;
         node["seed"] = transform.seed;
         node["selected_indices"] = int_vector(transform.selected_indices);
-        node["source_point"] = double_vector(transform.source_point);
-        node["target_point"] = double_vector(transform.target_point);
+        node["assigned_xopt"] = double_vector(transform.assigned_xopt);
+        node["base_xopt"] = double_vector(transform.base_xopt);
         node["parameters"] = double_vector(transform.parameters);
         node["matrix"] = double_matrix(transform.matrix);
         return node;
     };
     auto value_transform_spec = [&double_vector](const ValueTransformSpec& transform) {
         YAML::Node node;
-        node["kind"] = transform.kind;
+        node["kind"] = to_spec_name(transform.kind);
         node["seed"] = transform.seed;
         node["parameters"] = double_vector(transform.parameters);
         return node;
     };
     auto composition_spec = [&](const CompositionSpec& composition) {
         YAML::Node node;
-        node["kind"] = composition.kind;
+        node["kind"] = to_spec_name(composition.kind);
         node["seed"] = composition.seed;
         node["parameters"] = double_vector(composition.parameters);
-        node["centers"] = double_matrix(composition.centers);
-        node["offsets"] = double_vector(composition.offsets);
-        node["weights"] = double_vector(composition.weights);
         return node;
     };
 
     YAML::Node components(YAML::NodeType::Sequence);
-    for (const ComponentSpec& component : spec.component_specs) {
+    for (const ComponentSpec& component : spec.components) {
         YAML::Node node;
-        node["base_function"] = component.base_function;
+        node["base_function"] = to_string(component.base_function);
         node["component_dimension"] = component.component_dimension;
         node["coordinate_transform"] = transform_spec(component.coordinate_transform);
         node["value_transform"] = value_transform_spec(component.value_transform);
+        node["f_bias"] = component.f_bias;
         node["seed"] = component.seed;
         components.push_back(node);
     }
 
     YAML::Node node;
     node["dimension"] = spec.dimension;
-    node["lower_bound"] = double_vector(spec.lower_bound);
-    node["upper_bound"] = double_vector(spec.upper_bound);
-    node["component_specs"] = components;
-    node["composition_spec"] = composition_spec(spec.composition_spec);
+    node["domain"] = domain_spec(spec.domain);
+    node["components"] = components;
+    node["composition"] = composition_spec(spec.composition);
+    node["assigned_xopt"] = double_vector(spec.assigned_xopt);
+    node["assigned_fopt"] = spec.assigned_fopt;
+    if (spec.scale_factor.has_value()) {
+        node["scale_factor"] = *spec.scale_factor;
+    }
     node["seed"] = spec.seed;
-    node["function_class_label"] = spec.function_class_label;
-    node["known_global_minimizer"] = double_vector(spec.known_global_minimizer);
-    node["known_global_value"] = spec.known_global_value;
-    node["parameters"] = string_vector(spec.parameters);
+    node["label"] = spec.label;
+    node["metadata"] = string_vector(spec.metadata);
     return node;
 }
 
@@ -437,46 +610,84 @@ FunctionSpec function_spec_from_yaml(const YAML::Node& root) {
 
     FunctionSpec spec;
     spec.dimension = node["dimension"] ? node["dimension"].as<int>() : 0;
-    spec.lower_bound = yaml_double_vector(node["lower_bound"], "lower_bound");
-    spec.upper_bound = yaml_double_vector(node["upper_bound"], "upper_bound");
-    if (node["component_specs"]) {
-        if (!node["component_specs"].IsSequence()) {
-            throw std::invalid_argument("component_specs must be a sequence");
+    if (node["domain"]) {
+        const YAML::Node domain = node["domain"];
+        require(domain.IsMap(), "domain must be a map");
+        spec.domain.dimension = domain["dimension"] ? domain["dimension"].as<int>() : spec.dimension;
+        spec.domain.lower_bound = yaml_double_vector(domain["lower_bound"], "domain.lower_bound");
+        spec.domain.upper_bound = yaml_double_vector(domain["upper_bound"], "domain.upper_bound");
+    }
+    if (node["components"]) {
+        if (!node["components"].IsSequence()) {
+            throw std::invalid_argument("components must be a sequence");
         }
-        spec.component_specs.reserve(node["component_specs"].size());
-        for (const YAML::Node& component : node["component_specs"]) {
-            spec.component_specs.push_back(component_spec_from_yaml(component));
+        spec.components.reserve(node["components"].size());
+        for (const YAML::Node& component : node["components"]) {
+            spec.components.push_back(component_spec_from_yaml(component));
         }
     }
-    spec.composition_spec = composition_spec_from_yaml(node["composition_spec"]);
-    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
-    spec.function_class_label = node["function_class_label"] ? node["function_class_label"].as<std::string>() : "";
-    spec.known_global_minimizer = yaml_double_vector(node["known_global_minimizer"], "known_global_minimizer");
-    spec.known_global_value = node["known_global_value"] ? node["known_global_value"].as<double>() : 0.0;
-    spec.parameters = yaml_string_vector(node["parameters"], "function parameters");
+    spec.composition = composition_spec_from_yaml(node["composition"]);
+    spec.assigned_xopt = yaml_double_vector(node["assigned_xopt"], "assigned_xopt");
+    spec.assigned_fopt = node["assigned_fopt"] ? node["assigned_fopt"].as<double>() : 0.0;
+    if (node["scale_factor"] && !node["scale_factor"].IsNull()) {
+        spec.scale_factor = node["scale_factor"].as<double>();
+    }
+    if (root["runtime"] && root["runtime"]["scale_factor"] && !root["runtime"]["scale_factor"].IsNull()) {
+        spec.scale_factor = root["runtime"]["scale_factor"].as<double>();
+    }
+    if (root["runtime"] && root["runtime"]["assigned_fopt"] && !root["runtime"]["assigned_fopt"].IsNull()) {
+        spec.assigned_fopt = root["runtime"]["assigned_fopt"].as<double>();
+    }
+    spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
+    spec.label = node["label"] ? node["label"].as<std::string>() : "";
+    spec.metadata = yaml_string_vector(node["metadata"], "metadata");
     return spec;
 }
 
 YAML::Node suite_spec_to_yaml(const SuiteSpec& spec) {
-    auto int_vector = [](const std::vector<int>& values) {
+    auto base_function_vector = [](const std::vector<BasicFunctionId>& values) {
         YAML::Node node(YAML::NodeType::Sequence);
-        for (int value : values) {
-            node.push_back(value);
+        node.SetStyle(YAML::EmitterStyle::Flow);
+        for (BasicFunctionId value : values) {
+            node.push_back(static_cast<int>(value));
         }
         return node;
     };
     auto double_vector = [](const std::vector<double>& values) {
         YAML::Node node(YAML::NodeType::Sequence);
+        node.SetStyle(YAML::EmitterStyle::Flow);
         for (double value : values) {
             node.push_back(value);
         }
         return node;
     };
-    auto choice_vector = [&double_vector](const std::vector<ChoiceSpec>& choices) {
+    auto coordinate_choice_vector = [&double_vector](const std::vector<CoordinateTransformChoice>& choices) {
         YAML::Node node(YAML::NodeType::Sequence);
-        for (const ChoiceSpec& choice : choices) {
+        for (const CoordinateTransformChoice& choice : choices) {
             YAML::Node item;
-            item["kind"] = choice.kind;
+            item["kind"] = to_spec_name(choice.kind);
+            item["probability"] = choice.probability;
+            item["parameters"] = double_vector(choice.parameters);
+            node.push_back(item);
+        }
+        return node;
+    };
+    auto value_choice_vector = [&double_vector](const std::vector<ValueTransformChoice>& choices) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (const ValueTransformChoice& choice : choices) {
+            YAML::Node item;
+            item["kind"] = to_spec_name(choice.kind);
+            item["probability"] = choice.probability;
+            item["parameters"] = double_vector(choice.parameters);
+            node.push_back(item);
+        }
+        return node;
+    };
+    auto composition_choice_vector = [&double_vector](const std::vector<CompositionChoice>& choices) {
+        YAML::Node node(YAML::NodeType::Sequence);
+        for (const CompositionChoice& choice : choices) {
+            YAML::Node item;
+            item["kind"] = to_spec_name(choice.kind);
             item["probability"] = choice.probability;
             item["parameters"] = double_vector(choice.parameters);
             node.push_back(item);
@@ -486,19 +697,19 @@ YAML::Node suite_spec_to_yaml(const SuiteSpec& spec) {
 
     YAML::Node node;
     node["supported_dimensions"] = spec.supported_dimensions;
-    node["base_functions"] = int_vector(spec.base_functions);
-    node["base_function_coord_transforms"] = choice_vector(spec.base_function_coord_transforms);
-    node["coord_transforms"] = choice_vector(spec.coord_transforms);
-    node["value_transforms"] = choice_vector(spec.value_transforms);
-    node["composition_functions"] = choice_vector(spec.composition_functions);
-    node["base_functions_for_compositions"] = int_vector(spec.base_functions_for_compositions);
+    node["base_functions"] = base_function_vector(spec.base_functions);
+    node["composition_base_functions"] = base_function_vector(spec.composition_base_functions);
+    node["coordinate_transforms"] = coordinate_choice_vector(spec.coordinate_transforms);
+    node["value_transforms"] = value_choice_vector(spec.value_transforms);
+    node["compositions"] = composition_choice_vector(spec.compositions);
     node["max_components"] = spec.max_components;
     node["requested_number_of_functions"] = spec.requested_number_of_functions;
     node["max_number_of_functions"] = spec.max_number_of_functions;
     node["master_seed"] = spec.master_seed;
     node["lower_bound"] = spec.lower_bound;
     node["upper_bound"] = spec.upper_bound;
-    node["f_opt"] = spec.f_opt;
+    node["assigned_fopt"] = spec.assigned_fopt;
+    node["xopt_domain_shrink_factor"] = spec.xopt_domain_shrink_factor;
     node["suite_label"] = spec.suite_label;
     return node;
 }

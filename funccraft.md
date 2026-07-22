@@ -80,8 +80,8 @@ Composition functions:
 - `weighted_sum` / `sum` / `cpm`
 - `power_mean` / `powermean`
 - `level_well` / `levelwell` / `lvlwell`
-- `deceptive_softmax` / `dpm`
-- `deceptive_bg_softmax` / `dpmbgsoftmax`
+- `dpmsoftmax` / `dpm`
+- `dpmbgsoftmax`
 
 ## Batched Evaluation
 

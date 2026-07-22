@@ -15,7 +15,7 @@ struct CheckConfig {
     int max_functions = 500;
     unsigned long long seed = 1;
     double tolerance = 1.0e-8;
-    double f_opt = 100.0;
+    double assigned_fopt = 100.0;
 };
 
 bool is_integer_arg(const char* text) {
@@ -37,7 +37,7 @@ CheckConfig parse_cli(int argc, char* argv[]) {
     if (argc > arg_index + 1) config.max_functions = std::max(1, std::atoi(argv[arg_index + 1]));
     if (argc > arg_index + 2) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 2], nullptr, 10));
     if (argc > arg_index + 3) config.tolerance = std::atof(argv[arg_index + 3]);
-    if (argc > arg_index + 4) config.f_opt = std::atof(argv[arg_index + 4]);
+    if (argc > arg_index + 4) config.assigned_fopt = std::atof(argv[arg_index + 4]);
     return config;
 }
 
@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
         FuncCraft::SuiteSpec suite_spec = FuncCraft::load_suite_spec_yaml(suite_yaml.string());
         suite_spec.requested_number_of_functions = config.max_functions;
         suite_spec.master_seed = config.seed;
-        suite_spec.f_opt = config.f_opt;
+        suite_spec.assigned_fopt = config.assigned_fopt;
         suite_spec.suite_label = "check_optima";
         const FuncCraft::BenchmarkSuite suite(suite_spec, config.dimension);
 
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
                   << ", requested_functions=" << config.max_functions
                   << ", seed=" << config.seed
                   << ", tolerance=" << std::scientific << config.tolerance
-                  << ", f_opt=" << config.f_opt << "\n\n";
+                  << ", assigned_fopt=" << config.assigned_fopt << "\n\n";
 
         std::cout << std::left
                   << std::setw(6) << "idx"
@@ -135,12 +135,12 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < function_count; ++i) {
             const auto function = suite.function(i);
             const auto& spec = function.spec();
-            const auto fields = split_class_label(spec.function_class_label);
-            const double max_x_star = spec.known_global_minimizer.empty()
+            const auto fields = split_class_label(spec.label);
+            const double max_x_star = spec.assigned_xopt.empty()
                 ? 0.0
-                : *std::max_element(spec.known_global_minimizer.begin(), spec.known_global_minimizer.end());
-            const double value = function(std::vector<std::vector<double>>{spec.known_global_minimizer}).front();
-            const double error = std::fabs(value - spec.known_global_value);
+                : *std::max_element(spec.assigned_xopt.begin(), spec.assigned_xopt.end());
+            const double value = function(std::vector<std::vector<double>>{spec.assigned_xopt}).front();
+            const double error = std::fabs(value - spec.assigned_fopt);
             const bool ok = std::isfinite(value) && error <= config.tolerance;
 
             max_abs_error = std::max(max_abs_error, error);

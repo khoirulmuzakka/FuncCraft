@@ -3,110 +3,134 @@
 
 /**
  * @file suite_spec.h
- * @brief Plain-data specification types for benchmark suite generation.
- *
- * These types are intentionally serializable-friendly and contain only
- * primitive data such as strings, integers, and numeric vectors.
+ * @brief High-level typed specification for benchmark suite generation.
  */
 
-#include <string>
+#include "function_spec.h"
+
+#include <cstdint>
+#include <utility>
 #include <vector>
+#include <string>
 
 namespace FuncCraft {
 
 /**
- * @brief Plain-data description of a weighted choice.
+ * @brief Weighted suite-generation choice.
+ *
+ * Probabilities are fractions and each choice table must sum to one.
  */
-struct ChoiceSpec {
-    std::string kind;
+template <typename Kind>
+struct WeightedChoice {
+    Kind kind;
     double probability = 1.0;
     std::vector<double> parameters;
 };
 
-/**
- * @brief Build a choice spec with an optional parameter payload.
- */
-inline ChoiceSpec make_choice_spec(
-    std::string kind,
+using CoordinateTransformChoice = WeightedChoice<CoordinateTransformKind>;
+using ValueTransformChoice = WeightedChoice<ValueTransformKind>;
+using CompositionChoice = WeightedChoice<CompositionKind>;
+
+template <typename Kind>
+inline WeightedChoice<Kind> make_choice(
+    Kind kind,
     double probability = 1.0,
     std::vector<double> parameters = {}) {
-    ChoiceSpec spec;
-    spec.kind = std::move(kind);
-    spec.probability = probability;
-    spec.parameters = std::move(parameters);
-    return spec;
+    WeightedChoice<Kind> choice;
+    choice.kind = kind;
+    choice.probability = probability;
+    choice.parameters = std::move(parameters);
+    return choice;
 }
 
-/**
- * @brief Build a choice spec for families with one scalar parameter.
- */
-inline ChoiceSpec make_choice_spec(
-    std::string kind,
+template <typename Kind>
+inline WeightedChoice<Kind> make_choice(
+    Kind kind,
     double probability,
     double parameter) {
-    return make_choice_spec(std::move(kind), probability, std::vector<double>{parameter});
+    return make_choice(kind, probability, std::vector<double>{parameter});
 }
 
-/**
- * @brief Build a choice spec for families with two scalar parameters.
- */
-inline ChoiceSpec make_choice_spec(
-    std::string kind,
+template <typename Kind>
+inline WeightedChoice<Kind> make_choice(
+    Kind kind,
     double probability,
     double parameter0,
     double parameter1) {
-    return make_choice_spec(std::move(kind), probability, std::vector<double>{parameter0, parameter1});
+    return make_choice(kind, probability, std::vector<double>{parameter0, parameter1});
+}
+
+template <typename Kind>
+inline WeightedChoice<Kind> make_choice(
+    Kind kind,
+    double probability,
+    double parameter0,
+    double parameter1,
+    double parameter2) {
+    return make_choice(kind, probability, std::vector<double>{parameter0, parameter1, parameter2});
+}
+
+inline std::vector<BasicFunctionId> all_suite_base_functions() {
+    return list_basic_functions();
+}
+
+inline std::vector<CoordinateTransformChoice> all_coordinate_transform_choices() {
+    return {
+        make_choice(CoordinateTransformKind::None, 0.0),
+        make_choice(CoordinateTransformKind::Rotation, 0.5),
+        make_choice(CoordinateTransformKind::Affine, 0.0),
+        make_choice(CoordinateTransformKind::BlockRotation, 0.5),
+    };
+}
+
+inline std::vector<ValueTransformChoice> all_value_transform_choices() {
+    return {
+        make_choice(ValueTransformKind::None, 0.5),
+        make_choice(ValueTransformKind::Power, 0.25, 1.0, 1.0),
+        make_choice(ValueTransformKind::Oscillatory, 0.25, 0.1, 1.0),
+        make_choice(ValueTransformKind::CosineZero, 0.0, 1.0),
+    };
+}
+
+inline std::vector<CompositionChoice> all_composition_choices() {
+    return {
+        make_choice(CompositionKind::CpmWeightedSum, 0.1),
+        make_choice(CompositionKind::CpmPowerMean, 0.1, 3.0),
+        make_choice(CompositionKind::CpmPowerMean, 0.1, 0.1),
+        make_choice(CompositionKind::CpmLevelWell, 0.2, 0.1, 1.0),
+        make_choice(CompositionKind::DpmSoftmax, 0.25, 0.01),
+        make_choice(CompositionKind::DpmBgSoftmax, 0.25, 0.01, 1.0, 0.01),
+    };
 }
 
 /**
- * @brief Top-level plain-data specification for a generated benchmark suite.
+ * @brief Top-level generation recipe for a benchmark suite.
+ *
+ * This is deliberately higher level than `FunctionSpec`: it describes pools
+ * and probabilities. Generated functions are exported as fully materialized
+ * `FunctionSpec` objects.
  */
 struct SuiteSpec {
     std::string supported_dimensions = "any";
-    std::vector<int> base_functions = {
-        0, 1, 2, 3, 4, 5, 6, 7,
-        8, 9, 10, 11, 12, 13, 14, 15,
-        16, 17, 18, 19, 20, 21, 22, 23,
-        24, 25, 26, 27, 28, 29, 30, 31,
-        32, 33, 34, 35,
-    };
-    std::vector<ChoiceSpec> base_function_coord_transforms = {
-        make_choice_spec("none", 0.25),
-        make_choice_spec("rotation", 0.25),
-        make_choice_spec("affine", 0.25),
-        make_choice_spec("blockrotation", 0.25),
-    };
-    std::vector<ChoiceSpec> coord_transforms = {
-        make_choice_spec("none", 0.25),
-        make_choice_spec("rotation", 0.25),
-        make_choice_spec("affine", 0.25),
-        make_choice_spec("blockrotation", 0.25),
-    };
-    std::vector<ChoiceSpec> value_transforms = {
-        make_choice_spec("none", 0.25),
-        make_choice_spec("coszero", 0.25),
-        make_choice_spec("osc", 0.25),
-        make_choice_spec("power", 0.25),
-    };
-    std::vector<ChoiceSpec> composition_functions = {
-        make_choice_spec("cpmsum", 0.20),
-        make_choice_spec("cpmlwell", 0.20),
-        make_choice_spec("cpmpmean", 0.20),
-        make_choice_spec("dpmsoftmax", 0.20),
-        make_choice_spec("dpmbgsoftmax", 0.20),
-    };
-    std::vector<int> base_functions_for_compositions = {
-        0, 2, 4, 8, 9, 10, 11, 12,
-        15, 16, 19, 20, 21, 22, 23,
-    };
+
+    std::vector<BasicFunctionId> base_functions = all_suite_base_functions();
+    std::vector<BasicFunctionId> composition_base_functions = all_suite_base_functions();
+
+    std::vector<CoordinateTransformChoice> coordinate_transforms = all_coordinate_transform_choices();
+    std::vector<ValueTransformChoice> value_transforms = all_value_transform_choices();
+    std::vector<CompositionChoice> compositions = all_composition_choices();
+
     int max_components = 10;
     int requested_number_of_functions = 0;
     int max_number_of_functions = 0;
-    unsigned long long master_seed = 1;
+    std::uint64_t master_seed = 1;
+
     double lower_bound = -100.0;
     double upper_bound = 100.0;
-    double f_opt = 100.0;
-    std::string suite_label = "";
+    double assigned_fopt = 100.0;
+    double xopt_domain_shrink_factor = 0.8;
+
+    std::string suite_label;
 };
 
 } // namespace FuncCraft

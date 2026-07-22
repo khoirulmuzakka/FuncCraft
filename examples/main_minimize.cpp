@@ -23,7 +23,7 @@ struct RunConfig {
     int num_functions = 32;
     int population_size = 0;
     unsigned long long seed = 1;
-    double f_opt = 100.0;
+    double assigned_fopt = 100.0;
 };
 
 bool is_integer_arg(const char* text) {
@@ -46,7 +46,7 @@ RunConfig parse_cli(int argc, char* argv[]) {
     if (argc > arg_index + 2) config.num_functions = std::max(1, std::atoi(argv[arg_index + 2]));
     if (argc > arg_index + 3) config.population_size = std::max(0, std::atoi(argv[arg_index + 3]));
     if (argc > arg_index + 4) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 4], nullptr, 10));
-    if (argc > arg_index + 5) config.f_opt = std::atof(argv[arg_index + 5]);
+    if (argc > arg_index + 5) config.assigned_fopt = std::atof(argv[arg_index + 5]);
     return config;
 }
 
@@ -72,7 +72,7 @@ FuncCraft::SuiteSpec make_spec_from_yaml(const std::filesystem::path& yaml_path,
     FuncCraft::SuiteSpec spec = FuncCraft::load_suite_spec_yaml(yaml_path.string());
     spec.requested_number_of_functions = config.num_functions;
     spec.master_seed = config.seed;
-    spec.f_opt = config.f_opt;
+    spec.assigned_fopt = config.assigned_fopt;
     return spec;
 }
 
@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
         const std::filesystem::path suite_yaml = resolve_default_suite_yaml(argc > 0 ? argv[0] : nullptr);
         const FuncCraft::BenchmarkSuite suite(make_spec_from_yaml(suite_yaml, config), config.dimension);
 
-        std::cout << "Usage: run_minimize [algo] [dimension] [maxevals] [num_functions] [population_size] [seed] [f_opt]\n";
+        std::cout << "Usage: run_minimize [algo] [dimension] [maxevals] [num_functions] [population_size] [seed] [assigned_fopt]\n";
         std::cout << "Suite yaml: " << suite_yaml.string() << "\n";
         std::cout << "Suite size: " << suite.size()
                   << ", max_number_of_functions: " << suite.max_number_of_functions()
@@ -130,7 +130,7 @@ int main(int argc, char* argv[]) {
                   << ", maxevals: " << config.max_evals
                   << ", population_size: " << config.population_size
                   << ", seed: " << config.seed
-                  << ", f_opt: " << std::scientific << config.f_opt << "\n\n";
+                  << ", assigned_fopt: " << std::scientific << config.assigned_fopt << "\n\n";
 
         std::cout << std::left
                   << std::setw(6) << "idx"
@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
                   << std::right
                   << std::setw(16) << "best_f"
                   << std::setw(16) << "nfev"
-                  << std::setw(16) << "|f(x*)-f_opt|"
+                  << std::setw(16) << "|best-fopt|"
                   << "\n";
         std::cout << std::string(110, '-') << "\n";
 
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
             try {
                 const auto& function = suite.function(i);
                 const auto& spec = function.spec();
-                const auto fields = split_class_label(spec.function_class_label);
+                const auto fields = split_class_label(spec.label);
                 const auto bounds = function.domain();
                 std::vector<std::pair<double, double>> minion_bounds;
                 minion_bounds.reserve(static_cast<std::size_t>(bounds.dimension()));
@@ -184,7 +184,7 @@ int main(int argc, char* argv[]) {
                     static_cast<int>(config.seed),
                     settings);
                 const minion::MinionResult result = optimizer.optimize();
-                const double error = std::abs(result.fun - spec.known_global_value);
+                const double error = std::abs(result.fun - spec.assigned_fopt);
                 const bool ok = std::isfinite(result.fun);
                 failed += ok ? 0 : 1;
 
@@ -202,7 +202,7 @@ int main(int argc, char* argv[]) {
             } catch (const std::exception& e) {
                 const auto& function = suite.function(i);
                 std::cerr << "run_minimize failed at index " << i
-                          << " label=" << function.spec().function_class_label
+                          << " label=" << function.spec().label
                           << ": " << e.what() << "\n";
                 throw;
             }

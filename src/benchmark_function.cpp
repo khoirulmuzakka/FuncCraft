@@ -11,6 +11,49 @@
 namespace FuncCraft {
 namespace {
 
+std::vector<double> dpm_component_center(const ComponentSpec& component) {
+    detail::require(
+        !component.coordinate_transform.assigned_xopt.empty(),
+        "DPM component centers are obtained from component.coordinate_transform.assigned_xopt");
+    return component.coordinate_transform.assigned_xopt;
+}
+
+std::shared_ptr<CompositionFunction> make_resolved_composition(const FunctionSpec& spec) {
+    const CompositionSpec composition = spec.composition;
+    if (detail::composition_mode(composition.kind) != CompositionMode::DPM) {
+        return make_composition(composition, spec.components.size());
+    }
+
+    std::vector<std::vector<double>> centers;
+    std::vector<double> biases;
+    centers.reserve(spec.components.size());
+    biases.reserve(spec.components.size());
+    for (const ComponentSpec& component : spec.components) {
+        centers.push_back(dpm_component_center(component));
+        biases.push_back(component.f_bias);
+    }
+
+    if (composition.kind == CompositionKind::DpmSoftmax) {
+        const double sharpness = composition.parameters.size() > 0 ? composition.parameters[0] : 0.01;
+        return std::make_shared<DeceptiveSoftmaxComposition>(
+            std::move(centers),
+            std::move(biases),
+            sharpness);
+    }
+    if (composition.kind == CompositionKind::DpmBgSoftmax) {
+        const double sharpness = composition.parameters.size() > 0 ? composition.parameters[0] : 0.01;
+        const double background_strength = composition.parameters.size() > 1 ? composition.parameters[1] : 1.0;
+        const double background_sharpness = composition.parameters.size() > 2 ? composition.parameters[2] : 0.01;
+        return std::make_shared<DeceptiveBgSoftmaxComposition>(
+            std::move(centers),
+            std::move(biases),
+            sharpness,
+            background_strength,
+            background_sharpness);
+    }
+    throw std::logic_error("unhandled DPM composition kind");
+}
+
 std::vector<double> random_point_in_domain(std::mt19937_64& rng, const Domain& domain) {
     const int dimension = domain.dimension();
     std::vector<double> x(static_cast<std::size_t>(dimension), 0.0);
@@ -38,49 +81,30 @@ double percentile(std::vector<double> values, double q) {
 }
 
 double estimate_lambda(const ComposedFunction& raw_function, const Domain& domain, std::uint64_t seed) {
-    constexpr std::size_t kTargetSamples = 100;
-    constexpr std::size_t kBatchSize = 64;
-    constexpr std::size_t kMaxAttempts = kTargetSamples * 8;
+    constexpr std::size_t kSampleCount = 100;
     constexpr double kTargetScale = 1.0e5;
     constexpr double kMinRepresentativeScale = 1.0e-12;
     constexpr double kMaxLambda = 1.0e8;
 
     std::mt19937_64 rng(detail::mix_seed(seed ^ 0xD1CEB00B5EEDULL));
-    std::vector<double> values;
-    values.reserve(kTargetSamples);
-
     std::vector<std::vector<double>> batch;
-    batch.reserve(kBatchSize);
-
-    std::size_t attempts = 0;
-    while (values.size() < kTargetSamples && attempts < kMaxAttempts) {
-        batch.clear();
-        const std::size_t remaining = kTargetSamples - values.size();
-        const std::size_t batch_count = std::min<std::size_t>(kBatchSize, remaining);
-        for (std::size_t i = 0; i < batch_count && attempts < kMaxAttempts; ++i, ++attempts) {
-            batch.push_back(random_point_in_domain(rng, domain));
-        }
-        if (batch.empty()) {
-            break;
-        }
-
-        const std::vector<double> raw_values = raw_function(batch);
-        for (double value : raw_values) {
-            if (std::isfinite(value)) {
-                values.push_back(value);
-            }
-        }
+    batch.reserve(kSampleCount);
+    for (std::size_t i = 0; i < kSampleCount; ++i) {
+        batch.push_back(random_point_in_domain(rng, domain));
     }
 
-    if (values.empty()) {
+    std::vector<double> values = raw_function(batch);
+    values.erase(
+        std::remove_if(values.begin(), values.end(), [](double value) {
+            return !std::isfinite(value);
+        }),
+        values.end());
+
+    const double q = percentile(std::move(values), 0.25);
+    if (!std::isfinite(q) || q <= kMinRepresentativeScale) {
         return 1.0;
     }
-
-    const double q90 = percentile(std::move(values), 0.9);
-    if (!std::isfinite(q90) || q90 <= kMinRepresentativeScale) {
-        return 1.0;
-    }
-    return std::min(kTargetScale / q90, kMaxLambda);
+    return std::min(kTargetScale / q, kMaxLambda);
 }
 
 double saturating_apply_scale_and_bias(double raw_value, double lambda, double bias) {
@@ -107,40 +131,61 @@ double saturating_apply_scale_and_bias(double raw_value, double lambda, double b
 } // namespace
 
 BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
-    FunctionBuilder builder(spec.dimension);
-    if (!spec.lower_bound.empty() || !spec.upper_bound.empty()) {
-        builder.domain(make_domain(spec));
-    }
-    builder.seed(spec.seed);
-    if (!spec.known_global_minimizer.empty()) {
-        builder.known_global_minimizer(spec.known_global_minimizer);
-    }
-    builder.known_global_value(spec.known_global_value);
-    for (const std::string& parameter : spec.parameters) {
-        const std::size_t pos = parameter.find('=');
-        if (pos != std::string::npos) {
-            builder.parameter(parameter.substr(0, pos), parameter.substr(pos + 1));
+    FunctionSpec resolved_spec = std::move(spec);
+    const Domain input_domain = make_domain(resolved_spec);
+
+    for (ComponentSpec& component_spec : resolved_spec.components) {
+        const int component_dimension = component_spec.component_dimension > 0
+            ? component_spec.component_dimension
+            : resolved_spec.dimension;
+        component_spec.component_dimension = component_dimension;
+
+        BasicF primitive(component_spec.base_function, component_dimension);
+        CoordinateTransformSpec& transform = component_spec.coordinate_transform;
+        if (transform.dimension == 0) {
+            transform.dimension = resolved_spec.dimension;
+        }
+        if (transform.assigned_xopt.empty()) {
+            transform.assigned_xopt = !resolved_spec.assigned_xopt.empty()
+                ? resolved_spec.assigned_xopt
+                : std::vector<double>(static_cast<std::size_t>(resolved_spec.dimension), 0.0);
+        }
+        if (transform.base_xopt.empty()) {
+            transform.base_xopt = detail::map_point_from_default_domain(primitive.x_opt, input_domain);
         }
     }
-    for (const ComponentSpec& component_spec : spec.component_specs) {
+
+    FunctionBuilder builder(resolved_spec.dimension);
+    builder.domain(input_domain);
+    builder.seed(resolved_spec.seed);
+    if (!resolved_spec.assigned_xopt.empty()) {
+        builder.assigned_xopt(resolved_spec.assigned_xopt);
+    }
+    builder.assigned_fopt(resolved_spec.assigned_fopt);
+    builder.scale_factor(resolved_spec.scale_factor);
+
+    for (const ComponentSpec& component_spec : resolved_spec.components) {
         builder.add_component(
-            parse_basic_function_id(component_spec.base_function),
+            component_spec.base_function,
             component_spec.component_dimension,
             make_coordinate_transform(component_spec.coordinate_transform),
-            make_value_transform(component_spec.value_transform));
+            make_value_transform(component_spec.value_transform),
+            component_spec.f_bias);
     }
-    builder.composition(make_composition(spec.composition_spec, spec.component_specs.size()));
+    builder.composition(make_resolved_composition(resolved_spec));
 
+    const ComposedFunction raw_function = builder.build();
     spec_ = builder.build_spec();
     domain_ = make_domain(spec_);
 
-    const ComposedFunction raw_function = builder.build();
-    lambda_ = estimate_lambda(raw_function, domain_, static_cast<std::uint64_t>(spec_.seed));
-    bias_ = spec_.known_global_value;
-    function_ = [raw_function, lambda = lambda_, bias = bias_](const std::vector<std::vector<double>>& X) {
+    scale_factor_ = spec_.scale_factor.value_or(estimate_lambda(raw_function, domain_, spec_.seed));
+    assigned_fopt_ = spec_.assigned_fopt;
+    spec_.scale_factor = scale_factor_;
+    spec_.assigned_fopt = assigned_fopt_;
+    function_ = [raw_function, scale_factor = scale_factor_, assigned_fopt = assigned_fopt_](const std::vector<std::vector<double>>& X) {
         std::vector<double> values = raw_function(X);
         for (double& value : values) {
-            value = saturating_apply_scale_and_bias(value, lambda, bias);
+            value = saturating_apply_scale_and_bias(value, scale_factor, assigned_fopt);
         }
         return values;
     };
@@ -158,12 +203,12 @@ int BenchmarkFunction::dimension() const {
     return domain_.dimension();
 }
 
-double BenchmarkFunction::lambda() const {
-    return lambda_;
+double BenchmarkFunction::scale_factor() const {
+    return scale_factor_;
 }
 
-double BenchmarkFunction::bias() const {
-    return bias_;
+double BenchmarkFunction::assigned_fopt() const {
+    return assigned_fopt_;
 }
 
 const FunctionSpec& BenchmarkFunction::spec() const {
@@ -175,8 +220,6 @@ YAML::Node BenchmarkFunction::export_spec() const {
     node["format"] = "funccraft.benchmark_function";
     node["format_version"] = 1;
     node["function_spec"] = detail::function_spec_to_yaml(spec_);
-    node["runtime"]["lambda"] = lambda_;
-    node["runtime"]["bias"] = bias_;
     return node;
 }
 

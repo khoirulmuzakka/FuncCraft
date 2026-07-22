@@ -9,15 +9,11 @@ for a specific index.
 
 from . import _funccraft
 from .benchmark_function import BenchmarkFunction
-from .spec import ChoiceSpec, SuiteSpec
+from .spec import ChoiceSpec, SuiteSpec, suite_spec
 
 
 def _as_native_suite_spec(spec):
-    if isinstance(spec, SuiteSpec):
-        return spec.to_cpp()
-    if isinstance(spec, dict):
-        return SuiteSpec.from_dict(spec).to_cpp()
-    return spec
+    return suite_spec(spec)
 
 
 def make_benchmark_suite(spec, dimension):
@@ -26,8 +22,8 @@ def make_benchmark_suite(spec, dimension):
 
 
 def load_suite_spec_yaml(path):
-    """Load a :class:`SuiteSpec` from a YAML file."""
-    return SuiteSpec.from_cpp(_funccraft.load_suite_spec_yaml(str(path)))
+    """Load a native :class:`SuiteSpec` from a YAML file."""
+    return _funccraft.load_suite_spec_yaml(str(path))
 
 
 def make_benchmark_suite_from_yaml(path, dimension):
@@ -57,14 +53,14 @@ class BenchmarkSuite:
             self._suite = _funccraft.BenchmarkSuite(spec, dimension)
         else:
             self._suite = _funccraft.BenchmarkSuite(_as_native_suite_spec(spec), dimension)
-        self._spec = SuiteSpec.from_cpp(self._suite.spec)
+        self._spec = self._suite.spec
 
     @classmethod
     def from_cpp(cls, native):
         """Wrap an already-built native benchmark suite."""
         obj = cls.__new__(cls)
         obj._suite = native
-        obj._spec = SuiteSpec.from_cpp(native.spec)
+        obj._spec = native.spec
         return obj
 
     @property

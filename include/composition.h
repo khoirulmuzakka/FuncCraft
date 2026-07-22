@@ -29,7 +29,7 @@ public:
      * @brief Return the composition family used by this strategy.
      */
     virtual CompositionClass composition_class() const = 0;
-    virtual CompositionSpec spec() const = 0;
+    virtual CompositionSpec export_spec() const = 0;
 
 protected:
     virtual double raw_apply(const std::vector<double>& x, const std::vector<double>& z) const = 0;
@@ -56,14 +56,16 @@ protected:
 /**
  * @brief Trivial composition that forwards the single component value.
  */
-class SingleComponentComposition final : public CommonPointComposition {
+class NoneComposition final : public CommonPointComposition {
 public:
     CompositionClass composition_class() const override;
-    CompositionSpec spec() const override;
+    CompositionSpec export_spec() const override;
 
 protected:
     double common_raw_apply(const std::vector<double>& z) const override;
 };
+
+using SingleComponentComposition = NoneComposition;
 
 /**
  * @brief Weighted sum composition across multiple components.
@@ -76,7 +78,7 @@ public:
 
 private:
     double common_raw_apply(const std::vector<double>& z) const override;
-    CompositionSpec spec() const override;
+    CompositionSpec export_spec() const override;
     std::vector<double> weights_;
 };
 
@@ -91,7 +93,7 @@ public:
 
 private:
     double common_raw_apply(const std::vector<double>& z) const override;
-    CompositionSpec spec() const override;
+    CompositionSpec export_spec() const override;
     std::vector<double> weights_;
     double p_ = 1.0;
 };
@@ -107,7 +109,7 @@ public:
 
 private:
     double common_raw_apply(const std::vector<double>& z) const override;
-    CompositionSpec spec() const override;
+    CompositionSpec export_spec() const override;
     std::vector<double> weights_;
     double epsilon_ = 0.1;
     double alpha_ = 1.0;
@@ -130,7 +132,7 @@ public:
 
 private:
     double deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
-    CompositionSpec spec() const override;
+    CompositionSpec export_spec() const override;
     std::vector<std::vector<double>> centers_;
     std::vector<double> offsets_;
     double sharpness_ = 0.01;
@@ -155,7 +157,7 @@ public:
 
 private:
     double deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
-    CompositionSpec spec() const override;
+    CompositionSpec export_spec() const override;
     std::vector<std::vector<double>> centers_;
     std::vector<double> offsets_;
     double sharpness_ = 0.01;

@@ -4,7 +4,6 @@
 
 #include <map>
 #include <cmath>
-#include <cctype>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -12,26 +11,10 @@
 namespace FuncCraft {
 using namespace detail;
 
-namespace {
-
-std::string normalize_token(std::string value) {
-    std::string normalized;
-    normalized.reserve(value.size());
-    for (unsigned char ch : value) {
-        if (ch == '_' || ch == '-' || std::isspace(ch)) {
-            continue;
-        }
-        normalized.push_back(static_cast<char>(std::tolower(ch)));
-    }
-    return normalized;
-}
-
-} // namespace
-
 BasicFunctionId parse_basic_function_id(const std::string& name) {
-    const std::string normalized = normalize_token(name);
+    const std::string normalized = normalize_spec_name(name);
     for (BasicFunctionId id : list_basic_functions()) {
-        if (normalize_token(to_string(id)) == normalized) {
+        if (normalize_spec_name(to_string(id)) == normalized) {
             return id;
         }
     }
@@ -59,11 +42,11 @@ Domain make_domain(const FunctionSpec& spec) {
     require(spec.dimension > 0, "function dimension must be positive");
 
     Domain domain(spec.dimension);
-    if (!spec.lower_bound.empty() || !spec.upper_bound.empty()) {
-        require(static_cast<int>(spec.lower_bound.size()) == spec.dimension, "lower bound dimension mismatch");
-        require(static_cast<int>(spec.upper_bound.size()) == spec.dimension, "upper bound dimension mismatch");
-        domain.lower = spec.lower_bound;
-        domain.upper = spec.upper_bound;
+    if (!spec.domain.lower_bound.empty() || !spec.domain.upper_bound.empty()) {
+        require(static_cast<int>(spec.domain.lower_bound.size()) == spec.dimension, "lower bound dimension mismatch");
+        require(static_cast<int>(spec.domain.upper_bound.size()) == spec.dimension, "upper bound dimension mismatch");
+        domain.lower = spec.domain.lower_bound;
+        domain.upper = spec.domain.upper_bound;
     }
     require(domain.lower.size() == domain.upper.size(), "domain bound size mismatch");
     for (std::size_t i = 0; i < domain.lower.size(); ++i) {
@@ -72,139 +55,106 @@ Domain make_domain(const FunctionSpec& spec) {
     return domain;
 }
 
-std::shared_ptr<CoordinateTransform> make_coordinate_transform(const TransformSpec& spec) {
-    const std::string kind = normalize_token(spec.kind);
+std::shared_ptr<CoordinateTransform> make_coordinate_transform(const CoordinateTransformSpec& spec) {
+    const CoordinateTransformKind kind = spec.kind;
     require(spec.dimension > 0, "coordinate transform dimension must be positive");
-    require(static_cast<int>(spec.source_point.size()) == spec.dimension, "coordinate transform source point dimension mismatch");
-    require(static_cast<int>(spec.target_point.size()) == spec.dimension, "coordinate transform target point dimension mismatch");
+    require(static_cast<int>(spec.assigned_xopt.size()) == spec.dimension, "coordinate transform assigned_xopt dimension mismatch");
+    require(static_cast<int>(spec.base_xopt.size()) == spec.dimension, "coordinate transform base_xopt dimension mismatch");
 
-    const std::uint64_t seed = static_cast<std::uint64_t>(static_cast<std::uint32_t>(spec.seed));
-    if (kind.empty() || kind == "identity" || kind == "none") {
-        return std::make_shared<IdentityTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
+    const std::uint64_t seed = spec.seed;
+    if (kind == CoordinateTransformKind::None) {
+        return std::make_shared<IdentityTransform>(spec.dimension, spec.assigned_xopt, spec.base_xopt, seed);
     }
-    if (kind == "rotation" || kind == "rot") {
+    if (kind == CoordinateTransformKind::Rotation) {
         if (!spec.matrix.empty()) {
             return std::make_shared<RotationTransform>(
                 spec.dimension,
-                spec.source_point,
-                spec.target_point,
+                spec.assigned_xopt,
+                spec.base_xopt,
                 seed,
                 spec.matrix);
         }
-        return std::make_shared<RotationTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
+        return std::make_shared<RotationTransform>(spec.dimension, spec.assigned_xopt, spec.base_xopt, seed);
     }
-    if (kind == "affine" || kind == "aff") {
+    if (kind == CoordinateTransformKind::Affine) {
         if (!spec.matrix.empty()) {
             return std::make_shared<AffineTransform>(
                 spec.dimension,
-                spec.source_point,
-                spec.target_point,
+                spec.assigned_xopt,
+                spec.base_xopt,
                 seed,
                 spec.matrix);
         }
-        return std::make_shared<AffineTransform>(spec.dimension, spec.source_point, spec.target_point, seed);
+        return std::make_shared<AffineTransform>(spec.dimension, spec.assigned_xopt, spec.base_xopt, seed);
     }
-    if (kind == "blockrotation" || kind == "blockrot" || kind == "brot") {
+    if (kind == CoordinateTransformKind::BlockRotation) {
         require(!spec.selected_indices.empty(), "block rotation transform needs selected indices");
         if (!spec.matrix.empty()) {
             return std::make_shared<BlockRotationTransform>(
                 spec.dimension,
                 spec.selected_indices,
-                spec.source_point,
-                spec.target_point,
+                spec.assigned_xopt,
+                spec.base_xopt,
                 seed,
                 spec.matrix);
         }
         return std::make_shared<BlockRotationTransform>(
             spec.dimension,
             spec.selected_indices,
-            spec.source_point,
-            spec.target_point,
+            spec.assigned_xopt,
+            spec.base_xopt,
             seed);
     }
-    throw std::invalid_argument("unknown coordinate transform kind: " + spec.kind);
+    throw std::logic_error("unhandled coordinate transform kind");
 }
 
 std::shared_ptr<ValueTransform> make_value_transform(const ValueTransformSpec& spec) {
-    const std::string kind = normalize_token(spec.kind);
-    if (kind.empty() || kind == "identity" || kind == "none") {
+    const ValueTransformKind kind = spec.kind;
+    if (kind == ValueTransformKind::None) {
         return std::make_shared<IdentityValueTransform>();
     }
-    if (kind == "power") {
+    if (kind == ValueTransformKind::Power) {
         const double alpha = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
         const double p = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
         return std::make_shared<PowerValueTransform>(alpha, p);
     }
-    if (kind == "oscillatory" || kind == "osc") {
+    if (kind == ValueTransformKind::Oscillatory) {
         const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.1;
         const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
         return std::make_shared<OscillatoryValueTransform>(epsilon, alpha);
     }
-    if (kind == "cosinezero" || kind == "coszero") {
+    if (kind == ValueTransformKind::CosineZero) {
         const double alpha = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
         return std::make_shared<CosineZeroValueTransform>(alpha);
     }
-    throw std::invalid_argument("unknown value transform kind: " + spec.kind);
+    throw std::logic_error("unhandled value transform kind");
 }
 
 std::shared_ptr<CompositionFunction> make_composition(const CompositionSpec& spec, std::size_t component_count) {
-    const std::string kind = normalize_token(spec.kind);
-    if (kind.empty() || kind == "singlecomponent" || kind == "single") {
-        require(component_count == 1, "single-component composition requires exactly one component");
-        return std::make_shared<SingleComponentComposition>();
+    const CompositionKind kind = spec.kind;
+    if (kind == CompositionKind::None) {
+        require(component_count == 1, "no composition requires exactly one component");
+        return std::make_shared<NoneComposition>();
     }
-    if (kind == "weightedsum" || kind == "sum" || kind == "cpm") {
-        std::vector<double> weights = spec.weights.empty()
-            ? std::vector<double>(component_count, 1.0)
-            : spec.weights;
-        return std::make_shared<WeightedSumComposition>(std::move(weights));
+    if (kind == CompositionKind::CpmWeightedSum) {
+        return std::make_shared<WeightedSumComposition>(component_count);
     }
-    if (kind == "powermean" || kind == "powermeancomposition") {
+    if (kind == CompositionKind::CpmPowerMean) {
         const double p = spec.parameters.empty() ? 2.0 : spec.parameters[0];
-        std::vector<double> weights = spec.weights.empty()
-            ? std::vector<double>(component_count, 1.0)
-            : spec.weights;
-        return std::make_shared<PowerMeanComposition>(std::move(weights), p);
+        return std::make_shared<PowerMeanComposition>(component_count, p);
     }
-    if (kind == "levelwell" || kind == "lvlwell") {
+    if (kind == CompositionKind::CpmLevelWell) {
         const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.1;
         const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
-        std::vector<double> weights = spec.weights.empty()
-            ? std::vector<double>(component_count, 1.0)
-            : spec.weights;
-        return std::make_shared<LevelWellComposition>(std::move(weights), epsilon, alpha);
+        return std::make_shared<LevelWellComposition>(component_count, epsilon, alpha);
     }
-    if (kind == "deceptivesoftmax" || kind == "dpm") {
-        const double sharpness = spec.parameters.size() > 0 ? spec.parameters[0] : 0.01;
-        std::vector<std::vector<double>> centers = spec.centers;
-        std::vector<double> offsets = spec.offsets;
-        require(!centers.empty(), "deceptive softmax composition needs centers");
-        if (offsets.empty()) {
-            offsets.assign(centers.size(), 0.0);
-        }
-        return std::make_shared<DeceptiveSoftmaxComposition>(
-            std::move(centers),
-            std::move(offsets),
-            sharpness);
+    if (kind == CompositionKind::DpmSoftmax) {
+        throw std::invalid_argument("DPM softmax composition must be built from component coordinate-transform assigned_xopt");
     }
-    if (kind == "deceptivebgsoftmax" || kind == "dpm-bgsoftmax" || kind == "dpm_bgsoftmax" || kind == "dpmbgsoftmax" || kind == "bgsoftmax") {
-        const double sharpness = spec.parameters.size() > 0 ? spec.parameters[0] : 0.01;
-        const double background_strength = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
-        const double background_sharpness = spec.parameters.size() > 2 ? spec.parameters[2] : 0.01;
-        std::vector<std::vector<double>> centers = spec.centers;
-        std::vector<double> offsets = spec.offsets;
-        require(!centers.empty(), "deceptive bg softmax composition needs centers");
-        if (offsets.empty()) {
-            offsets.assign(centers.size(), 0.0);
-        }
-        return std::make_shared<DeceptiveBgSoftmaxComposition>(
-            std::move(centers),
-            std::move(offsets),
-            sharpness,
-            background_strength,
-            background_sharpness);
+    if (kind == CompositionKind::DpmBgSoftmax) {
+        throw std::invalid_argument("DPM bg softmax composition must be built from component coordinate-transform assigned_xopt");
     }
-    throw std::invalid_argument("unknown composition kind: " + spec.kind);
+    throw std::logic_error("unhandled composition kind");
 }
 
 std::shared_ptr<CompositionFunction> make_weighted_sum(std::size_t components) {
@@ -214,15 +164,15 @@ std::shared_ptr<CompositionFunction> make_weighted_sum(std::size_t components) {
 
 FunctionBuilder::FunctionBuilder(int dimension)
     : domain_(dimension),
-      x_star_(static_cast<std::size_t>(dimension), 0.0) {
+      assigned_xopt_(static_cast<std::size_t>(dimension), 0.0) {
     require(dimension > 0, "function dimension must be positive");
 }
 
 FunctionBuilder& FunctionBuilder::domain(Domain domain) {
     require(domain.dimension() > 0, "domain must have positive dimension");
     domain_ = std::move(domain);
-    if (x_star_.empty() || static_cast<int>(x_star_.size()) != domain_.dimension()) {
-        x_star_.assign(static_cast<std::size_t>(domain_.dimension()), 0.0);
+    if (assigned_xopt_.empty() || static_cast<int>(assigned_xopt_.size()) != domain_.dimension()) {
+        assigned_xopt_.assign(static_cast<std::size_t>(domain_.dimension()), 0.0);
     }
     return *this;
 }
@@ -232,14 +182,19 @@ FunctionBuilder& FunctionBuilder::seed(unsigned long long seed) {
     return *this;
 }
 
-FunctionBuilder& FunctionBuilder::known_global_minimizer(std::vector<double> x_star) {
-    require_dimension(x_star, domain_.dimension(), "known global minimizer");
-    x_star_ = std::move(x_star);
+FunctionBuilder& FunctionBuilder::assigned_xopt(std::vector<double> x_opt) {
+    require_dimension(x_opt, domain_.dimension(), "assigned_xopt");
+    assigned_xopt_ = std::move(x_opt);
     return *this;
 }
 
-FunctionBuilder& FunctionBuilder::known_global_value(double f_star) {
-    f_star_ = f_star;
+FunctionBuilder& FunctionBuilder::assigned_fopt(double f_opt) {
+    assigned_fopt_ = f_opt;
+    return *this;
+}
+
+FunctionBuilder& FunctionBuilder::scale_factor(std::optional<double> scale_factor) {
+    scale_factor_ = scale_factor;
     return *this;
 }
 
@@ -247,7 +202,8 @@ FunctionBuilder& FunctionBuilder::add_component(
     BasicFunctionId id,
     int component_dimension,
     std::shared_ptr<CoordinateTransform> coordinate_transform,
-    std::shared_ptr<ValueTransform> value_transform) {
+    std::shared_ptr<ValueTransform> value_transform,
+    double f_bias) {
     require(static_cast<bool>(coordinate_transform), "coordinate transform is null");
     require(static_cast<bool>(value_transform), "value transform is null");
     require(component_dimension > 0, "component dimension must be positive");
@@ -255,11 +211,12 @@ FunctionBuilder& FunctionBuilder::add_component(
     require(coordinate_transform->output_dimension() == component_dimension, "component transform output dimension mismatch");
 
     ComponentSpec component_spec;
-    component_spec.base_function = to_string(id);
+    component_spec.base_function = id;
     component_spec.component_dimension = component_dimension;
-    component_spec.coordinate_transform = coordinate_transform->spec();
-    component_spec.value_transform = value_transform->spec();
-    component_spec.seed = static_cast<int>(coordinate_transform->seed());
+    component_spec.coordinate_transform = coordinate_transform->export_spec();
+    component_spec.value_transform = value_transform->export_spec();
+    component_spec.f_bias = f_bias;
+    component_spec.seed = coordinate_transform->seed();
     component_specs_.push_back(std::move(component_spec));
 
     function_class_.base_functions.push_back(id);
@@ -302,7 +259,7 @@ FunctionSpec FunctionBuilder::build_spec() const {
     const std::shared_ptr<CompositionFunction> composition = composition_
         ? composition_
         : (component_specs_.size() == 1
-            ? std::shared_ptr<CompositionFunction>(std::make_shared<SingleComponentComposition>())
+            ? std::shared_ptr<CompositionFunction>(std::make_shared<NoneComposition>())
             : make_weighted_sum(component_specs_.size()));
     if (function_class_.composition == CompositionClass::None) {
         cls.composition = composition->composition_class();
@@ -310,18 +267,20 @@ FunctionSpec FunctionBuilder::build_spec() const {
 
     FunctionSpec spec;
     spec.dimension = domain_.dimension();
-    spec.lower_bound = domain_.lower;
-    spec.upper_bound = domain_.upper;
+    spec.domain.dimension = domain_.dimension();
+    spec.domain.lower_bound = domain_.lower;
+    spec.domain.upper_bound = domain_.upper;
     spec.seed = seed_;
-    spec.component_specs = component_specs_;
-    spec.composition_spec = composition->spec();
-    spec.function_class_label = class_label(cls);
-    spec.known_global_minimizer = x_star_;
-    spec.known_global_value = f_star_;
-    spec.parameters.reserve(parameters_.size());
-    for (const auto& [key, value] : parameters_) {
-        spec.parameters.push_back(key + "=" + value);
-    }
+    spec.components.reserve(component_specs_.size());
+    spec.components = component_specs_;
+    const CompositionSpec composition_spec = composition->export_spec();
+    spec.composition.kind = composition_spec.kind;
+    spec.composition.parameters = composition_spec.parameters;
+    spec.composition.seed = composition_spec.seed;
+    spec.assigned_xopt = assigned_xopt_;
+    spec.assigned_fopt = assigned_fopt_;
+    spec.scale_factor = scale_factor_;
+    spec.label = class_label(cls);
     return spec;
 }
 
@@ -335,12 +294,12 @@ ComposedFunction FunctionBuilder::build() const {
     };
 
     auto components = std::make_shared<std::vector<RuntimeComponent>>();
-    components->reserve(built_spec.component_specs.size());
+    components->reserve(component_specs_.size());
     const Domain domain = domain_;
-    for (const ComponentSpec& component_spec : built_spec.component_specs) {
-        const auto primitive = make_basic_function(component_spec.base_function, component_spec.component_dimension);
-        TransformSpec transform_spec = component_spec.coordinate_transform;
-        transform_spec.target_point = detail::map_point_from_default_domain(primitive->x_opt, domain);
+    for (const ComponentSpec& component_spec : component_specs_) {
+        const auto primitive = make_basicf_ptr(component_spec.base_function, component_spec.component_dimension);
+        CoordinateTransformSpec transform_spec = component_spec.coordinate_transform;
+        transform_spec.base_xopt = detail::map_point_from_default_domain(primitive->x_opt, domain);
         components->push_back(RuntimeComponent{
             std::move(primitive),
             make_coordinate_transform(std::move(transform_spec)),
@@ -348,9 +307,9 @@ ComposedFunction FunctionBuilder::build() const {
         });
     }
 
-    std::shared_ptr<CompositionFunction> composition = make_composition(
-        built_spec.composition_spec,
-        built_spec.component_specs.size());
+    std::shared_ptr<CompositionFunction> composition = composition_
+        ? composition_
+        : make_composition(built_spec.composition, built_spec.components.size());
     const int dimension = built_spec.dimension;
     const double penalty = std::numeric_limits<double>::infinity();
 

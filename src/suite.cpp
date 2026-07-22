@@ -28,18 +28,6 @@ std::string trim(std::string value) {
     return value;
 }
 
-std::string normalize_token(std::string value) {
-    std::string normalized;
-    normalized.reserve(value.size());
-    for (unsigned char ch : value) {
-        if (ch == '_' || ch == '-' || ch == '/' || ch == '[' || ch == ']' || ch == '{' || ch == '}' || std::isspace(ch)) {
-            continue;
-        }
-        normalized.push_back(static_cast<char>(std::tolower(ch)));
-    }
-    return normalized;
-}
-
 std::vector<int> unique_sorted(std::vector<int> values) {
     std::sort(values.begin(), values.end());
     values.erase(std::unique(values.begin(), values.end()), values.end());
@@ -130,30 +118,32 @@ std::vector<double> yaml_double_list(const YAML::Node& node, const std::string& 
     throw std::invalid_argument(field + " must be a scalar or sequence");
 }
 
-ChoiceSpec choice_from_yaml(const YAML::Node& node) {
+template <typename Choice, typename ParseKind>
+Choice choice_from_yaml(const YAML::Node& node, ParseKind parse_kind) {
     require(node && node.IsMap(), "choice entry must be a YAML mapping");
-    ChoiceSpec spec;
+    Choice choice;
     if (node["kind"]) {
-        spec.kind = node["kind"].as<std::string>();
+        choice.kind = parse_kind(node["kind"].as<std::string>());
     }
     if (node["probability"]) {
-        spec.probability = node["probability"].as<double>();
+        choice.probability = node["probability"].as<double>();
     }
     if (node["parameters"]) {
-        spec.parameters = yaml_double_list(node["parameters"], "choice parameters");
+        choice.parameters = yaml_double_list(node["parameters"], "choice parameters");
     }
-    return spec;
+    return choice;
 }
 
-std::vector<ChoiceSpec> yaml_choice_list(const YAML::Node& node, const std::string& field) {
+template <typename Choice, typename ParseKind>
+std::vector<Choice> yaml_choice_list(const YAML::Node& node, const std::string& field, ParseKind parse_kind) {
     if (!node || node.IsNull()) {
         return {};
     }
     require(node.IsSequence(), field + " must be a YAML sequence");
-    std::vector<ChoiceSpec> values;
+    std::vector<Choice> values;
     values.reserve(node.size());
     for (const auto& item : node) {
-        values.push_back(choice_from_yaml(item));
+        values.push_back(choice_from_yaml<Choice>(item, parse_kind));
     }
     return values;
 }
@@ -165,28 +155,47 @@ SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
         spec.supported_dimensions = yaml_supported_dimensions(node["supported_dimensions"]);
     }
     if (node["base_functions"]) {
-        spec.base_functions = yaml_int_list(node["base_functions"], "base_functions");
+        std::vector<int> ids = yaml_int_list(node["base_functions"], "base_functions");
+        spec.base_functions.clear();
+        spec.base_functions.reserve(ids.size());
+        for (int id : ids) {
+            spec.base_functions.push_back(static_cast<BasicFunctionId>(id));
+        }
     }
-    if (node["base_function_coord_transforms"]) {
-        spec.base_function_coord_transforms = yaml_choice_list(node["base_function_coord_transforms"], "base_function_coord_transforms");
-    }
-    if (node["coord_transforms"]) {
-        spec.coord_transforms = yaml_choice_list(node["coord_transforms"], "coord_transforms");
+    if (node["coordinate_transforms"]) {
+        spec.coordinate_transforms = yaml_choice_list<CoordinateTransformChoice>(
+            node["coordinate_transforms"],
+            "coordinate_transforms",
+            parse_coordinate_transform_kind);
     }
     if (node["value_transforms"]) {
-        spec.value_transforms = yaml_choice_list(node["value_transforms"], "value_transforms");
+        spec.value_transforms = yaml_choice_list<ValueTransformChoice>(
+            node["value_transforms"],
+            "value_transforms",
+            parse_value_transform_kind);
     }
-    if (node["composition_functions"]) {
-        spec.composition_functions = yaml_choice_list(node["composition_functions"], "composition_functions");
+    if (node["compositions"]) {
+        spec.compositions = yaml_choice_list<CompositionChoice>(
+            node["compositions"],
+            "compositions",
+            parse_composition_kind);
     }
-    if (node["base_functions_for_compositions"]) {
-        spec.base_functions_for_compositions = yaml_int_list(node["base_functions_for_compositions"], "base_functions_for_compositions");
+    if (node["composition_base_functions"]) {
+        std::vector<int> ids = yaml_int_list(node["composition_base_functions"], "composition_base_functions");
+        spec.composition_base_functions.clear();
+        spec.composition_base_functions.reserve(ids.size());
+        for (int id : ids) {
+            spec.composition_base_functions.push_back(static_cast<BasicFunctionId>(id));
+        }
     }
     if (node["max_components"]) {
         spec.max_components = node["max_components"].as<int>();
     }
     if (node["requested_number_of_functions"]) {
         spec.requested_number_of_functions = node["requested_number_of_functions"].as<int>();
+    }
+    if (node["max_number_of_functions"]) {
+        spec.max_number_of_functions = node["max_number_of_functions"].as<int>();
     }
     if (node["master_seed"]) {
         spec.master_seed = node["master_seed"].as<unsigned long long>();
@@ -197,8 +206,11 @@ SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
     if (node["upper_bound"]) {
         spec.upper_bound = node["upper_bound"].as<double>();
     }
-    if (node["f_opt"]) {
-        spec.f_opt = node["f_opt"].as<double>();
+    if (node["assigned_fopt"]) {
+        spec.assigned_fopt = node["assigned_fopt"].as<double>();
+    }
+    if (node["xopt_domain_shrink_factor"]) {
+        spec.xopt_domain_shrink_factor = node["xopt_domain_shrink_factor"].as<double>();
     }
     if (node["suite_label"]) {
         spec.suite_label = node["suite_label"].as<std::string>();
@@ -215,7 +227,7 @@ std::vector<int> parse_dimension_values(const std::string& expr, int ambient_dim
         cleaned.pop_back();
     }
     cleaned = trim(cleaned);
-    const std::string normalized = normalize_token(cleaned);
+    const std::string normalized = normalize_spec_name(cleaned);
     require(ambient_dimension > 0, "ambient dimension must be positive");
 
     if (normalized.empty() || normalized == "any" || normalized == "all") {
@@ -284,22 +296,22 @@ std::vector<int> normalize_dimensions(const SuiteSpec& spec, int ambient_dimensi
     return values;
 }
 
-std::vector<BasicFunctionId> normalize_base_functions(const std::vector<int>& ids) {
+std::vector<BasicFunctionId> normalize_base_functions(const std::vector<BasicFunctionId>& ids) {
     const auto all = list_basic_functions();
-    std::set<int> allowed;
+    std::set<BasicFunctionId> allowed;
     for (BasicFunctionId id : all) {
-        allowed.insert(static_cast<int>(id));
+        allowed.insert(id);
     }
 
     std::vector<BasicFunctionId> result;
-    std::set<int> seen;
+    std::set<BasicFunctionId> seen;
     if (ids.empty()) {
         result = all;
     } else {
-        for (int raw_id : ids) {
-            require(allowed.count(raw_id) != 0, "unknown base function id in suite spec");
-            if (seen.insert(raw_id).second) {
-                result.push_back(static_cast<BasicFunctionId>(raw_id));
+        for (BasicFunctionId id : ids) {
+            require(allowed.count(id) != 0, "unknown base function id in suite spec");
+            if (seen.insert(id).second) {
+                result.push_back(id);
             }
         }
     }
@@ -308,72 +320,74 @@ std::vector<BasicFunctionId> normalize_base_functions(const std::vector<int>& id
 }
 
 std::vector<BasicFunctionId> normalize_composition_base_functions(
-    const std::vector<int>& ids,
+    const std::vector<BasicFunctionId>& ids,
     const std::vector<BasicFunctionId>& fallback) {
     if (ids.empty()) {
         return fallback;
     }
 
     const auto all = list_basic_functions();
-    std::set<int> allowed;
+    std::set<BasicFunctionId> allowed;
     for (BasicFunctionId id : all) {
-        allowed.insert(static_cast<int>(id));
+        allowed.insert(id);
     }
 
     std::vector<BasicFunctionId> result;
-    std::set<int> seen;
-    for (int raw_id : ids) {
-        require(allowed.count(raw_id) != 0, "unknown composition base-function id in suite spec");
-        if (seen.insert(raw_id).second) {
-            result.push_back(static_cast<BasicFunctionId>(raw_id));
+    std::set<BasicFunctionId> seen;
+    for (BasicFunctionId id : ids) {
+        require(allowed.count(id) != 0, "unknown composition base-function id in suite spec");
+        if (seen.insert(id).second) {
+            result.push_back(id);
         }
     }
     require(!result.empty(), "composition base-function pool must contain at least one base function");
     return result;
 }
 
-std::vector<ChoiceSpec> normalize_choices(const std::vector<ChoiceSpec>& choices, const std::vector<ChoiceSpec>& fallback) {
+template <typename Choice>
+std::vector<Choice> normalize_choices(const std::vector<Choice>& choices, const std::vector<Choice>& fallback) {
     if (choices.empty()) {
         return fallback;
     }
 
-    std::vector<ChoiceSpec> result;
+    std::vector<Choice> result;
     result.reserve(choices.size());
-    for (const ChoiceSpec& choice : choices) {
-        ChoiceSpec normalized = choice;
-        normalized.kind = normalize_token(choice.kind);
-        require(!normalized.kind.empty(), "choice kind must not be empty");
+    for (const Choice& choice : choices) {
+        Choice normalized = choice;
         require(normalized.probability >= 0.0, "choice probability must be nonnegative");
         result.push_back(std::move(normalized));
     }
+    double probability_sum = 0.0;
+    for (const Choice& choice : result) {
+        probability_sum += choice.probability;
+    }
+    require(std::fabs(probability_sum - 1.0) <= 1.0e-12, "choice probabilities must sum to one");
     return result;
 }
 
-double total_probability(const std::vector<ChoiceSpec>& choices) {
+template <typename Choice>
+double total_probability(const std::vector<Choice>& choices) {
     double sum = 0.0;
-    for (const ChoiceSpec& choice : choices) {
+    for (const Choice& choice : choices) {
         sum += choice.probability;
     }
     return sum;
 }
 
-const ChoiceSpec& choose_weighted(const std::vector<ChoiceSpec>& choices, std::mt19937_64& rng) {
+template <typename Choice>
+const Choice& choose_weighted(const std::vector<Choice>& choices, std::mt19937_64& rng) {
     require(!choices.empty(), "weighted choice list must not be empty");
     const double total = total_probability(choices);
     require(total > 0.0, "weighted choice list must have positive total probability");
     const double target = uniform01(rng) * total;
     double accum = 0.0;
-    for (const ChoiceSpec& choice : choices) {
+    for (const Choice& choice : choices) {
         accum += choice.probability;
         if (target <= accum) {
             return choice;
         }
     }
     return choices.back();
-}
-
-std::vector<double> equal_weights(int count) {
-    return std::vector<double>(static_cast<std::size_t>(count), 1.0);
 }
 
 Domain centered_scaled_domain(const Domain& domain, double factor) {
@@ -423,42 +437,40 @@ std::vector<std::vector<double>> latin_hypercube_points_in_domain(
     return points;
 }
 
-std::vector<std::vector<double>> latin_hypercube_centers(std::mt19937_64& rng, const Domain& domain, int count) {
-    constexpr double kCenterDomainFraction = 0.8;
-    return latin_hypercube_points_in_domain(rng, centered_scaled_domain(domain, kCenterDomainFraction), count);
+std::vector<std::vector<double>> latin_hypercube_centers(
+    std::mt19937_64& rng,
+    const Domain& domain,
+    int count,
+    double shrink_factor) {
+    return latin_hypercube_points_in_domain(rng, centered_scaled_domain(domain, shrink_factor), count);
 }
 
-TransformSpec make_coordinate_transform_spec(
-    const ChoiceSpec& choice,
+CoordinateTransformSpec make_coordinate_transform_spec(
+    const CoordinateTransformChoice& choice,
     int dimension,
-    const std::vector<double>& source_point,
-    const std::vector<double>& target_point,
+    const std::vector<double>& assigned_xopt,
     std::uint64_t seed,
     std::mt19937_64& rng,
     const std::vector<int>* selected_indices) {
-    TransformSpec spec;
+    CoordinateTransformSpec spec;
+    spec.kind = choice.kind;
     spec.dimension = dimension;
-    spec.seed = static_cast<int>(seed);
-    spec.source_point = source_point;
-    spec.target_point = target_point;
+    spec.seed = seed;
+    spec.assigned_xopt = assigned_xopt;
 
-    if (choice.kind == "identity" || choice.kind == "none" || choice.kind.empty()) {
-        spec.kind = "identity";
+    if (choice.kind == CoordinateTransformKind::None) {
         return spec;
     }
-    if (choice.kind == "rot" || choice.kind == "rotation") {
-        spec.kind = "rotation";
+    if (choice.kind == CoordinateTransformKind::Rotation) {
         return spec;
     }
-    if (choice.kind == "aff" || choice.kind == "affine") {
-        spec.kind = "affine";
+    if (choice.kind == CoordinateTransformKind::Affine) {
         return spec;
     }
-    if (choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation") {
+    if (choice.kind == CoordinateTransformKind::BlockRotation) {
         require(dimension > 1, "block rotation requires dimension greater than one");
         if (selected_indices != nullptr) {
             require(!selected_indices->empty(), "block rotation selected indices must not be empty");
-            spec.kind = "block_rotation";
             spec.selected_indices = *selected_indices;
             for (int idx : spec.selected_indices) {
                 require(idx >= 0 && idx < dimension, "block rotation selected index out of range");
@@ -470,116 +482,61 @@ TransformSpec make_coordinate_transform_spec(
         while (static_cast<int>(indices.size()) < selected_size) {
             indices.insert(uniform_int(rng, 0, dimension - 1));
         }
-        spec.kind = "block_rotation";
         spec.selected_indices.assign(indices.begin(), indices.end());
         return spec;
     }
-    throw std::invalid_argument("unknown coordinate transform kind in suite spec: " + choice.kind);
+    throw std::logic_error("unhandled coordinate transform kind in suite spec");
 }
 
-ValueTransformSpec make_value_transform_spec(const ChoiceSpec& choice) {
+ValueTransformSpec make_value_transform_spec(const ValueTransformChoice& choice) {
     ValueTransformSpec spec;
-    if (choice.kind == "identity" || choice.kind == "none" || choice.kind.empty()) {
-        spec.kind = "identity";
+    spec.kind = choice.kind;
+    if (choice.kind == ValueTransformKind::None) {
         return spec;
     }
-    if (choice.kind == "coszero" || choice.kind == "cosinezero") {
-        spec.kind = "cosine_zero";
+    if (choice.kind == ValueTransformKind::CosineZero) {
         spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0} : choice.parameters;
         return spec;
     }
-    if (choice.kind == "osc" || choice.kind == "oscillatory") {
-        spec.kind = "oscillatory";
+    if (choice.kind == ValueTransformKind::Oscillatory) {
         spec.parameters = choice.parameters.empty() ? std::vector<double>{0.1, 1.0} : choice.parameters;
         return spec;
     }
-    if (choice.kind == "power") {
-        spec.kind = "power";
+    if (choice.kind == ValueTransformKind::Power) {
         spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0, 1.0} : choice.parameters;
         return spec;
     }
-    throw std::invalid_argument("unknown value transform kind in suite spec: " + choice.kind);
+    throw std::logic_error("unhandled value transform kind in suite spec");
 }
 
 CompositionSpec make_composition_spec(
-    const ChoiceSpec& choice,
-    int component_count,
-    const std::vector<std::vector<double>>& centers,
-    const std::vector<double>& offsets) {
+    const CompositionChoice& choice) {
     CompositionSpec spec;
-    if (choice.kind == "cpm" || choice.kind == "cpmsum" || choice.kind == "sum" || choice.kind == "weightedsum") {
-        spec.kind = "weighted_sum";
-        spec.weights = equal_weights(component_count);
+    spec.kind = choice.kind;
+    if (choice.kind == CompositionKind::CpmWeightedSum) {
         return spec;
     }
-    if (choice.kind == "cpmlwell" || choice.kind == "levelwell" || choice.kind == "lwell") {
-        spec.kind = "level_well";
-        spec.weights = equal_weights(component_count);
+    if (choice.kind == CompositionKind::CpmLevelWell) {
         spec.parameters = choice.parameters.empty() ? std::vector<double>{0.1, 1.0} : choice.parameters;
         return spec;
     }
-    if (choice.kind == "cpmpmean" || choice.kind == "powermean") {
-        spec.kind = "power_mean";
-        spec.weights = equal_weights(component_count);
+    if (choice.kind == CompositionKind::CpmPowerMean) {
         spec.parameters = choice.parameters.empty() ? std::vector<double>{2.0} : choice.parameters;
         return spec;
     }
-    if (choice.kind == "dpmsoftmax" || choice.kind == "dpm" || choice.kind == "softmax") {
-        spec.kind = "deceptive_softmax";
-        spec.centers = centers;
-        spec.offsets = offsets;
+    if (choice.kind == CompositionKind::DpmSoftmax) {
         spec.parameters = choice.parameters.empty()
             ? std::vector<double>{0.01}
             : choice.parameters;
         return spec;
     }
-    if (choice.kind == "dpm-bgsoftmax" || choice.kind == "dpm_bgsoftmax" || choice.kind == "dpmbgsoftmax" || choice.kind == "bgsoftmax") {
-        spec.kind = "deceptive_bg_softmax";
-        spec.centers = centers;
-        spec.offsets = offsets;
+    if (choice.kind == CompositionKind::DpmBgSoftmax) {
         spec.parameters = choice.parameters.empty()
             ? std::vector<double>{0.01, 1.0, 0.01}
             : choice.parameters;
         return spec;
     }
-    throw std::invalid_argument("unknown composition kind in suite spec: " + choice.kind);
-}
-
-std::vector<ChoiceSpec> default_base_transform_choices() {
-    return {
-        make_choice_spec("none", 0.25),
-        make_choice_spec("rotation", 0.25),
-        make_choice_spec("affine", 0.25),
-        make_choice_spec("blockrotation", 0.25),
-    };
-}
-
-std::vector<ChoiceSpec> default_coord_transform_choices() {
-    return {
-        make_choice_spec("none", 0.25),
-        make_choice_spec("rotation", 0.25),
-        make_choice_spec("affine", 0.25),
-        make_choice_spec("blockrotation", 0.25),
-    };
-}
-
-std::vector<ChoiceSpec> default_value_transform_choices() {
-    return {
-        make_choice_spec("none", 0.25),
-        make_choice_spec("coszero", 0.25),
-        make_choice_spec("osc", 0.25),
-        make_choice_spec("power", 0.25),
-    };
-}
-
-std::vector<ChoiceSpec> default_composition_choices() {
-    return {
-        make_choice_spec("cpmsum", 0.20),
-        make_choice_spec("cpmlwell", 0.20),
-        make_choice_spec("cpmpmean", 0.20),
-        make_choice_spec("dpmsoftmax", 0.20),
-        make_choice_spec("dpmbgsoftmax", 0.20),
-    };
+    throw std::logic_error("unhandled composition kind in suite spec");
 }
 
 std::vector<BasicFunctionId> sample_base_functions(
@@ -597,19 +554,12 @@ std::vector<BasicFunctionId> sample_base_functions(
     return selected;
 }
 
-bool is_block_rotation_choice(const ChoiceSpec& choice) {
-    return choice.kind == "brot" || choice.kind == "blockrot" || choice.kind == "blockrotation";
+bool is_block_rotation_choice(const CoordinateTransformChoice& choice) {
+    return choice.kind == CoordinateTransformKind::BlockRotation;
 }
 
-bool is_deceptive_composition_choice(const ChoiceSpec& choice) {
-    const std::string kind = normalize_token(choice.kind);
-    return kind == "dpm"
-        || kind == "dpmsoftmax"
-        || kind == "softmax"
-        || kind == "dpmbgsoftmax"
-        || kind == "dpm-bgsoftmax"
-        || kind == "dpm_bgsoftmax"
-        || kind == "bgsoftmax";
+bool is_deceptive_composition_choice(const CompositionChoice& choice) {
+    return choice.kind == CompositionKind::DpmSoftmax || choice.kind == CompositionKind::DpmBgSoftmax;
 }
 
 std::vector<int> full_dimension_indices(int dimension) {
@@ -654,7 +604,7 @@ std::vector<std::vector<int>> covering_block_subspaces(int dimension, int count,
 }
 
 std::vector<std::vector<int>> block_rotation_subspaces(
-    const std::vector<ChoiceSpec>& coord_choices,
+    const std::vector<CoordinateTransformChoice>& coord_choices,
     int dimension,
     std::mt19937_64& rng) {
     const bool all_block_rotation = std::all_of(coord_choices.begin(), coord_choices.end(), is_block_rotation_choice);
@@ -721,12 +671,12 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
 
     const std::vector<BasicFunctionId> mandatory_base_functions = normalize_base_functions(spec_.base_functions);
     const std::vector<BasicFunctionId> composition_pool = normalize_composition_base_functions(
-        spec_.base_functions_for_compositions,
+        spec_.composition_base_functions,
         mandatory_base_functions);
 
-    const int coord_family_count = static_cast<int>(normalize_choices(spec_.coord_transforms, default_coord_transform_choices()).size());
-    const int value_family_count = static_cast<int>(normalize_choices(spec_.value_transforms, default_value_transform_choices()).size());
-    const auto composition_choices = normalize_choices(spec_.composition_functions, default_composition_choices());
+    const int coord_family_count = static_cast<int>(normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices()).size());
+    const int value_family_count = static_cast<int>(normalize_choices(spec_.value_transforms, all_value_transform_choices()).size());
+    const auto composition_choices = normalize_choices(spec_.compositions, all_composition_choices());
     const int max_components = spec_.max_components;
     require(max_components >= 2, "suite spec max_components must be at least 2");
     std::uint64_t theoretical_composed = 0;
@@ -747,9 +697,8 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         : mandatory_count;
     require(requested_count >= mandatory_count, "requested_number_of_functions is smaller than the mandatory base-function count");
 
-    const auto base_choices = normalize_choices(spec_.base_function_coord_transforms, default_base_transform_choices());
-    const auto coord_choices = normalize_choices(spec_.coord_transforms, default_coord_transform_choices());
-    const auto value_choices = normalize_choices(spec_.value_transforms, default_value_transform_choices());
+    const auto coord_choices = normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices());
+    const auto value_choices = normalize_choices(spec_.value_transforms, all_value_transform_choices());
     if (requested_count > mandatory_count) {
         require(!composition_pool.empty(), "composition base-function pool must not be empty");
     }
@@ -762,7 +711,7 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         FunctionBlueprint blueprint;
         blueprint.composed = false;
         blueprint.base_function = id;
-        blueprint.base_transform_choice = choose_weighted(base_choices, rng);
+        blueprint.coordinate_transform_choice = choose_weighted(coord_choices, rng);
         blueprint.seed = mix_seed(spec_.master_seed + sequence + 0x2000ull);
         blueprints_.push_back(std::move(blueprint));
         ++sequence;
@@ -776,17 +725,17 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         }
 
         std::mt19937_64 rng(mix_seed(spec_.master_seed + sequence + 0x3000ull));
-        const ChoiceSpec& comp_choice = choose_weighted(composition_choices, rng);
+        const CompositionChoice& comp_choice = choose_weighted(composition_choices, rng);
         const int max_components = spec_.max_components;
         const int component_count = uniform_int(rng, 2, max_components);
         FunctionBlueprint blueprint;
         blueprint.composed = true;
         blueprint.component_count = component_count;
         blueprint.component_bases = sample_base_functions(composition_pool, component_count, rng);
-        blueprint.coord_transform_choices.reserve(static_cast<std::size_t>(component_count));
+        blueprint.coordinate_transform_choices.reserve(static_cast<std::size_t>(component_count));
         blueprint.value_transform_choices.reserve(static_cast<std::size_t>(component_count));
         for (int i = 0; i < component_count; ++i) {
-            blueprint.coord_transform_choices.push_back(choose_weighted(coord_choices, rng));
+            blueprint.coordinate_transform_choices.push_back(choose_weighted(coord_choices, rng));
             blueprint.value_transform_choices.push_back(choose_weighted(value_choices, rng));
         }
         blueprint.composition_choice = comp_choice;
@@ -820,62 +769,68 @@ bool BenchmarkSuite::supports_dimension(int dimension) const {
 BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& blueprint) const {
     require(dimension_ > 0, "dimension must be positive");
 
-    FunctionBuilder builder(dimension_);
-    builder.domain(Domain(dimension_, spec_.lower_bound, spec_.upper_bound));
-    builder.seed(blueprint.seed);
-    builder.known_global_value(spec_.f_opt);
-    builder.parameter("suite_label", spec_.suite_label);
-
     const Domain domain(dimension_, spec_.lower_bound, spec_.upper_bound);
     std::mt19937_64 rng(mix_seed(blueprint.seed ^ static_cast<std::uint64_t>(dimension_)));
 
-    if (!blueprint.composed) {
-        const auto x_star = latin_hypercube_centers(rng, domain, 1).front();
-        builder.known_global_minimizer(x_star);
-        builder.parameter("suite_role", "base");
+    FunctionSpec function_spec;
+    function_spec.dimension = dimension_;
+    function_spec.domain.dimension = dimension_;
+    function_spec.domain.lower_bound = domain.lower;
+    function_spec.domain.upper_bound = domain.upper;
+    function_spec.seed = blueprint.seed;
+    function_spec.assigned_fopt = spec_.assigned_fopt;
+    function_spec.metadata.push_back("suite_label=" + spec_.suite_label);
 
-        const std::vector<double> target = x_star;
-        const std::vector<int> full_subspace = is_block_rotation_choice(blueprint.base_transform_choice)
+    if (!blueprint.composed) {
+        const auto x_star = latin_hypercube_centers(rng, domain, 1, spec_.xopt_domain_shrink_factor).front();
+        function_spec.assigned_xopt = x_star;
+        function_spec.metadata.push_back("suite_role=base");
+        function_spec.composition.kind = CompositionKind::None;
+
+        const std::vector<int> full_subspace = is_block_rotation_choice(blueprint.coordinate_transform_choice)
             ? full_dimension_indices(dimension_)
             : std::vector<int>{};
-        builder.add_component(
-            blueprint.base_function,
+        ComponentSpec component;
+        component.base_function = blueprint.base_function;
+        component.component_dimension = dimension_;
+        component.coordinate_transform = make_coordinate_transform_spec(
+            blueprint.coordinate_transform_choice,
             dimension_,
-            make_coordinate_transform(
-                make_coordinate_transform_spec(
-                    blueprint.base_transform_choice,
-                    dimension_,
-                    x_star,
-                    target,
-                    blueprint.seed,
-                    rng,
-                    is_block_rotation_choice(blueprint.base_transform_choice) ? &full_subspace : nullptr)),
-            std::make_shared<IdentityValueTransform>())
-            .composition(std::make_shared<SingleComponentComposition>());
+            x_star,
+            blueprint.seed,
+            rng,
+            is_block_rotation_choice(blueprint.coordinate_transform_choice) ? &full_subspace : nullptr);
+        component.value_transform.kind = ValueTransformKind::None;
+        component.seed = blueprint.seed;
+        function_spec.components.push_back(std::move(component));
 
-        return BenchmarkFunction(builder.build_spec());
+        return BenchmarkFunction(std::move(function_spec));
     }
 
     const bool dpm_mode = is_deceptive_composition_choice(blueprint.composition_choice);
     const int random_center_count = dpm_mode
         ? 1 + std::max(0, blueprint.component_count - 2)
         : 1;
-    const std::vector<std::vector<double>> random_centers = latin_hypercube_centers(rng, domain, random_center_count);
+    const std::vector<std::vector<double>> random_centers = latin_hypercube_centers(
+        rng,
+        domain,
+        random_center_count,
+        spec_.xopt_domain_shrink_factor);
     const auto x_star = random_centers.front();
     std::vector<std::vector<double>> centers(static_cast<std::size_t>(blueprint.component_count), x_star);
     std::vector<double> offsets(static_cast<std::size_t>(blueprint.component_count), 0.0);
     const bool uses_block_rotation = std::any_of(
-        blueprint.coord_transform_choices.begin(),
-        blueprint.coord_transform_choices.end(),
+        blueprint.coordinate_transform_choices.begin(),
+        blueprint.coordinate_transform_choices.end(),
         is_block_rotation_choice);
     std::vector<std::vector<int>> block_subspaces = uses_block_rotation
-        ? block_rotation_subspaces(blueprint.coord_transform_choices, dimension_, rng)
+        ? block_rotation_subspaces(blueprint.coordinate_transform_choices, dimension_, rng)
         : std::vector<std::vector<int>>(static_cast<std::size_t>(blueprint.component_count));
-    if (dpm_mode && is_block_rotation_choice(blueprint.coord_transform_choices.front())) {
+    if (dpm_mode && is_block_rotation_choice(blueprint.coordinate_transform_choices.front())) {
         block_subspaces.front() = full_dimension_indices(dimension_);
     }
     if (dpm_mode) {
-        const double deceptive_step = 10.0 + 0.1 * spec_.f_opt;
+        const double deceptive_step = 10.0 + 0.1 * spec_.assigned_fopt;
         int random_center_index = 1;
         for (int i = 1; i < blueprint.component_count; ++i) {
             if (i == 1) {
@@ -888,41 +843,32 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         }
     }
 
-    builder.known_global_minimizer(x_star);
-    builder.parameter("suite_role", "composed");
+    function_spec.assigned_xopt = x_star;
+    function_spec.metadata.push_back("suite_role=composed");
+    function_spec.composition = make_composition_spec(blueprint.composition_choice);
 
     for (int i = 0; i < blueprint.component_count; ++i) {
-        const std::vector<double>& source = centers[static_cast<std::size_t>(i)];
-        const std::vector<double> target = x_star;
+        const auto pos = static_cast<std::size_t>(i);
         const std::uint64_t component_seed = mix_seed(blueprint.seed + static_cast<std::uint64_t>(i) + 1ULL);
-        builder.add_component(
-            blueprint.component_bases[static_cast<std::size_t>(i)],
+        ComponentSpec component;
+        component.base_function = blueprint.component_bases[pos];
+        component.component_dimension = dimension_;
+        component.coordinate_transform = make_coordinate_transform_spec(
+            blueprint.coordinate_transform_choices[pos],
             dimension_,
-            make_coordinate_transform(
-                make_coordinate_transform_spec(
-                    blueprint.coord_transform_choices[static_cast<std::size_t>(i)],
-                    dimension_,
-                    source,
-                    target,
-                    component_seed,
-                    rng,
-                    is_block_rotation_choice(blueprint.coord_transform_choices[static_cast<std::size_t>(i)])
-                        ? &block_subspaces[static_cast<std::size_t>(i)]
-                        : nullptr)),
-            make_value_transform(
-                make_value_transform_spec(
-                    blueprint.value_transform_choices[static_cast<std::size_t>(i)])));
+            centers[pos],
+            component_seed,
+            rng,
+            is_block_rotation_choice(blueprint.coordinate_transform_choices[pos])
+                ? &block_subspaces[pos]
+                : nullptr);
+        component.value_transform = make_value_transform_spec(blueprint.value_transform_choices[pos]);
+        component.f_bias = offsets[pos];
+        component.seed = component_seed;
+        function_spec.components.push_back(std::move(component));
     }
 
-    builder.composition(make_composition(
-        make_composition_spec(
-            blueprint.composition_choice,
-            blueprint.component_count,
-            centers,
-            offsets),
-        static_cast<std::size_t>(blueprint.component_count)));
-
-    return BenchmarkFunction(builder.build_spec());
+    return BenchmarkFunction(std::move(function_spec));
 }
 
 int BenchmarkSuite::size() const {
