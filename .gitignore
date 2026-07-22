@@ -1,5 +1,6 @@
 .vscode/
 build/
+build-*/
 Logs/*.log
 src/__pycache__
 */*/__pycache__
@@ -9,6 +10,7 @@ __pycache__
 python_env
 lib
 dist/
+values_*.txt
 Temp/
 Output/
 bin
@@ -23,6 +25,8 @@ examples/.DS_Store
 .DS_Store
 pyfunccraft/lib
 minionpy.egg-info
+pyfunccraft.egg-info
+funccraft.egg-info
 examples/test.py
 _skbuild
 venv
@@ -54,6 +58,8 @@ eigen.zip
 cec2011/*
 pyfunccraft/*.so
 pyfunccraft/*.pyd
+funccraft/*.so
+funccraft/*.pyd
 
 docs/*.pdf 
 docs/*.bbl 
@@ -67,4 +73,5 @@ docs/*.fdb_latexmk
 docs/figures/
 examples/*.pdf
 examples/*.png
+build*/
 

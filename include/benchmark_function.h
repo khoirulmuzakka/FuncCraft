@@ -83,6 +83,15 @@ private:
     ComposedFunction function_;
 };
 
+/**
+ * @brief Load a benchmark-function specification from a YAML file.
+ */
+FunctionSpec load_function_spec_yaml(const std::string& path);
+/**
+ * @brief Build a benchmark function directly from a YAML file.
+ */
+BenchmarkFunction make_benchmark_function_from_yaml(const std::string& path);
+
 } // namespace FuncCraft
 
 #endif // FUNCCRAFT_BENCHMARK_FUNCTION_H

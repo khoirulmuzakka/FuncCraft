@@ -7,7 +7,7 @@ benchmark instance.
 """
 
 from . import _funccraft
-from .function_spec import Domain, FunctionSpec
+from .spec import Domain, FunctionSpec
 
 
 def _as_native_function_spec(spec):
@@ -23,13 +23,23 @@ def make_benchmark_function(spec):
     return BenchmarkFunction(spec)
 
 
+def load_function_spec_yaml(path):
+    """Load a :class:`FunctionSpec` from a YAML file."""
+    return FunctionSpec.from_cpp(_funccraft.load_function_spec_yaml(str(path)))
+
+
+def make_benchmark_function_from_yaml(path):
+    """Build a :class:`BenchmarkFunction` directly from a YAML file."""
+    return BenchmarkFunction(_funccraft.make_benchmark_function_from_yaml(str(path)))
+
+
 class BenchmarkFunction:
     """Concrete benchmark function.
 
     Parameters
     ----------
     spec:
-        A :class:`~pyfunccraft.function_spec.FunctionSpec` describing one
+        A :class:`~funccraft.spec.FunctionSpec` describing one
         function instance.
 
     Notes
@@ -109,5 +119,7 @@ __all__ = [
     "BenchmarkFunction",
     "Domain",
     "FunctionSpec",
+    "load_function_spec_yaml",
     "make_benchmark_function",
+    "make_benchmark_function_from_yaml",
 ]

@@ -46,11 +46,11 @@ This configures CMake, builds the library, and builds the example executables.
 ### Manual CMake build
 
 ```bash
-cmake -S . -B build -DFUNCCRAFT_BUILD_EXAMPLES=ON -DFUNCCRAFT_LINK_MINION=ON
+cmake -S . -B build -DBUILD_EXAMPLES=ON
 cmake --build build --config Release
 ```
 
-`FUNCCRAFT_LINK_MINION=ON` enables the `run_custom` example, which uses the Minion optimizer.
+`BUILD_EXAMPLES=ON` builds the example targets, including the Minion-dependent minimization examples.
 
 ## Quick Start
 
@@ -112,5 +112,4 @@ That classification is stored in the function metadata and rendered as a compact
 
 - The library is built around batch evaluation. Primitive and composed functions expose `operator()` on a vector of input vectors.
 - The public API is namespaced under `FuncCraft`.
-- The examples are optional and can be disabled with `FUNCCRAFT_BUILD_EXAMPLES=OFF`.
-
+- The library and Python interface build by default. Examples are optional and can be enabled with `BUILD_EXAMPLES=ON`.

@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel", "scikit-build", "cmake>=3.18", "pybind11"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "funccraft"
+version = "0.1.0"
+description = "Python bindings for the FuncCraft benchmark-function generator."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "Khoirul Faiq Muzakka", email = "khoirul.muzakka@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: Unix",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development",
+]
+
+[tool.setuptools.packages.find]
+include = ["funccraft"]
+
+[tool.setuptools.package-data]
+"funccraft" = ["_funccraft*"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.scikit-build]
+cmake_minimum_required = "3.18"
+cmake_args = [
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DCMAKE_CXX_STANDARD=17",
+    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+    "-DBUILD_PYTHON=ON",
+]
+cmake-options = [
+    "-DPython3_EXECUTABLE=${PYTHON_EXECUTABLE}",
+    "-DPython3_INCLUDE_DIRS=${Python3_INCLUDE_DIR}",
+    "-DPython3_LIBRARIES=${Python3_LIBRARY}",
+]
+cmake-verbose-makefile = "ON"
+include-package-data = false
+
+[tool.scikit-build.find]
+include = ["funccraft"]
+
+[project.urls]
+homepage = "https://github.com/khoirulmuzakka/FuncCraft"
+source = "https://github.com/khoirulmuzakka/FuncCraft"

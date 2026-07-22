@@ -184,4 +184,16 @@ void BenchmarkFunction::export_spec(const std::string& path) const {
     detail::write_yaml_file(path, export_spec());
 }
 
+FunctionSpec load_function_spec_yaml(const std::string& path) {
+    try {
+        return detail::function_spec_from_yaml(YAML::LoadFile(path));
+    } catch (const YAML::Exception& e) {
+        throw std::invalid_argument(std::string("failed to load function spec from YAML: ") + e.what());
+    }
+}
+
+BenchmarkFunction make_benchmark_function_from_yaml(const std::string& path) {
+    return BenchmarkFunction(load_function_spec_yaml(path));
+}
+
 } // namespace FuncCraft

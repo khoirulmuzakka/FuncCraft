@@ -97,6 +97,10 @@ std::vector<std::vector<double>> random_affine_matrix(std::mt19937_64& rng, int 
  */
 YAML::Node function_spec_to_yaml(const FunctionSpec& spec);
 /**
+ * @brief Load a function spec from a YAML node.
+ */
+FunctionSpec function_spec_from_yaml(const YAML::Node& node);
+/**
  * @brief Convert a suite spec to a YAML node.
  */
 YAML::Node suite_spec_to_yaml(const SuiteSpec& spec);

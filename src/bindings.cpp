@@ -226,6 +226,9 @@ PYBIND11_MODULE(_funccraft, m) {
     m.def("make_benchmark_suite", py::overload_cast<FuncCraft::SuiteSpec, int>(&FuncCraft::make_benchmark_suite),
         py::arg("spec"), py::arg("dimension"));
     m.def("load_suite_spec_yaml", &FuncCraft::load_suite_spec_yaml, py::arg("path"));
+    m.def("load_function_spec_yaml", &FuncCraft::load_function_spec_yaml, py::arg("path"));
     m.def("make_benchmark_suite_from_yaml", &FuncCraft::make_benchmark_suite_from_yaml,
         py::arg("path"), py::arg("dimension"));
+    m.def("make_benchmark_function_from_yaml", &FuncCraft::make_benchmark_function_from_yaml,
+        py::arg("path"));
 }

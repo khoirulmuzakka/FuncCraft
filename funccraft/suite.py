@@ -1,15 +1,15 @@
 """Runtime benchmark-suite wrapper for FuncCraft.
 
 `BenchmarkSuite` is the object you use when you want a family of benchmark
-functions sampled from a :class:`~pyfunccraft.function_spec.SuiteSpec`.
+functions sampled from a :class:`~funccraft.spec.SuiteSpec`.
 It stores the generated blueprints lazily and materializes a concrete
-:class:`~pyfunccraft.benchmark_function.BenchmarkFunction` only when you ask
+:class:`~funccraft.benchmark_function.BenchmarkFunction` only when you ask
 for a specific index.
 """
 
 from . import _funccraft
 from .benchmark_function import BenchmarkFunction
-from .function_spec import ChoiceSpec, SuiteSpec
+from .spec import ChoiceSpec, SuiteSpec
 
 
 def _as_native_suite_spec(spec):
@@ -41,7 +41,7 @@ class BenchmarkSuite:
     Parameters
     ----------
     spec:
-        A :class:`~pyfunccraft.function_spec.SuiteSpec` describing the
+        A :class:`~funccraft.spec.SuiteSpec` describing the
         sampling rules and default values.
     dimension:
         The fixed ambient dimension for every function in the suite.

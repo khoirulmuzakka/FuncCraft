@@ -222,6 +222,120 @@ std::vector<std::vector<double>> random_affine_matrix(std::mt19937_64& rng, int 
     return matrix;
 }
 
+std::vector<double> yaml_double_vector(const YAML::Node& node, const std::string& field) {
+    std::vector<double> values;
+    if (!node) {
+        return values;
+    }
+    if (!node.IsSequence()) {
+        throw std::invalid_argument(field + " must be a sequence");
+    }
+    values.reserve(node.size());
+    for (const YAML::Node& item : node) {
+        values.push_back(item.as<double>());
+    }
+    return values;
+}
+
+std::vector<int> yaml_int_vector(const YAML::Node& node, const std::string& field) {
+    std::vector<int> values;
+    if (!node) {
+        return values;
+    }
+    if (!node.IsSequence()) {
+        throw std::invalid_argument(field + " must be a sequence");
+    }
+    values.reserve(node.size());
+    for (const YAML::Node& item : node) {
+        values.push_back(item.as<int>());
+    }
+    return values;
+}
+
+std::vector<std::string> yaml_string_vector(const YAML::Node& node, const std::string& field) {
+    std::vector<std::string> values;
+    if (!node) {
+        return values;
+    }
+    if (!node.IsSequence()) {
+        throw std::invalid_argument(field + " must be a sequence");
+    }
+    values.reserve(node.size());
+    for (const YAML::Node& item : node) {
+        values.push_back(item.as<std::string>());
+    }
+    return values;
+}
+
+std::vector<std::vector<double>> yaml_double_matrix(const YAML::Node& node, const std::string& field) {
+    std::vector<std::vector<double>> values;
+    if (!node) {
+        return values;
+    }
+    if (!node.IsSequence()) {
+        throw std::invalid_argument(field + " must be a sequence");
+    }
+    values.reserve(node.size());
+    for (const YAML::Node& row : node) {
+        values.push_back(yaml_double_vector(row, field + " row"));
+    }
+    return values;
+}
+
+TransformSpec transform_spec_from_yaml(const YAML::Node& node) {
+    if (!node || !node.IsMap()) {
+        throw std::invalid_argument("coordinate_transform must be a map");
+    }
+    TransformSpec spec;
+    spec.kind = node["kind"] ? node["kind"].as<std::string>() : "";
+    spec.dimension = node["dimension"] ? node["dimension"].as<int>() : 0;
+    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.selected_indices = yaml_int_vector(node["selected_indices"], "selected_indices");
+    spec.source_point = yaml_double_vector(node["source_point"], "source_point");
+    spec.target_point = yaml_double_vector(node["target_point"], "target_point");
+    spec.parameters = yaml_double_vector(node["parameters"], "transform parameters");
+    spec.matrix = yaml_double_matrix(node["matrix"], "matrix");
+    return spec;
+}
+
+ValueTransformSpec value_transform_spec_from_yaml(const YAML::Node& node) {
+    if (!node || !node.IsMap()) {
+        throw std::invalid_argument("value_transform must be a map");
+    }
+    ValueTransformSpec spec;
+    spec.kind = node["kind"] ? node["kind"].as<std::string>() : "";
+    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.parameters = yaml_double_vector(node["parameters"], "value transform parameters");
+    return spec;
+}
+
+CompositionSpec composition_spec_from_yaml(const YAML::Node& node) {
+    if (!node || !node.IsMap()) {
+        throw std::invalid_argument("composition_spec must be a map");
+    }
+    CompositionSpec spec;
+    spec.kind = node["kind"] ? node["kind"].as<std::string>() : "";
+    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.parameters = yaml_double_vector(node["parameters"], "composition parameters");
+    spec.centers = yaml_double_matrix(node["centers"], "centers");
+    spec.offsets = yaml_double_vector(node["offsets"], "offsets");
+    spec.weights = yaml_double_vector(node["weights"], "weights");
+    return spec;
+}
+
+ComponentSpec component_spec_from_yaml(const YAML::Node& node) {
+    if (!node || !node.IsMap()) {
+        throw std::invalid_argument("component spec must be a map");
+    }
+    ComponentSpec spec;
+    spec.base_function = node["base_function"] ? node["base_function"].as<std::string>() : "";
+    spec.component_dimension = node["component_dimension"] ? node["component_dimension"].as<int>() : 0;
+    spec.coordinate_transform = transform_spec_from_yaml(node["coordinate_transform"]);
+    spec.value_transform = value_transform_spec_from_yaml(node["value_transform"]);
+    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    return spec;
+}
+
 YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
     auto double_vector = [](const std::vector<double>& values) {
         YAML::Node node(YAML::NodeType::Sequence);
@@ -304,6 +418,34 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
     node["known_global_value"] = spec.known_global_value;
     node["parameters"] = string_vector(spec.parameters);
     return node;
+}
+
+FunctionSpec function_spec_from_yaml(const YAML::Node& root) {
+    const YAML::Node node = root["function_spec"] ? root["function_spec"] : root;
+    if (!node || !node.IsMap()) {
+        throw std::invalid_argument("function spec YAML must be a map");
+    }
+
+    FunctionSpec spec;
+    spec.dimension = node["dimension"] ? node["dimension"].as<int>() : 0;
+    spec.lower_bound = yaml_double_vector(node["lower_bound"], "lower_bound");
+    spec.upper_bound = yaml_double_vector(node["upper_bound"], "upper_bound");
+    if (node["component_specs"]) {
+        if (!node["component_specs"].IsSequence()) {
+            throw std::invalid_argument("component_specs must be a sequence");
+        }
+        spec.component_specs.reserve(node["component_specs"].size());
+        for (const YAML::Node& component : node["component_specs"]) {
+            spec.component_specs.push_back(component_spec_from_yaml(component));
+        }
+    }
+    spec.composition_spec = composition_spec_from_yaml(node["composition_spec"]);
+    spec.seed = node["seed"] ? node["seed"].as<int>() : 0;
+    spec.function_class_label = node["function_class_label"] ? node["function_class_label"].as<std::string>() : "";
+    spec.known_global_minimizer = yaml_double_vector(node["known_global_minimizer"], "known_global_minimizer");
+    spec.known_global_value = node["known_global_value"] ? node["known_global_value"].as<double>() : 0.0;
+    spec.parameters = yaml_string_vector(node["parameters"], "function parameters");
+    return spec;
 }
 
 YAML::Node suite_spec_to_yaml(const SuiteSpec& spec) {
