@@ -38,14 +38,14 @@ where:
 For the implemented linear coordinate transforms, the convention is:
 
 ```text
-T(x) = base_xopt + M * (x - assigned_xopt)
+T(x) = target_xopt + M * (x - assigned_xopt)
 ```
 
 Here `assigned_xopt` is the desired minimum location in the generated/search
-coordinates. `base_xopt` is the corresponding minimum location in the
-primitive coordinates, which must be the selected base function's `x_opt` by
-construction. This lets the suite place a generated optimum at `assigned_xopt`
-while evaluating the primitive at its own optimum.
+coordinates. `target_xopt` is runtime-only and is filled internally by
+`BenchmarkFunction` from the selected base function's native `x_opt` and the
+active benchmark domain. This lets users place a generated optimum at
+`assigned_xopt` without needing to know the primitive domain-scaling details.
 
 The usual suite generator chooses these ingredients from weighted
 choice lists, places the global optimum and deceptive centers deterministically
@@ -170,9 +170,6 @@ Create one composed benchmark function from a `FunctionSpec`:
 int main() {
     using namespace FuncCraft;
 
-    BasicF sphere_base(BasicFunctionId::Sphere, 2);
-    BasicF rastrigin_base(BasicFunctionId::Rastrigin, 2);
-
     std::mt19937_64 rng(1);
     std::uniform_real_distribution<double> uniform(-4.0, 4.0);
     std::vector<double> x_star = {uniform(rng), uniform(rng)};
@@ -181,14 +178,12 @@ int main() {
     sphere_transform.kind = CoordinateTransformKind::None;
     sphere_transform.dimension = 2;
     sphere_transform.assigned_xopt = x_star;
-    sphere_transform.base_xopt = sphere_base.x_opt;
 
     CoordinateTransformSpec rastrigin_transform;
     rastrigin_transform.kind = CoordinateTransformKind::Rotation;
     rastrigin_transform.dimension = 2;
     rastrigin_transform.seed = 17;
     rastrigin_transform.assigned_xopt = x_star;
-    rastrigin_transform.base_xopt = rastrigin_base.x_opt;
 
     ValueTransformSpec no_value_transform;
     no_value_transform.kind = ValueTransformKind::None;
@@ -332,8 +327,6 @@ Create one composed benchmark function:
 ```python
 import numpy as np
 from funccraft import (
-    BasicF,
-    BasicFunctionId,
     BenchmarkFunction,
     make_benchmark_function_from_yaml,
     make_component,
@@ -343,9 +336,6 @@ from funccraft import (
     make_function_spec,
     make_value_transform,
 )
-
-sphere_base = BasicF(BasicFunctionId.Sphere, 2)
-rastrigin_base = BasicF(BasicFunctionId.Rastrigin, 2)
 
 rng = np.random.default_rng(1)
 x_star = rng.uniform(-4.0, 4.0, size=2).tolist()
@@ -361,7 +351,6 @@ spec = make_function_spec(
                 kind="none",
                 dimension=2,
                 assigned_xopt=x_star,
-                base_xopt=sphere_base.x_opt,
             ),
             value_transform=make_value_transform("none"),
         ),
@@ -372,7 +361,6 @@ spec = make_function_spec(
                 kind="rotation",
                 dimension=2,
                 assigned_xopt=x_star,
-                base_xopt=rastrigin_base.x_opt,
                 seed=17,
             ),
             value_transform=make_value_transform("power", parameters=[1.25, 1.0]),
@@ -505,7 +493,7 @@ one complete function spec. The exported YAML contains:
 
 - dimension and bounds;
 - component base functions;
-- coordinate transform kind, seed, selected indices, `assigned_xopt`, `base_xopt`,
+- coordinate transform kind, seed, selected indices, `assigned_xopt`,
   parameters, and generated matrix when applicable;
 - value transform kind, seed, and parameters;
 - each component's `f_bias`;

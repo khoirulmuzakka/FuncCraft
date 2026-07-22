@@ -107,7 +107,6 @@ def alias_function_spec(kind):
                     kind="none",
                     dimension=2,
                     assigned_xopt=[float(index), 0.0],
-                    base_xopt=[0.0, 0.0],
                 ),
                 value_transform=make_value_transform("none"),
                 f_bias=10.0 * index,

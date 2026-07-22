@@ -27,18 +27,17 @@ public:
     int dimension() const;
     std::uint64_t seed() const;
     const std::vector<double>& assigned_xopt() const;
-    const std::vector<double>& base_xopt() const;
 
 protected:
     CoordinateTransform(
         int dimension,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed);
 
     int dimension_ = 0;
     std::vector<double> assigned_xopt_;
-    std::vector<double> base_xopt_;
+    std::vector<double> target_xopt_;
     std::uint64_t seed_ = 0;
 };
 
@@ -50,7 +49,7 @@ public:
     IdentityTransform(
         int dimension,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed);
 
     void apply(const std::vector<double>& x, std::vector<double>& out) const override;
@@ -63,24 +62,22 @@ public:
 /**
  * @brief Applies a seed-generated rotation matrix around assigned_xopt.
  *
- * The input, assigned_xopt, and base_xopt all have the full transform
+ * The input, assigned_xopt, and internal target xopt all have the full transform
  * dimension. This transform uses
- * `T(x) = base_xopt + matrix * (x - assigned_xopt)`, so `assigned_xopt` is
- * the desired optimizer in generated/search coordinates and `base_xopt` is
- * the primitive-coordinate optimizer, which must be the base function's
- * `x_opt` by construction.
+ * `T(x) = target_xopt + matrix * (x - assigned_xopt)`, so `assigned_xopt`
+ * is the desired optimizer in generated/search coordinates.
  */
 class RotationTransform final : public CoordinateTransform {
 public:
     RotationTransform(
         int dimension,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed);
     RotationTransform(
         int dimension,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed,
         std::vector<std::vector<double>> matrix);
 
@@ -97,24 +94,22 @@ private:
 /**
  * @brief Applies a seed-generated affine matrix around assigned_xopt.
  *
- * The input, assigned_xopt, and base_xopt all have the full transform
+ * The input, assigned_xopt, and internal target xopt all have the full transform
  * dimension. This transform uses
- * `T(x) = base_xopt + matrix * (x - assigned_xopt)`, so `assigned_xopt` is
- * the desired optimizer in generated/search coordinates and `base_xopt` is
- * the primitive-coordinate optimizer, which must be the base function's
- * `x_opt` by construction.
+ * `T(x) = target_xopt + matrix * (x - assigned_xopt)`, so `assigned_xopt`
+ * is the desired optimizer in generated/search coordinates.
  */
 class AffineTransform final : public CoordinateTransform {
 public:
     AffineTransform(
         int dimension,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed);
     AffineTransform(
         int dimension,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed,
         std::vector<std::vector<double>> matrix);
 
@@ -141,13 +136,13 @@ public:
         int dimension,
         std::vector<int> selected_indices,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed);
     BlockRotationTransform(
         int dimension,
         std::vector<int> selected_indices,
         std::vector<double> assigned_xopt,
-        std::vector<double> base_xopt,
+        std::vector<double> target_xopt,
         std::uint64_t seed,
         std::vector<std::vector<double>> matrix);
 

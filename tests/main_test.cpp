@@ -78,6 +78,119 @@ void check_optima() {
     }
 }
 
+void check_identity_transform_assigned_optimum() {
+    FuncCraft::FunctionSpec spec;
+    spec.dimension = 2;
+    spec.domain.dimension = 2;
+    spec.domain.lower_bound = {-10.0, -10.0};
+    spec.domain.upper_bound = {10.0, 10.0};
+    spec.assigned_xopt = {1.0, 2.0};
+    spec.assigned_fopt = 0.0;
+    spec.scale_factor = 1.0;
+
+    FuncCraft::ComponentSpec component;
+    component.base_function = FuncCraft::BasicFunctionId::Sphere;
+    component.component_dimension = 2;
+    component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::None;
+    component.coordinate_transform.dimension = 2;
+    component.coordinate_transform.assigned_xopt = spec.assigned_xopt;
+    component.value_transform.kind = FuncCraft::ValueTransformKind::None;
+    spec.components = {component};
+    spec.composition.kind = FuncCraft::CompositionKind::None;
+
+    const FuncCraft::BenchmarkFunction function(spec);
+    const double value = function({spec.assigned_xopt}).front();
+    require_close(value, spec.assigned_fopt, 1.0e-12, "identity transform assigned optimum mismatch");
+}
+
+void check_native_domain_scaled_optimum() {
+    FuncCraft::FunctionSpec spec;
+    spec.dimension = 2;
+    spec.domain.dimension = 2;
+    spec.domain.lower_bound = {-10.0, -10.0};
+    spec.domain.upper_bound = {10.0, 10.0};
+    spec.assigned_xopt = {4.0, -3.0};
+    spec.assigned_fopt = 0.0;
+    spec.scale_factor = 1.0;
+
+    FuncCraft::ComponentSpec component;
+    component.base_function = FuncCraft::BasicFunctionId::HappyCat;
+    component.component_dimension = 2;
+    component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::None;
+    component.coordinate_transform.dimension = 2;
+    component.coordinate_transform.assigned_xopt = spec.assigned_xopt;
+    component.value_transform.kind = FuncCraft::ValueTransformKind::None;
+    spec.components = {component};
+    spec.composition.kind = FuncCraft::CompositionKind::None;
+
+    const FuncCraft::BenchmarkFunction function(spec);
+    const double value = function({spec.assigned_xopt}).front();
+    require_close(value, spec.assigned_fopt, 1.0e-12, "native-domain scaled optimum mismatch");
+}
+
+void check_native_domain_scaled_optimum_high_dimension() {
+    constexpr int dimension = 100;
+    std::vector<double> x_star(static_cast<std::size_t>(dimension), 10.0);
+
+    for (FuncCraft::CoordinateTransformKind kind : {
+             FuncCraft::CoordinateTransformKind::None,
+             FuncCraft::CoordinateTransformKind::Rotation,
+             FuncCraft::CoordinateTransformKind::BlockRotation,
+         }) {
+        FuncCraft::FunctionSpec spec;
+        spec.dimension = dimension;
+        spec.domain.dimension = dimension;
+        spec.domain.lower_bound.assign(static_cast<std::size_t>(dimension), -100.0);
+        spec.domain.upper_bound.assign(static_cast<std::size_t>(dimension), 100.0);
+        spec.assigned_xopt = x_star;
+        spec.assigned_fopt = 100.0;
+        spec.scale_factor = 1.0;
+
+        FuncCraft::ComponentSpec component;
+        component.base_function = FuncCraft::BasicFunctionId::HappyCat;
+        component.component_dimension = dimension;
+        component.coordinate_transform.kind = kind;
+        component.coordinate_transform.dimension = dimension;
+        component.coordinate_transform.assigned_xopt = spec.assigned_xopt;
+        if (kind == FuncCraft::CoordinateTransformKind::BlockRotation) {
+            component.coordinate_transform.selected_indices.resize(static_cast<std::size_t>(dimension));
+            for (int i = 0; i < dimension; ++i) {
+                component.coordinate_transform.selected_indices[static_cast<std::size_t>(i)] = i;
+            }
+        }
+        component.value_transform.kind = FuncCraft::ValueTransformKind::None;
+        spec.components = {component};
+        spec.composition.kind = FuncCraft::CompositionKind::None;
+
+        const FuncCraft::BenchmarkFunction function(spec);
+        const double value = function({spec.assigned_xopt}).front();
+        require_close(value, spec.assigned_fopt, 1.0e-12, "high-dimensional native-domain optimum mismatch");
+    }
+}
+
+void check_suite_yaml_accepts_base_function_names(const std::filesystem::path& path) {
+    {
+        std::ofstream out(path);
+        out << "supported_dimensions: 2\n";
+        out << "base_functions: [Sphere, Ackley]\n";
+        out << "composition_base_functions: [Rastrigin, Rosenbrock]\n";
+        out << "requested_number_of_functions: 2\n";
+        out << "master_seed: 7\n";
+    }
+
+    const FuncCraft::SuiteSpec spec = FuncCraft::load_suite_spec_yaml(path.string());
+    require(spec.base_functions.size() == 2, "suite YAML base function name count mismatch");
+    require(
+        spec.base_functions.front() == FuncCraft::BasicFunctionId::Sphere,
+        "suite YAML did not parse Sphere base function name");
+    require(
+        spec.base_functions.back() == FuncCraft::BasicFunctionId::Ackley,
+        "suite YAML did not parse Ackley base function name");
+
+    const FuncCraft::BenchmarkSuite suite(spec, 2);
+    require(suite.size() == 2, "suite YAML name-based suite size mismatch");
+}
+
 FuncCraft::BenchmarkSuite make_roundtrip_suite() {
     FuncCraft::SuiteSpec spec;
     spec.requested_number_of_functions = 100;
@@ -112,7 +225,6 @@ FuncCraft::FunctionSpec make_alias_function_spec(FuncCraft::CompositionKind comp
         component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::None;
         component.coordinate_transform.dimension = 2;
         component.coordinate_transform.assigned_xopt = {static_cast<double>(i), 0.0};
-        component.coordinate_transform.base_xopt = {0.0, 0.0};
         component.value_transform.kind = FuncCraft::ValueTransformKind::None;
         component.f_bias = 10.0 * static_cast<double>(i);
         spec.components.push_back(component);
@@ -240,6 +352,10 @@ int run_tests() {
     std::filesystem::create_directories(temp);
 
     check_optima();
+    check_identity_transform_assigned_optimum();
+    check_native_domain_scaled_optimum();
+    check_native_domain_scaled_optimum_high_dimension();
+    check_suite_yaml_accepts_base_function_names(temp / "suite_names.yaml");
     check_composition_kind_aliases();
     check_function_yaml_roundtrip(temp / "function.yaml");
     check_suite_yaml_roundtrip(temp / "suite.yaml");

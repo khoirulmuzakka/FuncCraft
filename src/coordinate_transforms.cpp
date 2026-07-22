@@ -31,15 +31,15 @@ std::vector<std::vector<double>> identity_matrix(int dimension) {
 CoordinateTransform::CoordinateTransform(
     int dimension,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed)
     : dimension_(dimension),
       assigned_xopt_(std::move(assigned_xopt)),
-      base_xopt_(std::move(base_xopt)),
+      target_xopt_(std::move(target_xopt)),
       seed_(seed) {
     require(dimension_ > 0, "coordinate transform dimension must be positive");
     require(!assigned_xopt_.empty(), "coordinate transform assigned_xopt must not be empty");
-    require(!base_xopt_.empty(), "coordinate transform base_xopt must not be empty");
+    require(!target_xopt_.empty(), "coordinate transform target_xopt must not be empty");
 }
 
 int CoordinateTransform::dimension() const {
@@ -54,23 +54,23 @@ const std::vector<double>& CoordinateTransform::assigned_xopt() const {
     return assigned_xopt_;
 }
 
-const std::vector<double>& CoordinateTransform::base_xopt() const {
-    return base_xopt_;
-}
-
 IdentityTransform::IdentityTransform(
     int dimension,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed)
-    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(base_xopt), seed) {
+    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(target_xopt), seed) {
     require_dimension(assigned_xopt_, dimension_, "identity transform assigned_xopt");
-    require_dimension(base_xopt_, dimension_, "identity transform base_xopt");
+    require_dimension(target_xopt_, dimension_, "identity transform target_xopt");
 }
 
 void IdentityTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
     require_dimension(x, input_dimension(), "identity transform input");
-    out = x;
+    out.assign(static_cast<std::size_t>(dimension_), 0.0);
+    for (int i = 0; i < dimension_; ++i) {
+        const auto idx = static_cast<std::size_t>(i);
+        out[idx] = target_xopt_[idx] + (x[idx] - assigned_xopt_[idx]);
+    }
 }
 
 int IdentityTransform::input_dimension() const {
@@ -91,7 +91,6 @@ CoordinateTransformSpec IdentityTransform::export_spec() const {
     spec.dimension = dimension_;
     spec.seed = seed_;
     spec.assigned_xopt = assigned_xopt_;
-    spec.base_xopt = base_xopt_;
     spec.matrix = identity_matrix(dimension_);
     return spec;
 }
@@ -99,11 +98,11 @@ CoordinateTransformSpec IdentityTransform::export_spec() const {
 RotationTransform::RotationTransform(
     int dimension,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed)
-    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(base_xopt), seed) {
+    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(target_xopt), seed) {
     require_dimension(assigned_xopt_, dimension_, "rotation transform assigned_xopt");
-    require_dimension(base_xopt_, dimension_, "rotation transform base_xopt");
+    require_dimension(target_xopt_, dimension_, "rotation transform target_xopt");
     std::mt19937_64 rng(mix_seed(seed_));
     matrix_ = random_rotation_matrix(rng, dimension_);
 }
@@ -111,13 +110,13 @@ RotationTransform::RotationTransform(
 RotationTransform::RotationTransform(
     int dimension,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed,
     std::vector<std::vector<double>> matrix)
-    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(base_xopt), seed),
+    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(target_xopt), seed),
       matrix_(std::move(matrix)) {
     require_dimension(assigned_xopt_, dimension_, "rotation transform assigned_xopt");
-    require_dimension(base_xopt_, dimension_, "rotation transform base_xopt");
+    require_dimension(target_xopt_, dimension_, "rotation transform target_xopt");
     require_matrix_shape(matrix_, dimension_, dimension_, "rotation transform matrix");
 }
 
@@ -126,7 +125,7 @@ void RotationTransform::apply(const std::vector<double>& x, std::vector<double>&
     out.assign(static_cast<std::size_t>(dimension_), 0.0);
     for (int r = 0; r < dimension_; ++r) {
         const auto rr = static_cast<std::size_t>(r);
-        out[rr] = base_xopt_[rr];
+        out[rr] = target_xopt_[rr];
         for (int c = 0; c < dimension_; ++c) {
             out[rr] += matrix_[rr][static_cast<std::size_t>(c)]
                 * (x[static_cast<std::size_t>(c)] - assigned_xopt_[static_cast<std::size_t>(c)]);
@@ -152,7 +151,6 @@ CoordinateTransformSpec RotationTransform::export_spec() const {
     spec.dimension = dimension_;
     spec.seed = seed_;
     spec.assigned_xopt = assigned_xopt_;
-    spec.base_xopt = base_xopt_;
     spec.matrix = matrix_;
     return spec;
 }
@@ -160,11 +158,11 @@ CoordinateTransformSpec RotationTransform::export_spec() const {
 AffineTransform::AffineTransform(
     int dimension,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed)
-    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(base_xopt), seed) {
+    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(target_xopt), seed) {
     require_dimension(assigned_xopt_, dimension_, "affine transform assigned_xopt");
-    require_dimension(base_xopt_, dimension_, "affine transform base_xopt");
+    require_dimension(target_xopt_, dimension_, "affine transform target_xopt");
     std::mt19937_64 rng(mix_seed(seed_));
     matrix_ = random_affine_matrix(rng, dimension_);
 }
@@ -172,13 +170,13 @@ AffineTransform::AffineTransform(
 AffineTransform::AffineTransform(
     int dimension,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed,
     std::vector<std::vector<double>> matrix)
-    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(base_xopt), seed),
+    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(target_xopt), seed),
       matrix_(std::move(matrix)) {
     require_dimension(assigned_xopt_, dimension_, "affine transform assigned_xopt");
-    require_dimension(base_xopt_, dimension_, "affine transform base_xopt");
+    require_dimension(target_xopt_, dimension_, "affine transform target_xopt");
     require_matrix_shape(matrix_, dimension_, dimension_, "affine transform matrix");
 }
 
@@ -187,7 +185,7 @@ void AffineTransform::apply(const std::vector<double>& x, std::vector<double>& o
     out.assign(static_cast<std::size_t>(dimension_), 0.0);
     for (int r = 0; r < dimension_; ++r) {
         const auto rr = static_cast<std::size_t>(r);
-        out[rr] = base_xopt_[rr];
+        out[rr] = target_xopt_[rr];
         for (int c = 0; c < dimension_; ++c) {
             out[rr] += matrix_[rr][static_cast<std::size_t>(c)]
                 * (x[static_cast<std::size_t>(c)] - assigned_xopt_[static_cast<std::size_t>(c)]);
@@ -213,7 +211,6 @@ CoordinateTransformSpec AffineTransform::export_spec() const {
     spec.dimension = dimension_;
     spec.seed = seed_;
     spec.assigned_xopt = assigned_xopt_;
-    spec.base_xopt = base_xopt_;
     spec.matrix = matrix_;
     return spec;
 }
@@ -222,14 +219,14 @@ BlockRotationTransform::BlockRotationTransform(
     int dimension,
     std::vector<int> selected_indices,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed)
-    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(base_xopt), seed),
+    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(target_xopt), seed),
       selected_indices_(std::move(selected_indices)) {
     require(dimension_ > 0, "block rotation transform dimension must be positive");
     require(!selected_indices_.empty(), "block rotation transform needs at least one selected index");
     require_dimension(assigned_xopt_, dimension_, "block rotation assigned_xopt");
-    require_dimension(base_xopt_, dimension_, "block rotation base_xopt");
+    require_dimension(target_xopt_, dimension_, "block rotation target_xopt");
     for (int idx : selected_indices_) {
         require(idx >= 0 && idx < dimension_, "block rotation selected index out of range");
     }
@@ -241,16 +238,16 @@ BlockRotationTransform::BlockRotationTransform(
     int dimension,
     std::vector<int> selected_indices,
     std::vector<double> assigned_xopt,
-    std::vector<double> base_xopt,
+    std::vector<double> target_xopt,
     std::uint64_t seed,
     std::vector<std::vector<double>> matrix)
-    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(base_xopt), seed),
+    : CoordinateTransform(dimension, std::move(assigned_xopt), std::move(target_xopt), seed),
       selected_indices_(std::move(selected_indices)),
       matrix_(std::move(matrix)) {
     require(dimension_ > 0, "block rotation transform dimension must be positive");
     require(!selected_indices_.empty(), "block rotation transform needs at least one selected index");
     require_dimension(assigned_xopt_, dimension_, "block rotation assigned_xopt");
-    require_dimension(base_xopt_, dimension_, "block rotation base_xopt");
+    require_dimension(target_xopt_, dimension_, "block rotation target_xopt");
     for (int idx : selected_indices_) {
         require(idx >= 0 && idx < dimension_, "block rotation selected index out of range");
     }
@@ -260,11 +257,11 @@ BlockRotationTransform::BlockRotationTransform(
 
 void BlockRotationTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
     require_dimension(x, input_dimension(), "block rotation transform input");
-    out = base_xopt_;
+    out = target_xopt_;
 
     for (std::size_t r = 0; r < selected_indices_.size(); ++r) {
         const auto out_idx = static_cast<std::size_t>(selected_indices_[r]);
-        out[out_idx] = base_xopt_[out_idx];
+        out[out_idx] = target_xopt_[out_idx];
         for (std::size_t c = 0; c < selected_indices_.size(); ++c) {
             const auto in_idx = static_cast<std::size_t>(selected_indices_[c]);
             out[out_idx] += matrix_[r][c] * (x[in_idx] - assigned_xopt_[in_idx]);
@@ -291,7 +288,6 @@ CoordinateTransformSpec BlockRotationTransform::export_spec() const {
     spec.seed = seed_;
     spec.selected_indices = selected_indices_;
     spec.assigned_xopt = assigned_xopt_;
-    spec.base_xopt = base_xopt_;
     spec.matrix = matrix_;
     return spec;
 }
@@ -301,3 +297,4 @@ const std::vector<int>& BlockRotationTransform::selected_indices() const {
 }
 
 } // namespace FuncCraft
+

@@ -74,4 +74,5 @@ docs/figures/
 examples/*.pdf
 examples/*.png
 build*/
+examples/*.yaml
 

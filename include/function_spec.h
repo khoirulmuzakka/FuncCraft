@@ -11,7 +11,7 @@
  * - where component minima are assigned in the generated/search coordinates;
  * - which coordinate/value transforms and composition family are requested;
  * - which optimum location/value should be controlled by construction.
- * - concrete transform matrices and primitive-coordinate base xopt when known.
+ * - concrete transform matrices when known.
  */
 
 #include "core.h"
@@ -107,8 +107,8 @@ enum class CompositionKind {
  * @brief Coordinate-transform request/materialization for one component.
  *
  * `assigned_xopt` is the desired component optimizer in the generated/search
- * coordinates. `base_xopt` is the primitive-coordinate optimizer, determined
- * from the selected base function's `x_opt` during materialization.
+ * coordinates. The corresponding transform target is computed internally from
+ * the selected base function and benchmark domain.
  *
  * `selected_indices` is only meaningful for block rotation. If it is empty,
  * suite generation may choose the subspace. `matrix` is empty until the
@@ -118,7 +118,6 @@ struct CoordinateTransformSpec {
     CoordinateTransformKind kind = CoordinateTransformKind::None;
     int dimension = 0;
     std::vector<double> assigned_xopt;
-    std::vector<double> base_xopt;
     std::vector<int> selected_indices;
     std::vector<double> parameters;
     std::vector<std::vector<double>> matrix;

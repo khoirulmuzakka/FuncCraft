@@ -17,7 +17,6 @@
 #include "value_transforms.h"
 
 #include <functional>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -78,11 +77,6 @@ public:
      */
     FunctionBuilder& composition(std::shared_ptr<CompositionFunction> composition);
     /**
-     * @brief Store an arbitrary string parameter in the final spec.
-     */
-    FunctionBuilder& parameter(std::string key, std::string value);
-
-    /**
      * @brief Materialize the final composed runtime callable.
      */
     ComposedFunction build() const;
@@ -107,7 +101,6 @@ private:
     std::vector<ComponentSpec> component_specs_;
     std::shared_ptr<CompositionFunction> composition_;
     FunctionClass function_class_;
-    std::map<std::string, std::string> parameters_;
 };
 
 /**
@@ -127,18 +120,15 @@ std::shared_ptr<BasicF> make_basic_function(const std::string& name, int dimensi
  */
 Domain make_domain(const FunctionSpec& spec);
 /**
- * @brief Parse string parameters into a key-value map.
- *
- * Strings without `=` are treated as flags with an empty value.
- */
-std::map<std::string, std::string> parse_parameters(const std::vector<std::string>& parameters);
-/**
  * @brief Create a runtime coordinate transform from a plain transform spec.
  *
- * The spec must provide the full ambient dimension, assigned xopt, base xopt,
- * and any family-specific indices or parameters.
+ * The spec must provide the full ambient dimension, assigned xopt, and any
+ * family-specific indices or parameters. `target_xopt` is computed internally
+ * during benchmark materialization.
  */
-std::shared_ptr<CoordinateTransform> make_coordinate_transform(const CoordinateTransformSpec& spec);
+std::shared_ptr<CoordinateTransform> make_coordinate_transform(
+    const CoordinateTransformSpec& spec,
+    const std::vector<double>& target_xopt);
 /**
  * @brief Create a runtime value transform from a plain value-transform spec.
  *

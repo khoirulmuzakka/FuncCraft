@@ -120,7 +120,6 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("kind", &FuncCraft::CoordinateTransformSpec::kind)
         .def_readwrite("dimension", &FuncCraft::CoordinateTransformSpec::dimension)
         .def_readwrite("assigned_xopt", &FuncCraft::CoordinateTransformSpec::assigned_xopt)
-        .def_readwrite("base_xopt", &FuncCraft::CoordinateTransformSpec::base_xopt)
         .def_readwrite("selected_indices", &FuncCraft::CoordinateTransformSpec::selected_indices)
         .def_readwrite("parameters", &FuncCraft::CoordinateTransformSpec::parameters)
         .def_readwrite("matrix", &FuncCraft::CoordinateTransformSpec::matrix)

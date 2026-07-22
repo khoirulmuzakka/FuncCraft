@@ -2,7 +2,6 @@
 #include "basicf.h"
 #include "support.h"
 
-#include <map>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -25,19 +24,6 @@ std::shared_ptr<BasicF> make_basic_function(const std::string& name, int dimensi
     return make_basicf_ptr(parse_basic_function_id(name), dimension);
 }
 
-std::map<std::string, std::string> parse_parameters(const std::vector<std::string>& parameters) {
-    std::map<std::string, std::string> result;
-    for (const std::string& entry : parameters) {
-        const std::size_t pos = entry.find('=');
-        if (pos == std::string::npos) {
-            result[entry] = "";
-        } else {
-            result[entry.substr(0, pos)] = entry.substr(pos + 1);
-        }
-    }
-    return result;
-}
-
 Domain make_domain(const FunctionSpec& spec) {
     require(spec.dimension > 0, "function dimension must be positive");
 
@@ -55,37 +41,39 @@ Domain make_domain(const FunctionSpec& spec) {
     return domain;
 }
 
-std::shared_ptr<CoordinateTransform> make_coordinate_transform(const CoordinateTransformSpec& spec) {
+std::shared_ptr<CoordinateTransform> make_coordinate_transform(
+    const CoordinateTransformSpec& spec,
+    const std::vector<double>& target_xopt) {
     const CoordinateTransformKind kind = spec.kind;
     require(spec.dimension > 0, "coordinate transform dimension must be positive");
     require(static_cast<int>(spec.assigned_xopt.size()) == spec.dimension, "coordinate transform assigned_xopt dimension mismatch");
-    require(static_cast<int>(spec.base_xopt.size()) == spec.dimension, "coordinate transform base_xopt dimension mismatch");
+    require(static_cast<int>(target_xopt.size()) == spec.dimension, "coordinate transform target_xopt dimension mismatch");
 
     const std::uint64_t seed = spec.seed;
     if (kind == CoordinateTransformKind::None) {
-        return std::make_shared<IdentityTransform>(spec.dimension, spec.assigned_xopt, spec.base_xopt, seed);
+        return std::make_shared<IdentityTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed);
     }
     if (kind == CoordinateTransformKind::Rotation) {
         if (!spec.matrix.empty()) {
             return std::make_shared<RotationTransform>(
                 spec.dimension,
                 spec.assigned_xopt,
-                spec.base_xopt,
+                target_xopt,
                 seed,
                 spec.matrix);
         }
-        return std::make_shared<RotationTransform>(spec.dimension, spec.assigned_xopt, spec.base_xopt, seed);
+        return std::make_shared<RotationTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed);
     }
     if (kind == CoordinateTransformKind::Affine) {
         if (!spec.matrix.empty()) {
             return std::make_shared<AffineTransform>(
                 spec.dimension,
                 spec.assigned_xopt,
-                spec.base_xopt,
+                target_xopt,
                 seed,
                 spec.matrix);
         }
-        return std::make_shared<AffineTransform>(spec.dimension, spec.assigned_xopt, spec.base_xopt, seed);
+        return std::make_shared<AffineTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed);
     }
     if (kind == CoordinateTransformKind::BlockRotation) {
         require(!spec.selected_indices.empty(), "block rotation transform needs selected indices");
@@ -94,7 +82,7 @@ std::shared_ptr<CoordinateTransform> make_coordinate_transform(const CoordinateT
                 spec.dimension,
                 spec.selected_indices,
                 spec.assigned_xopt,
-                spec.base_xopt,
+                target_xopt,
                 seed,
                 spec.matrix);
         }
@@ -102,7 +90,7 @@ std::shared_ptr<CoordinateTransform> make_coordinate_transform(const CoordinateT
             spec.dimension,
             spec.selected_indices,
             spec.assigned_xopt,
-            spec.base_xopt,
+            target_xopt,
             seed);
     }
     throw std::logic_error("unhandled coordinate transform kind");
@@ -243,11 +231,6 @@ FunctionBuilder& FunctionBuilder::composition(std::shared_ptr<CompositionFunctio
     return *this;
 }
 
-FunctionBuilder& FunctionBuilder::parameter(std::string key, std::string value) {
-    parameters_[std::move(key)] = std::move(value);
-    return *this;
-}
-
 FunctionSpec FunctionBuilder::spec() const {
     return build_spec();
 }
@@ -291,6 +274,9 @@ ComposedFunction FunctionBuilder::build() const {
         std::shared_ptr<BasicF> basic_function;
         std::shared_ptr<CoordinateTransform> coordinate_transform;
         std::shared_ptr<ValueTransform> value_transform;
+        Domain native_domain;
+        std::vector<double> target_xopt;
+        std::vector<double> native_xopt;
     };
 
     auto components = std::make_shared<std::vector<RuntimeComponent>>();
@@ -298,12 +284,18 @@ ComposedFunction FunctionBuilder::build() const {
     const Domain domain = domain_;
     for (const ComponentSpec& component_spec : component_specs_) {
         const auto primitive = make_basicf_ptr(component_spec.base_function, component_spec.component_dimension);
-        CoordinateTransformSpec transform_spec = component_spec.coordinate_transform;
-        transform_spec.base_xopt = detail::map_point_from_default_domain(primitive->x_opt, domain);
+        const Domain native_domain = primitive->default_domain();
+        const std::vector<double> target_xopt = detail::map_point_between_domains(
+            primitive->x_opt,
+            native_domain,
+            domain);
         components->push_back(RuntimeComponent{
-            std::move(primitive),
-            make_coordinate_transform(std::move(transform_spec)),
+            primitive,
+            make_coordinate_transform(component_spec.coordinate_transform, target_xopt),
             make_value_transform(component_spec.value_transform),
+            native_domain,
+            target_xopt,
+            primitive->x_opt,
         });
     }
 
@@ -325,7 +317,11 @@ ComposedFunction FunctionBuilder::build() const {
             for (std::size_t component_index = 0; component_index < components->size(); ++component_index) {
                 const auto& component = (*components)[component_index];
                 component.coordinate_transform->apply(x, transformed);
-                detail::map_point_to_default_domain(transformed, domain, normalized);
+                if (detail::squared_distance(transformed, component.target_xopt) <= 1.0e-24) {
+                    normalized = component.native_xopt;
+                } else {
+                    detail::map_point_between_domains(transformed, domain, component.native_domain, normalized);
+                }
                 const double raw_value = component.basic_function->evaluate(normalized.data());
                 if (!std::isfinite(raw_value)) {
                     invalid = true;

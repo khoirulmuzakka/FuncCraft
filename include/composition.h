@@ -65,8 +65,6 @@ protected:
     double common_raw_apply(const std::vector<double>& z) const override;
 };
 
-using SingleComponentComposition = NoneComposition;
-
 /**
  * @brief Weighted sum composition across multiple components.
  */
@@ -119,8 +117,8 @@ private:
  * @brief Softmax-based deceptive composition.
  *
  * The output is computed by a smooth selective softmax blend. The softmax
- * distance is normalized by the ambient dimension to keep the scale stable
- * across low- and high-dimensional settings.
+ * The output is computed by a smooth selective softmax blend based on
+ * distances to the component centers.
  */
 class DeceptiveSoftmaxComposition final : public DeceptivePointComposition {
 public:

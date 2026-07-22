@@ -101,6 +101,57 @@ std::vector<int> yaml_int_list(const YAML::Node& node, const std::string& field)
     throw std::invalid_argument(field + " must be a scalar or sequence");
 }
 
+BasicFunctionId parse_basic_function_yaml_item(const YAML::Node& node, const std::string& field) {
+    require(node && node.IsScalar(), field + " entries must be scalar");
+    const std::string text = trim(node.as<std::string>());
+    const std::string normalized = normalize_spec_name(text);
+    for (BasicFunctionId id : list_basic_functions()) {
+        if (normalize_spec_name(to_string(id)) == normalized) {
+            return id;
+        }
+    }
+    try {
+        return static_cast<BasicFunctionId>(std::stoi(text));
+    } catch (const std::exception&) {
+        throw std::invalid_argument("unknown base function in " + field + ": " + text);
+    }
+}
+
+std::vector<BasicFunctionId> yaml_basic_function_list(const YAML::Node& node, const std::string& field) {
+    if (!node || node.IsNull()) {
+        return {};
+    }
+    std::vector<BasicFunctionId> values;
+    if (node.IsSequence()) {
+        values.reserve(node.size());
+        for (const auto& item : node) {
+            values.push_back(parse_basic_function_yaml_item(item, field));
+        }
+        return values;
+    }
+    if (node.IsScalar()) {
+        const std::string text = trim(node.as<std::string>());
+        if (text.empty()) {
+            return {};
+        }
+        if (text.find(',') != std::string::npos) {
+            std::istringstream in(text);
+            std::string token;
+            while (std::getline(in, token, ',')) {
+                token = trim(token);
+                if (!token.empty()) {
+                    YAML::Node scalar(token);
+                    values.push_back(parse_basic_function_yaml_item(scalar, field));
+                }
+            }
+            return values;
+        }
+        values.push_back(parse_basic_function_yaml_item(node, field));
+        return values;
+    }
+    throw std::invalid_argument(field + " must be a scalar or sequence");
+}
+
 std::vector<double> yaml_double_list(const YAML::Node& node, const std::string& field) {
     if (!node || node.IsNull()) {
         return {};
@@ -155,12 +206,7 @@ SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
         spec.supported_dimensions = yaml_supported_dimensions(node["supported_dimensions"]);
     }
     if (node["base_functions"]) {
-        std::vector<int> ids = yaml_int_list(node["base_functions"], "base_functions");
-        spec.base_functions.clear();
-        spec.base_functions.reserve(ids.size());
-        for (int id : ids) {
-            spec.base_functions.push_back(static_cast<BasicFunctionId>(id));
-        }
+        spec.base_functions = yaml_basic_function_list(node["base_functions"], "base_functions");
     }
     if (node["coordinate_transforms"]) {
         spec.coordinate_transforms = yaml_choice_list<CoordinateTransformChoice>(
@@ -181,12 +227,9 @@ SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
             parse_composition_kind);
     }
     if (node["composition_base_functions"]) {
-        std::vector<int> ids = yaml_int_list(node["composition_base_functions"], "composition_base_functions");
-        spec.composition_base_functions.clear();
-        spec.composition_base_functions.reserve(ids.size());
-        for (int id : ids) {
-            spec.composition_base_functions.push_back(static_cast<BasicFunctionId>(id));
-        }
+        spec.composition_base_functions = yaml_basic_function_list(
+            node["composition_base_functions"],
+            "composition_base_functions");
     }
     if (node["max_components"]) {
         spec.max_components = node["max_components"].as<int>();
@@ -383,7 +426,7 @@ const Choice& choose_weighted(const std::vector<Choice>& choices, std::mt19937_6
     double accum = 0.0;
     for (const Choice& choice : choices) {
         accum += choice.probability;
-        if (target <= accum) {
+        if (target < accum) {
             return choice;
         }
     }
@@ -717,13 +760,7 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         ++sequence;
     }
 
-    int attempts = 0;
-    const int max_attempts = std::max(1000, requested_count * 500);
     while (static_cast<int>(blueprints_.size()) < requested_count) {
-        if (++attempts > max_attempts) {
-            throw std::runtime_error("could not generate enough unique benchmark-suite blueprints");
-        }
-
         std::mt19937_64 rng(mix_seed(spec_.master_seed + sequence + 0x3000ull));
         const CompositionChoice& comp_choice = choose_weighted(composition_choices, rng);
         const int max_components = spec_.max_components;

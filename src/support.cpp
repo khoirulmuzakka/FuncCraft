@@ -62,40 +62,34 @@ void require_dimension(const std::vector<double>& x, int dimension, const std::s
     require(static_cast<int>(x.size()) == dimension, name + " dimension mismatch");
 }
 
-void map_point_to_default_domain(const std::vector<double>& point, const Domain& domain, std::vector<double>& out) {
-    require_dimension(point, domain.dimension(), "mapping point");
-    constexpr double kDefaultDomainLower = -5.0;
-    constexpr double kDefaultDomainUpper = 5.0;
-
+void map_point_between_domains(
+    const std::vector<double>& point,
+    const Domain& source_domain,
+    const Domain& target_domain,
+    std::vector<double>& out) {
+    require_dimension(point, source_domain.dimension(), "mapping point");
+    require(source_domain.dimension() == target_domain.dimension(), "domain mapping dimension mismatch");
     out.assign(point.size(), 0.0);
     for (std::size_t i = 0; i < point.size(); ++i) {
-        const double lo = domain.lower[i];
-        const double hi = domain.upper[i];
-        if (hi == lo) {
-            out[i] = 0.0;
+        const double source_lo = source_domain.lower[i];
+        const double source_hi = source_domain.upper[i];
+        const double target_lo = target_domain.lower[i];
+        const double target_hi = target_domain.upper[i];
+        if (source_hi == source_lo) {
+            out[i] = 0.5 * (target_lo + target_hi);
             continue;
         }
-        const double t = (point[i] - lo) / (hi - lo);
-        out[i] = kDefaultDomainLower + t * (kDefaultDomainUpper - kDefaultDomainLower);
+        const double t = (point[i] - source_lo) / (source_hi - source_lo);
+        out[i] = target_lo + t * (target_hi - target_lo);
     }
 }
 
-std::vector<double> map_point_from_default_domain(const std::vector<double>& point, const Domain& domain) {
-    require_dimension(point, domain.dimension(), "inverse mapping point");
-    constexpr double kDefaultDomainLower = -5.0;
-    constexpr double kDefaultDomainUpper = 5.0;
-
-    std::vector<double> mapped(point.size(), 0.0);
-    for (std::size_t i = 0; i < point.size(); ++i) {
-        const double lo = domain.lower[i];
-        const double hi = domain.upper[i];
-        if (hi == lo) {
-            mapped[i] = lo;
-            continue;
-        }
-        const double t = (point[i] - kDefaultDomainLower) / (kDefaultDomainUpper - kDefaultDomainLower);
-        mapped[i] = lo + t * (hi - lo);
-    }
+std::vector<double> map_point_between_domains(
+    const std::vector<double>& point,
+    const Domain& source_domain,
+    const Domain& target_domain) {
+    std::vector<double> mapped;
+    map_point_between_domains(point, source_domain, target_domain, mapped);
     return mapped;
 }
 
@@ -463,7 +457,6 @@ CoordinateTransformSpec coordinate_transform_spec_from_yaml(const YAML::Node& no
     spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.selected_indices = yaml_int_vector(node["selected_indices"], "selected_indices");
     spec.assigned_xopt = yaml_double_vector(node["assigned_xopt"], "assigned_xopt");
-    spec.base_xopt = yaml_double_vector(node["base_xopt"], "base_xopt");
     spec.parameters = yaml_double_vector(node["parameters"], "transform parameters");
     spec.matrix = yaml_double_matrix(node["matrix"], "matrix");
     return spec;
@@ -485,7 +478,7 @@ CompositionSpec composition_spec_from_yaml(const YAML::Node& node) {
         return {};
     }
     if (!node.IsMap()) {
-        throw std::invalid_argument("composition_spec must be a map");
+        throw std::invalid_argument("composition must be a map");
     }
     CompositionSpec spec;
     spec.kind = parse_composition_kind(node["kind"] ? node["kind"].as<std::string>() : "");
@@ -554,7 +547,6 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
         node["seed"] = transform.seed;
         node["selected_indices"] = int_vector(transform.selected_indices);
         node["assigned_xopt"] = double_vector(transform.assigned_xopt);
-        node["base_xopt"] = double_vector(transform.base_xopt);
         node["parameters"] = double_vector(transform.parameters);
         node["matrix"] = double_matrix(transform.matrix);
         return node;

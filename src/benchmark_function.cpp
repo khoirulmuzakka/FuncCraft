@@ -140,7 +140,6 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             : resolved_spec.dimension;
         component_spec.component_dimension = component_dimension;
 
-        BasicF primitive(component_spec.base_function, component_dimension);
         CoordinateTransformSpec& transform = component_spec.coordinate_transform;
         if (transform.dimension == 0) {
             transform.dimension = resolved_spec.dimension;
@@ -149,9 +148,6 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             transform.assigned_xopt = !resolved_spec.assigned_xopt.empty()
                 ? resolved_spec.assigned_xopt
                 : std::vector<double>(static_cast<std::size_t>(resolved_spec.dimension), 0.0);
-        }
-        if (transform.base_xopt.empty()) {
-            transform.base_xopt = detail::map_point_from_default_domain(primitive.x_opt, input_domain);
         }
     }
 
@@ -165,10 +161,15 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
     builder.scale_factor(resolved_spec.scale_factor);
 
     for (const ComponentSpec& component_spec : resolved_spec.components) {
+        const BasicF primitive(component_spec.base_function, component_spec.component_dimension);
+        const std::vector<double> target_xopt = detail::map_point_between_domains(
+            primitive.x_opt,
+            primitive.default_domain(),
+            input_domain);
         builder.add_component(
             component_spec.base_function,
             component_spec.component_dimension,
-            make_coordinate_transform(component_spec.coordinate_transform),
+            make_coordinate_transform(component_spec.coordinate_transform, target_xopt),
             make_value_transform(component_spec.value_transform),
             component_spec.f_bias);
     }

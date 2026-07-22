@@ -10,7 +10,6 @@ Typical manual function:
 
     from funccraft import *
 
-    base = BasicF(BasicFunctionId.Sphere, 2)
     xopt = [1.0, -2.0]
 
     spec = make_function_spec(
@@ -23,7 +22,6 @@ Typical manual function:
                     kind="rotation",
                     dimension=2,
                     assigned_xopt=xopt,
-                    base_xopt=base.x_opt,
                     seed=1,
                 ),
             ),
@@ -101,7 +99,6 @@ def make_coordinate_transform(
     kind="none",
     dimension=0,
     assigned_xopt=None,
-    base_xopt=None,
     selected_indices=None,
     parameters=None,
     matrix=None,
@@ -110,13 +107,13 @@ def make_coordinate_transform(
     """Create a native ``CoordinateTransformSpec``.
 
     ``assigned_xopt`` is the desired optimum location in generated/search
-    coordinates. ``base_xopt`` is the primitive base function's optimizer.
+    coordinates. The transform target is determined internally from the
+    selected base function and domain scaling.
     """
     spec = CoordinateTransformSpec()
     spec.kind = coordinate_transform_kind(kind)
     spec.dimension = int(dimension)
     spec.assigned_xopt = _list(assigned_xopt)
-    spec.base_xopt = _list(base_xopt)
     spec.selected_indices = _list(selected_indices)
     spec.parameters = _list(parameters)
     spec.matrix = _matrix(matrix)
@@ -411,7 +408,6 @@ def coordinate_transform_spec(data):
     spec.kind = coordinate_transform_kind(data.get("kind", _NO_COORDINATE_TRANSFORM))
     spec.dimension = int(data.get("dimension", 0))
     spec.assigned_xopt = _list(data.get("assigned_xopt", []))
-    spec.base_xopt = _list(data.get("base_xopt", []))
     spec.selected_indices = _list(data.get("selected_indices", []))
     spec.parameters = _list(data.get("parameters", []))
     spec.matrix = _matrix(data.get("matrix", []))
@@ -559,7 +555,6 @@ def spec_to_dict(spec):
             "kind": spec.kind.name,
             "dimension": spec.dimension,
             "assigned_xopt": _list(spec.assigned_xopt),
-            "base_xopt": _list(spec.base_xopt),
             "selected_indices": _list(spec.selected_indices),
             "parameters": _list(spec.parameters),
             "matrix": _matrix(spec.matrix),
