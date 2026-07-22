@@ -64,7 +64,11 @@ public:
  * @brief Applies a seed-generated rotation matrix around a source point.
  *
  * The input, source point, and target point all have the full transform
- * dimension. The rotated result replaces the full vector.
+ * dimension. This transform uses
+ * `T(x) = target_point + matrix * (x - source_point)`, so `source_point` is
+ * the desired minimizer in generated/search coordinates and `target_point` is
+ * the primitive-coordinate minimizer, which must be the base function's
+ * `x_opt` by construction.
  */
 class RotationTransform final : public CoordinateTransform {
 public:
@@ -94,7 +98,11 @@ private:
  * @brief Applies a seed-generated affine matrix around a source point.
  *
  * The input, source point, and target point all have the full transform
- * dimension. The affine result replaces the full vector.
+ * dimension. This transform uses
+ * `T(x) = target_point + matrix * (x - source_point)`, so `source_point` is
+ * the desired minimizer in generated/search coordinates and `target_point` is
+ * the primitive-coordinate minimizer, which must be the base function's
+ * `x_opt` by construction.
  */
 class AffineTransform final : public CoordinateTransform {
 public:
@@ -126,10 +134,6 @@ private:
  * `selected_indices` uses 0-based indices into the full input vector. The full
  * vector dimension is preserved; only the selected coordinates are replaced by
  * the rotated block. Unselected coordinates pass through unchanged.
- *
- * When this transform is used by a composed benchmark function, the suite may
- * assign disjoint index blocks to different components so that each component
- * acts on a non-overlapping subspace.
  */
 class BlockRotationTransform final : public CoordinateTransform {
 public:

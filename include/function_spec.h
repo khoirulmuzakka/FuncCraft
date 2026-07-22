@@ -26,6 +26,11 @@ namespace FuncCraft {
  * - `seed` controls deterministic transform generation.
  * - `selected_indices` is used by block/subspace transforms and is interpreted as 0-based indices.
  * - `source_point` and `target_point` are full-length vectors with size `dimension`.
+ *   Linear transforms use the convention
+ *   `T(x) = target_point + matrix * (x - source_point)`: `source_point` is
+ *   the desired minimizer in generated/search coordinates, while
+ *   `target_point` is the corresponding primitive-coordinate minimizer,
+ *   which must be the base function's `x_opt` by construction.
  * - `parameters` stores extra scalar parameters for transform families that need them.
  * - `matrix` stores the concrete linear transform used at runtime when the
  *   transform family has one.
