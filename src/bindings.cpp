@@ -1,6 +1,7 @@
 #include "basicf.h"
 #include "benchmark_function.h"
 #include "suite.h"
+#include "suite_collection.h"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -131,22 +132,31 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("parameters", &FuncCraft::ValueTransformSpec::parameters)
         .def_readwrite("seed", &FuncCraft::ValueTransformSpec::seed);
 
+    auto function_spec_binding = py::class_<FuncCraft::FunctionSpec, std::shared_ptr<FuncCraft::FunctionSpec>>(m, "FunctionSpec");
+
     py::class_<FuncCraft::ComponentSpec>(m, "ComponentSpec")
         .def(py::init<>())
-        .def_readwrite("base_function", &FuncCraft::ComponentSpec::base_function)
-        .def_readwrite("component_dimension", &FuncCraft::ComponentSpec::component_dimension)
+        .def_property(
+            "base_function",
+            [](const FuncCraft::ComponentSpec& self) -> std::optional<FuncCraft::BasicFunctionId> {
+                return self.base_function;
+            },
+            [](FuncCraft::ComponentSpec& self, std::optional<FuncCraft::BasicFunctionId> value) {
+                self.base_function = value;
+            })
+        .def_readwrite("composed_function", &FuncCraft::ComponentSpec::composed_function)
         .def_readwrite("coordinate_transform", &FuncCraft::ComponentSpec::coordinate_transform)
         .def_readwrite("value_transform", &FuncCraft::ComponentSpec::value_transform)
-        .def_readwrite("f_bias", &FuncCraft::ComponentSpec::f_bias)
         .def_readwrite("seed", &FuncCraft::ComponentSpec::seed);
 
     py::class_<FuncCraft::CompositionSpec>(m, "CompositionSpec")
         .def(py::init<>())
         .def_readwrite("kind", &FuncCraft::CompositionSpec::kind)
         .def_readwrite("parameters", &FuncCraft::CompositionSpec::parameters)
+        .def_readwrite("biases", &FuncCraft::CompositionSpec::biases)
         .def_readwrite("seed", &FuncCraft::CompositionSpec::seed);
 
-    py::class_<FuncCraft::FunctionSpec>(m, "FunctionSpec")
+    function_spec_binding
         .def(py::init<>())
         .def_readwrite("dimension", &FuncCraft::FunctionSpec::dimension)
         .def_readwrite("domain", &FuncCraft::FunctionSpec::domain)
@@ -171,7 +181,10 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("coordinate_transforms", &FuncCraft::SuiteSpec::coordinate_transforms)
         .def_readwrite("value_transforms", &FuncCraft::SuiteSpec::value_transforms)
         .def_readwrite("compositions", &FuncCraft::SuiteSpec::compositions)
+        .def_readwrite("min_components", &FuncCraft::SuiteSpec::min_components)
         .def_readwrite("max_components", &FuncCraft::SuiteSpec::max_components)
+        .def_readwrite("max_nested_composition_depth", &FuncCraft::SuiteSpec::max_nested_composition_depth)
+        .def_readwrite("nested_probability", &FuncCraft::SuiteSpec::nested_probability)
         .def_readwrite("requested_number_of_functions", &FuncCraft::SuiteSpec::requested_number_of_functions)
         .def_readwrite("max_number_of_functions", &FuncCraft::SuiteSpec::max_number_of_functions)
         .def_readwrite("master_seed", &FuncCraft::SuiteSpec::master_seed)
@@ -180,6 +193,12 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("assigned_fopt", &FuncCraft::SuiteSpec::assigned_fopt)
         .def_readwrite("xopt_domain_shrink_factor", &FuncCraft::SuiteSpec::xopt_domain_shrink_factor)
         .def_readwrite("suite_label", &FuncCraft::SuiteSpec::suite_label);
+
+    py::class_<FuncCraft::SuiteCollectionId>(m, "SuiteCollectionId")
+        .def(py::init<>())
+        .def_readwrite("year", &FuncCraft::SuiteCollectionId::year)
+        .def_readwrite("version", &FuncCraft::SuiteCollectionId::version)
+        .def_readwrite("name", &FuncCraft::SuiteCollectionId::name);
 
     py::class_<FuncCraft::BenchmarkFunction>(m, "BenchmarkFunction")
         .def(py::init<FuncCraft::FunctionSpec>(), py::arg("spec"))
@@ -221,15 +240,38 @@ PYBIND11_MODULE(_funccraft, m) {
             self.export_spec(path);
         }, py::arg("path"));
 
+    py::class_<FuncCraft::SuiteCollection>(m, "SuiteCollection")
+        .def(py::init<int, int>(), py::arg("year"), py::arg("version"))
+        .def_property_readonly("year", &FuncCraft::SuiteCollection::year)
+        .def_property_readonly("version", &FuncCraft::SuiteCollection::version)
+        .def_property_readonly("name", &FuncCraft::SuiteCollection::name)
+        .def_property_readonly("number_of_function", &FuncCraft::SuiteCollection::number_of_function)
+        .def_property_readonly("number_of_functions", &FuncCraft::SuiteCollection::number_of_functions)
+        .def("spec", &FuncCraft::SuiteCollection::spec)
+        .def("benchmark_suite", &FuncCraft::SuiteCollection::benchmark_suite,
+            py::arg("dimension"));
+
     m.def("make_benchmark_function", [](FuncCraft::FunctionSpec spec) {
         return FuncCraft::BenchmarkFunction(std::move(spec));
     }, py::arg("spec"));
+    m.def("make_benchmark_function", [](const std::string& path) {
+        return FuncCraft::make_benchmark_function(path);
+    }, py::arg("path"));
     m.def("make_benchmark_suite", py::overload_cast<FuncCraft::SuiteSpec, int>(&FuncCraft::make_benchmark_suite),
         py::arg("spec"), py::arg("dimension"));
-    m.def("load_suite_spec_yaml", &FuncCraft::load_suite_spec_yaml, py::arg("path"));
-    m.def("load_function_spec_yaml", &FuncCraft::load_function_spec_yaml, py::arg("path"));
-    m.def("make_benchmark_suite_from_yaml", &FuncCraft::make_benchmark_suite_from_yaml,
+    m.def("make_benchmark_suite", py::overload_cast<const std::string&, int>(&FuncCraft::make_benchmark_suite),
         py::arg("path"), py::arg("dimension"));
-    m.def("make_benchmark_function_from_yaml", &FuncCraft::make_benchmark_function_from_yaml,
-        py::arg("path"));
+    m.def("load_suite_spec", &FuncCraft::load_suite_spec, py::arg("path"));
+    m.def("load_function_spec", &FuncCraft::load_function_spec, py::arg("path"));
+    m.def("list_suite_collections", &FuncCraft::list_suite_collections);
+    m.def("suite_collection", &FuncCraft::suite_collection, py::arg("year"), py::arg("version"));
+    m.def("suite_collection_spec", &FuncCraft::suite_collection_spec, py::arg("year"), py::arg("version"));
+    m.def("suite_collection_number_of_functions", &FuncCraft::suite_collection_number_of_functions,
+        py::arg("year"), py::arg("version"));
+    m.def("suite_collection_number_of_function", &FuncCraft::suite_collection_number_of_function,
+        py::arg("year"), py::arg("version"));
+    m.def("suite_collection_benchmark_suite", &FuncCraft::suite_collection_benchmark_suite,
+        py::arg("year"),
+        py::arg("version"),
+        py::arg("dimension"));
 }

@@ -131,34 +131,44 @@ def make_value_transform(kind="none", parameters=None, seed=0):
 
 
 def make_component(
-    base_function=BasicFunctionId.Sphere,
-    component_dimension=0,
+    base_function=None,
+    composed_function=None,
     coordinate_transform=None,
     value_transform=None,
-    f_bias=0.0,
     seed=0,
 ):
     """Create a native ``ComponentSpec``.
 
     ``base_function`` accepts a ``BasicFunctionId``, integer id, or name.
+    It is required only when ``composed_function`` is not set. A composed
+    component may be a ``FunctionSpec``, compatible dict, or object exposing
+    a ``spec`` attribute such as ``BenchmarkFunction``.
     ``coordinate_transform`` and ``value_transform`` may be native specs or
     dictionaries with the same field names.
     """
     spec = ComponentSpec()
-    spec.base_function = basic_function_id(base_function)
-    spec.component_dimension = int(component_dimension)
+    if composed_function is not None:
+        spec.composed_function = _owned_function_spec(composed_function)
+    else:
+        if base_function is None:
+            raise ValueError("basic component requires base_function")
+        spec.base_function = basic_function_id(base_function)
     spec.coordinate_transform = coordinate_transform_spec(coordinate_transform or {})
     spec.value_transform = value_transform_spec(value_transform or {})
-    spec.f_bias = float(f_bias)
     spec.seed = int(seed)
     return spec
 
 
-def make_composition(kind="none", parameters=None, seed=0):
+def make_composition(kind="none", parameters=None, biases=None, seed=0):
     """Create a native ``CompositionSpec``."""
     spec = CompositionSpec()
-    spec.kind = composition_kind(kind)
+    kind = composition_kind(kind)
+    bias_values = _list(biases)
+    if bias_values and kind not in (CompositionKind.DpmSoftmax, CompositionKind.DpmBgSoftmax):
+        raise ValueError("composition biases are only valid for DPM compositions")
+    spec.kind = kind
     spec.parameters = _list(parameters)
+    spec.biases = bias_values
     spec.seed = int(seed)
     return spec
 
@@ -237,7 +247,10 @@ def make_suite_spec(
     coordinate_transforms=None,
     value_transforms=None,
     compositions=None,
+    min_components=None,
     max_components=None,
+    max_nested_composition_depth=None,
+    nested_probability=None,
     requested_number_of_functions=None,
     max_number_of_functions=None,
     master_seed=None,
@@ -251,6 +264,9 @@ def make_suite_spec(
 
     Omitted fields keep the C++ defaults. Choice tables accept native choice
     objects or dictionaries with ``kind``, ``probability``, and ``parameters``.
+    ``max_nested_composition_depth=0`` means composed suite functions use only
+    primitive components. Larger values allow composed functions as components;
+    ``nested_probability`` controls how often each component is nested.
     """
     spec = SuiteSpec()
     if supported_dimensions is not None:
@@ -269,8 +285,14 @@ def make_suite_spec(
         spec.value_transforms = [value_transform_choice(item) for item in value_transforms]
     if compositions is not None:
         spec.compositions = [composition_choice(item) for item in compositions]
+    if min_components is not None:
+        spec.min_components = int(min_components)
     if max_components is not None:
         spec.max_components = int(max_components)
+    if max_nested_composition_depth is not None:
+        spec.max_nested_composition_depth = int(max_nested_composition_depth)
+    if nested_probability is not None:
+        spec.nested_probability = float(nested_probability)
     if requested_number_of_functions is not None:
         spec.requested_number_of_functions = int(requested_number_of_functions)
     if max_number_of_functions is not None:
@@ -429,12 +451,16 @@ def value_transform_spec(data):
 def component_spec(data):
     if isinstance(data, ComponentSpec):
         return data
+    data = data or {}
     spec = ComponentSpec()
-    spec.base_function = basic_function_id(data.get("base_function", BasicFunctionId.Sphere))
-    spec.component_dimension = int(data.get("component_dimension", 0))
+    if data.get("composed_function") is not None:
+        spec.composed_function = function_spec(data["composed_function"])
+    else:
+        if "base_function" not in data:
+            raise ValueError("basic component requires base_function")
+        spec.base_function = basic_function_id(data["base_function"])
     spec.coordinate_transform = coordinate_transform_spec(data.get("coordinate_transform", {}))
     spec.value_transform = value_transform_spec(data.get("value_transform", {}))
-    spec.f_bias = float(data.get("f_bias", 0.0))
     spec.seed = int(data.get("seed", 0))
     return spec
 
@@ -444,13 +470,20 @@ def composition_spec(data):
         return data
     data = data or {}
     spec = CompositionSpec()
-    spec.kind = composition_kind(data.get("kind", _NO_COMPOSITION))
+    kind = composition_kind(data.get("kind", _NO_COMPOSITION))
+    bias_values = _list(data.get("biases", []))
+    if bias_values and kind not in (CompositionKind.DpmSoftmax, CompositionKind.DpmBgSoftmax):
+        raise ValueError("composition biases are only valid for DPM compositions")
+    spec.kind = kind
     spec.parameters = _list(data.get("parameters", []))
+    spec.biases = bias_values
     spec.seed = int(data.get("seed", 0))
     return spec
 
 
 def function_spec(data):
+    if hasattr(data, "spec"):
+        return function_spec(spec_to_dict(data.spec))
     if isinstance(data, FunctionSpec):
         return data
     if not isinstance(data, Mapping):
@@ -467,6 +500,11 @@ def function_spec(data):
     spec.label = str(data.get("label", ""))
     spec.metadata = _list(data.get("metadata", []))
     return spec
+
+
+def _owned_function_spec(data):
+    """Return a FunctionSpec instance safe to store in shared_ptr fields."""
+    return function_spec(spec_to_dict(function_spec(data)))
 
 
 def coordinate_transform_choice(data):
@@ -521,8 +559,14 @@ def suite_spec(data):
         spec.value_transforms = [value_transform_choice(item) for item in data["value_transforms"]]
     if "compositions" in data:
         spec.compositions = [composition_choice(item) for item in data["compositions"]]
+    if "min_components" in data:
+        spec.min_components = int(data["min_components"])
     if "max_components" in data:
         spec.max_components = int(data["max_components"])
+    if "max_nested_composition_depth" in data:
+        spec.max_nested_composition_depth = int(data["max_nested_composition_depth"])
+    if "nested_probability" in data:
+        spec.nested_probability = float(data["nested_probability"])
     if "requested_number_of_functions" in data:
         spec.requested_number_of_functions = int(data["requested_number_of_functions"])
     if "max_number_of_functions" in data:
@@ -563,16 +607,28 @@ def spec_to_dict(spec):
     if isinstance(spec, ValueTransformSpec):
         return {"kind": spec.kind.name, "parameters": _list(spec.parameters), "seed": spec.seed}
     if isinstance(spec, ComponentSpec):
-        return {
-            "base_function": spec.base_function.name,
-            "component_dimension": spec.component_dimension,
+        result = {
             "coordinate_transform": spec_to_dict(spec.coordinate_transform),
             "value_transform": spec_to_dict(spec.value_transform),
-            "f_bias": spec.f_bias,
             "seed": spec.seed,
         }
+        if spec.composed_function is not None:
+            result["composed_function"] = spec_to_dict(spec.composed_function)
+        else:
+            if spec.base_function is None:
+                raise ValueError("basic component requires base_function")
+            result["base_function"] = spec.base_function.name
+        return result
     if isinstance(spec, CompositionSpec):
-        return {"kind": spec.kind.name, "parameters": _list(spec.parameters), "seed": spec.seed}
+        result = {
+            "kind": spec.kind.name,
+            "parameters": _list(spec.parameters),
+            "seed": spec.seed,
+        }
+        biases = _list(spec.biases)
+        if biases:
+            result["biases"] = biases
+        return result
     if isinstance(spec, FunctionSpec):
         return {
             "dimension": spec.dimension,
@@ -600,7 +656,10 @@ def spec_to_dict(spec):
             "coordinate_transforms": [spec_to_dict(item) for item in spec.coordinate_transforms],
             "value_transforms": [spec_to_dict(item) for item in spec.value_transforms],
             "compositions": [spec_to_dict(item) for item in spec.compositions],
+            "min_components": spec.min_components,
             "max_components": spec.max_components,
+            "max_nested_composition_depth": spec.max_nested_composition_depth,
+            "nested_probability": spec.nested_probability,
             "requested_number_of_functions": spec.requested_number_of_functions,
             "max_number_of_functions": spec.max_number_of_functions,
             "master_seed": spec.master_seed,

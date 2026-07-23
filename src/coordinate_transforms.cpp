@@ -16,16 +16,6 @@ void require_matrix_shape(const std::vector<std::vector<double>>& matrix, int ro
     }
 }
 
-std::vector<std::vector<double>> identity_matrix(int dimension) {
-    std::vector<std::vector<double>> matrix(
-        static_cast<std::size_t>(dimension),
-        std::vector<double>(static_cast<std::size_t>(dimension), 0.0));
-    for (int i = 0; i < dimension; ++i) {
-        matrix[static_cast<std::size_t>(i)][static_cast<std::size_t>(i)] = 1.0;
-    }
-    return matrix;
-}
-
 } // namespace
 
 CoordinateTransform::CoordinateTransform(
@@ -52,6 +42,10 @@ std::uint64_t CoordinateTransform::seed() const {
 
 const std::vector<double>& CoordinateTransform::assigned_xopt() const {
     return assigned_xopt_;
+}
+
+const std::vector<double>& CoordinateTransform::target_xopt() const {
+    return target_xopt_;
 }
 
 IdentityTransform::IdentityTransform(
@@ -83,16 +77,6 @@ int IdentityTransform::output_dimension() const {
 
 CoordinateTransformClass IdentityTransform::transform_class() const {
     return CoordinateTransformClass::None;
-}
-
-CoordinateTransformSpec IdentityTransform::export_spec() const {
-    CoordinateTransformSpec spec;
-    spec.kind = CoordinateTransformKind::None;
-    spec.dimension = dimension_;
-    spec.seed = seed_;
-    spec.assigned_xopt = assigned_xopt_;
-    spec.matrix = identity_matrix(dimension_);
-    return spec;
 }
 
 RotationTransform::RotationTransform(
@@ -145,14 +129,8 @@ CoordinateTransformClass RotationTransform::transform_class() const {
     return CoordinateTransformClass::Rotation;
 }
 
-CoordinateTransformSpec RotationTransform::export_spec() const {
-    CoordinateTransformSpec spec;
-    spec.kind = CoordinateTransformKind::Rotation;
-    spec.dimension = dimension_;
-    spec.seed = seed_;
-    spec.assigned_xopt = assigned_xopt_;
-    spec.matrix = matrix_;
-    return spec;
+const std::vector<std::vector<double>>& RotationTransform::matrix() const {
+    return matrix_;
 }
 
 AffineTransform::AffineTransform(
@@ -205,14 +183,8 @@ CoordinateTransformClass AffineTransform::transform_class() const {
     return CoordinateTransformClass::Affine;
 }
 
-CoordinateTransformSpec AffineTransform::export_spec() const {
-    CoordinateTransformSpec spec;
-    spec.kind = CoordinateTransformKind::Affine;
-    spec.dimension = dimension_;
-    spec.seed = seed_;
-    spec.assigned_xopt = assigned_xopt_;
-    spec.matrix = matrix_;
-    return spec;
+const std::vector<std::vector<double>>& AffineTransform::matrix() const {
+    return matrix_;
 }
 
 BlockRotationTransform::BlockRotationTransform(
@@ -281,19 +253,12 @@ CoordinateTransformClass BlockRotationTransform::transform_class() const {
     return CoordinateTransformClass::BlockRotation;
 }
 
-CoordinateTransformSpec BlockRotationTransform::export_spec() const {
-    CoordinateTransformSpec spec;
-    spec.kind = CoordinateTransformKind::BlockRotation;
-    spec.dimension = dimension_;
-    spec.seed = seed_;
-    spec.selected_indices = selected_indices_;
-    spec.assigned_xopt = assigned_xopt_;
-    spec.matrix = matrix_;
-    return spec;
-}
-
 const std::vector<int>& BlockRotationTransform::selected_indices() const {
     return selected_indices_;
+}
+
+const std::vector<std::vector<double>>& BlockRotationTransform::matrix() const {
+    return matrix_;
 }
 
 } // namespace FuncCraft

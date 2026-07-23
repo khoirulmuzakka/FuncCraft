@@ -39,9 +39,9 @@ public:
      */
     BenchmarkSuite(SuiteSpec spec, int dimension);
     /**
-     * @brief Construct a benchmark suite by loading its spec from a YAML file.
+     * @brief Construct a benchmark suite by loading its spec from a file.
      */
-    BenchmarkSuite(const std::string& yaml_path, int dimension);
+    BenchmarkSuite(const std::string& spec_path, int dimension);
 
     /**
      * @brief Return the number of generated functions.
@@ -98,12 +98,7 @@ private:
     struct FunctionBlueprint {
         bool composed = false;
         BasicFunctionId base_function = BasicFunctionId::Sphere;
-        std::vector<BasicFunctionId> component_bases;
         CoordinateTransformChoice coordinate_transform_choice;
-        std::vector<CoordinateTransformChoice> coordinate_transform_choices;
-        std::vector<ValueTransformChoice> value_transform_choices;
-        CompositionChoice composition_choice;
-        int component_count = 1;
         std::uint64_t seed = 0;
     };
 
@@ -123,13 +118,13 @@ private:
  */
 BenchmarkSuite make_benchmark_suite(SuiteSpec spec, int dimension);
 /**
- * @brief Load a suite specification from a YAML file.
+ * @brief Load a suite specification from a file.
  */
-SuiteSpec load_suite_spec_yaml(const std::string& path);
+SuiteSpec load_suite_spec(const std::string& path);
 /**
- * @brief Build a suite directly from a YAML file and an ambient dimension.
+ * @brief Build a suite directly from a specification file and an ambient dimension.
  */
-BenchmarkSuite make_benchmark_suite_from_yaml(const std::string& path, int dimension);
+BenchmarkSuite make_benchmark_suite(const std::string& path, int dimension);
 
 } // namespace FuncCraft
 

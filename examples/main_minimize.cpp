@@ -1,15 +1,15 @@
-#include "suite.h"
+#include "funccraft.h"
 #include <minion.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
-#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <limits>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -20,10 +20,10 @@ struct RunConfig {
     std::string algo = "ARRDE";
     int dimension = 10;
     std::size_t max_evals = 10000;
-    int num_functions = 32;
     int population_size = 0;
     unsigned long long seed = 1;
-    double assigned_fopt = 100.0;
+    int low = 0;
+    int high = 31;
 };
 
 bool is_integer_arg(const char* text) {
@@ -38,42 +38,16 @@ bool is_integer_arg(const char* text) {
 RunConfig parse_cli(int argc, char* argv[]) {
     RunConfig config;
     int arg_index = 1;
-    if (argc > 1) {
+    if (argc > 1 && !is_integer_arg(argv[1])) {
         config.algo = argv[arg_index++];
     }
     if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
     if (argc > arg_index + 1) config.max_evals = static_cast<std::size_t>(std::strtoull(argv[arg_index + 1], nullptr, 10));
-    if (argc > arg_index + 2) config.num_functions = std::max(1, std::atoi(argv[arg_index + 2]));
-    if (argc > arg_index + 3) config.population_size = std::max(0, std::atoi(argv[arg_index + 3]));
-    if (argc > arg_index + 4) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 4], nullptr, 10));
-    if (argc > arg_index + 5) config.assigned_fopt = std::atof(argv[arg_index + 5]);
+    if (argc > arg_index + 2) config.population_size = std::max(0, std::atoi(argv[arg_index + 2]));
+    if (argc > arg_index + 3) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 3], nullptr, 10));
+    if (argc > arg_index + 4) config.low = std::max(0, std::atoi(argv[arg_index + 4]));
+    if (argc > arg_index + 5) config.high = std::max(0, std::atoi(argv[arg_index + 5]));
     return config;
-}
-
-std::filesystem::path resolve_default_suite_yaml(const char* argv0) {
-    const std::filesystem::path cwd_candidate = std::filesystem::path("BenchmarkSuites") / "default_suite.yaml";
-    if (std::filesystem::exists(cwd_candidate)) {
-        return cwd_candidate;
-    }
-
-    if (argv0 != nullptr && *argv0 != '\0') {
-        const std::filesystem::path exe_path = std::filesystem::absolute(std::filesystem::path(argv0));
-        const std::filesystem::path exe_dir = exe_path.parent_path();
-        const std::filesystem::path exe_candidate = exe_dir / ".." / "BenchmarkSuites" / "default_suite.yaml";
-        if (std::filesystem::exists(exe_candidate)) {
-            return exe_candidate;
-        }
-    }
-
-    return cwd_candidate;
-}
-
-FuncCraft::SuiteSpec make_spec_from_yaml(const std::filesystem::path& yaml_path, const RunConfig& config) {
-    FuncCraft::SuiteSpec spec = FuncCraft::load_suite_spec_yaml(yaml_path.string());
-    spec.requested_number_of_functions = config.num_functions;
-    spec.master_seed = config.seed;
-    spec.assigned_fopt = config.assigned_fopt;
-    return spec;
 }
 
 std::array<std::string, 4> split_class_label(const std::string& label) {
@@ -117,20 +91,29 @@ int main(int argc, char* argv[]) {
 
     try {
         const RunConfig config = parse_cli(argc, argv);
-        const std::filesystem::path suite_yaml = resolve_default_suite_yaml(argc > 0 ? argv[0] : nullptr);
-        const FuncCraft::BenchmarkSuite suite(make_spec_from_yaml(suite_yaml, config), config.dimension);
+        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
+        const FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(config.dimension);
+        if (config.high < config.low) {
+            throw std::invalid_argument("high must be greater than or equal to low");
+        }
+        if (config.low >= suite.size() || config.high >= suite.size()) {
+            throw std::out_of_range("requested function index range is outside the suite size");
+        }
+        const int processed_functions = config.high - config.low + 1;
 
-        std::cout << "Usage: run_minimize [algo] [dimension] [maxevals] [num_functions] [population_size] [seed] [assigned_fopt]\n";
-        std::cout << "Suite yaml: " << suite_yaml.string() << "\n";
+        std::cout << "Usage: run_minimize [algo] [dimension] [maxevals] [population_size] [seed] [low] [high]\n";
+        std::cout << "Suite collection: " << collection.name()
+                  << " (" << collection.year() << "_v" << collection.version() << ")\n";
         std::cout << "Suite size: " << suite.size()
                   << ", max_number_of_functions: " << suite.max_number_of_functions()
                   << ", dimension: " << suite.dimension()
-                  << ", requested_functions: " << config.num_functions
+                  << ", index_range: [" << config.low << ", " << config.high << "]"
+                  << ", processed_functions: " << processed_functions
                   << ", algo: " << config.algo
                   << ", maxevals: " << config.max_evals
                   << ", population_size: " << config.population_size
                   << ", seed: " << config.seed
-                  << ", assigned_fopt: " << std::scientific << config.assigned_fopt << "\n\n";
+                  << "\n\n";
 
         std::cout << std::left
                   << std::setw(6) << "idx"
@@ -145,9 +128,8 @@ int main(int argc, char* argv[]) {
                   << "\n";
         std::cout << std::string(110, '-') << "\n";
 
-        const int function_count = std::min(config.num_functions, suite.size());
         int failed = 0;
-        for (int i = 0; i < function_count; ++i) {
+        for (int i = config.low; i <= config.high; ++i) {
             try {
                 const auto& function = suite.function(i);
                 const auto& spec = function.spec();

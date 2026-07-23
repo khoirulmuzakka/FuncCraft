@@ -6,7 +6,6 @@
  * @brief Coordinate transforms used to remap benchmark input vectors.
  */
 
-#include "function_spec.h"
 #include "core.h"
 
 #include <cstdint>
@@ -22,11 +21,11 @@ public:
     virtual int input_dimension() const = 0;
     virtual int output_dimension() const = 0;
     virtual CoordinateTransformClass transform_class() const = 0;
-    virtual CoordinateTransformSpec export_spec() const = 0;
 
     int dimension() const;
     std::uint64_t seed() const;
     const std::vector<double>& assigned_xopt() const;
+    const std::vector<double>& target_xopt() const;
 
 protected:
     CoordinateTransform(
@@ -56,7 +55,6 @@ public:
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
-    CoordinateTransformSpec export_spec() const override;
 };
 
 /**
@@ -85,7 +83,7 @@ public:
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
-    CoordinateTransformSpec export_spec() const override;
+    const std::vector<std::vector<double>>& matrix() const;
 
 private:
     std::vector<std::vector<double>> matrix_;
@@ -117,7 +115,7 @@ public:
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
-    CoordinateTransformSpec export_spec() const override;
+    const std::vector<std::vector<double>>& matrix() const;
 
 private:
     std::vector<std::vector<double>> matrix_;
@@ -150,9 +148,9 @@ public:
     int input_dimension() const override;
     int output_dimension() const override;
     CoordinateTransformClass transform_class() const override;
-    CoordinateTransformSpec export_spec() const override;
 
     const std::vector<int>& selected_indices() const;
+    const std::vector<std::vector<double>>& matrix() const;
 
 private:
     std::vector<int> selected_indices_;

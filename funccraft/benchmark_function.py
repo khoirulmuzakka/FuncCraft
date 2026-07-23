@@ -15,18 +15,13 @@ def _as_native_function_spec(spec):
 
 
 def make_benchmark_function(spec):
-    """Build a :class:`BenchmarkFunction` from a full function specification."""
+    """Build a :class:`BenchmarkFunction` from a spec object, dict, or file path."""
     return BenchmarkFunction(spec)
 
 
-def load_function_spec_yaml(path):
-    """Load a native :class:`FunctionSpec` from a YAML file."""
-    return _funccraft.load_function_spec_yaml(str(path))
-
-
-def make_benchmark_function_from_yaml(path):
-    """Build a :class:`BenchmarkFunction` directly from a YAML file."""
-    return BenchmarkFunction(_funccraft.make_benchmark_function_from_yaml(str(path)))
+def load_function_spec(path):
+    """Load a native :class:`FunctionSpec` from a file."""
+    return _funccraft.load_function_spec(str(path))
 
 
 class BenchmarkFunction:
@@ -48,6 +43,9 @@ class BenchmarkFunction:
     def __init__(self, spec):
         if isinstance(spec, _funccraft.BenchmarkFunction):
             self._function = spec
+            self._spec = self._function.spec
+        elif isinstance(spec, str):
+            self._function = _funccraft.make_benchmark_function(spec)
             self._spec = self._function.spec
         else:
             self._function = _funccraft.BenchmarkFunction(_as_native_function_spec(spec))
@@ -119,7 +117,6 @@ __all__ = [
     "BenchmarkFunction",
     "DomainSpec",
     "FunctionSpec",
-    "load_function_spec_yaml",
+    "load_function_spec",
     "make_benchmark_function",
-    "make_benchmark_function_from_yaml",
 ]

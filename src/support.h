@@ -10,8 +10,6 @@
  */
 
 #include "core.h"
-#include "function_spec.h"
-#include "suite_spec.h"
 
 #include <cstdint>
 #include <random>
@@ -22,9 +20,15 @@
 #include <yaml-cpp/yaml.h>
 
 namespace FuncCraft {
+
+struct FunctionSpec;
+struct SuiteSpec;
+
 namespace detail {
 
 constexpr double kPi = 3.14159265358979323846;
+constexpr std::uint64_t kAssignedXoptSeedRole = 0xA5516EED0D7ULL;
+constexpr std::uint64_t kDpmCenterSeedRole = 0xD9CE17E25ULL;
 
 /**
  * @brief Throw if the condition is false.
@@ -66,6 +70,10 @@ std::string join_base_ids(const std::vector<BasicFunctionId>& ids);
  */
 std::uint64_t mix_seed(std::uint64_t x);
 /**
+ * @brief Generate a deterministic child seed from a base seed, role, and two indices.
+ */
+std::uint64_t indexed_seed(std::uint64_t seed, std::uint64_t role, std::uint64_t index0, std::uint64_t index1);
+/**
  * @brief Draw one uniform random number from [0, 1).
  */
 double uniform01(std::mt19937_64& rng);
@@ -77,6 +85,36 @@ int uniform_int(std::mt19937_64& rng, int lo, int hi);
  * @brief Draw one standard normal random variate.
  */
 double normal01(std::mt19937_64& rng);
+/**
+ * @brief Return a centered copy of a domain scaled by factor.
+ */
+Domain centered_scaled_domain(const Domain& domain, double factor);
+/**
+ * @brief Generate Latin-hypercube points whose coordinate prefixes are stable across dimensions.
+ */
+std::vector<std::vector<double>> prefix_stable_latin_hypercube_points_in_domain(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const Domain& domain,
+    int count);
+/**
+ * @brief Generate centered Latin-hypercube points whose coordinate prefixes are stable across dimensions.
+ */
+std::vector<std::vector<double>> prefix_stable_latin_hypercube_centers(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const Domain& domain,
+    int count,
+    double shrink_factor);
+/**
+ * @brief Complete a user-supplied coordinate prefix to the domain dimension deterministically.
+ */
+std::vector<double> complete_prefix_stable_point(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const std::vector<double>& prefix,
+    const Domain& domain,
+    double shrink_factor);
 /**
  * @brief Normalize spec identifiers for matching.
  *

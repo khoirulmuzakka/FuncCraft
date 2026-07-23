@@ -6,8 +6,10 @@
 #include <cctype>
 #include <cstdint>
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <random>
 #include <set>
 #include <sstream>
@@ -234,6 +236,15 @@ SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
     if (node["max_components"]) {
         spec.max_components = node["max_components"].as<int>();
     }
+    if (node["min_components"]) {
+        spec.min_components = node["min_components"].as<int>();
+    }
+    if (node["max_nested_composition_depth"]) {
+        spec.max_nested_composition_depth = node["max_nested_composition_depth"].as<int>();
+    }
+    if (node["nested_probability"]) {
+        spec.nested_probability = node["nested_probability"].as<double>();
+    }
     if (node["requested_number_of_functions"]) {
         spec.requested_number_of_functions = node["requested_number_of_functions"].as<int>();
     }
@@ -433,61 +444,6 @@ const Choice& choose_weighted(const std::vector<Choice>& choices, std::mt19937_6
     return choices.back();
 }
 
-Domain centered_scaled_domain(const Domain& domain, double factor) {
-    require(factor > 0.0 && factor <= 1.0, "domain scale factor must be in (0, 1]");
-    Domain scaled = domain;
-    for (int i = 0; i < domain.dimension(); ++i) {
-        const auto idx = static_cast<std::size_t>(i);
-        const double center = 0.5 * (domain.lower[idx] + domain.upper[idx]);
-        const double half_width = 0.5 * (domain.upper[idx] - domain.lower[idx]) * factor;
-        scaled.lower[idx] = center - half_width;
-        scaled.upper[idx] = center + half_width;
-    }
-    return scaled;
-}
-
-std::vector<std::vector<double>> latin_hypercube_points_in_domain(
-    std::mt19937_64& rng,
-    const Domain& domain,
-    int count) {
-    require(count >= 0, "latin hypercube sample count must be nonnegative");
-    require(domain.dimension() > 0, "latin hypercube domain dimension must be positive");
-
-    std::vector<std::vector<double>> points(
-        static_cast<std::size_t>(count),
-        std::vector<double>(static_cast<std::size_t>(domain.dimension()), 0.0));
-    if (count == 0) {
-        return points;
-    }
-
-    std::vector<int> strata(static_cast<std::size_t>(count), 0);
-    for (int i = 0; i < count; ++i) {
-        strata[static_cast<std::size_t>(i)] = i;
-    }
-
-    for (int d = 0; d < domain.dimension(); ++d) {
-        stable_shuffle(strata, rng);
-        const auto dim = static_cast<std::size_t>(d);
-        const double lo = domain.lower[dim];
-        const double hi = domain.upper[dim];
-        for (int i = 0; i < count; ++i) {
-            const double t = (static_cast<double>(strata[static_cast<std::size_t>(i)]) + uniform01(rng))
-                / static_cast<double>(count);
-            points[static_cast<std::size_t>(i)][dim] = lo + (hi - lo) * t;
-        }
-    }
-
-    return points;
-}
-
-std::vector<std::vector<double>> latin_hypercube_centers(
-    std::mt19937_64& rng,
-    const Domain& domain,
-    int count,
-    double shrink_factor) {
-    return latin_hypercube_points_in_domain(rng, centered_scaled_domain(domain, shrink_factor), count);
-}
-
 CoordinateTransformSpec make_coordinate_transform_spec(
     const CoordinateTransformChoice& choice,
     int dimension,
@@ -511,7 +467,6 @@ CoordinateTransformSpec make_coordinate_transform_spec(
         return spec;
     }
     if (choice.kind == CoordinateTransformKind::BlockRotation) {
-        require(dimension > 1, "block rotation requires dimension greater than one");
         if (selected_indices != nullptr) {
             require(!selected_indices->empty(), "block rotation selected indices must not be empty");
             spec.selected_indices = *selected_indices;
@@ -580,6 +535,73 @@ CompositionSpec make_composition_spec(
         return spec;
     }
     throw std::logic_error("unhandled composition kind in suite spec");
+}
+
+std::vector<double> dpm_component_biases(int component_count, double assigned_fopt) {
+    require(component_count > 0, "DPM bias count must be positive");
+    std::vector<double> biases(static_cast<std::size_t>(component_count), 0.0);
+    const double deceptive_step = 10.0 + 0.1 * assigned_fopt;
+    for (int i = 1; i < component_count; ++i) {
+        biases[static_cast<std::size_t>(i)] = deceptive_step * static_cast<double>(i);
+    }
+    return biases;
+}
+
+std::vector<std::vector<double>> composition_component_centers(
+    bool dpm_mode,
+    int component_count,
+    const std::vector<double>& assigned_xopt,
+    std::uint64_t seed,
+    std::uint64_t role,
+    const Domain& domain,
+    double shrink_factor) {
+    require(component_count > 0, "composition component count must be positive");
+    std::vector<std::vector<double>> centers(static_cast<std::size_t>(component_count), assigned_xopt);
+    if (!dpm_mode) {
+        return centers;
+    }
+
+    const int random_center_count = std::max(0, component_count - 1);
+    const std::vector<std::vector<double>> random_centers = prefix_stable_latin_hypercube_centers(
+        seed,
+        role,
+        domain,
+        random_center_count,
+        shrink_factor);
+    for (int i = 1; i < component_count; ++i) {
+        centers[static_cast<std::size_t>(i)] = random_centers[static_cast<std::size_t>(i - 1)];
+    }
+    return centers;
+}
+
+bool choose_nested_component(int remaining_nested_depth, double nested_probability, std::mt19937_64& rng) {
+    return remaining_nested_depth > 0 && uniform01(rng) < nested_probability;
+}
+
+int sample_nested_depth_for_component(int remaining_nested_depth, std::mt19937_64& rng) {
+    require(remaining_nested_depth > 0, "remaining nested depth must be positive");
+    return uniform_int(rng, 1, remaining_nested_depth);
+}
+
+FunctionSpec make_suite_function_spec(
+    int dimension,
+    const Domain& domain,
+    std::uint64_t seed,
+    const std::vector<double>& assigned_xopt,
+    double assigned_fopt,
+    const std::string& suite_label,
+    const std::string& suite_role) {
+    FunctionSpec spec;
+    spec.dimension = dimension;
+    spec.domain.dimension = dimension;
+    spec.domain.lower_bound = domain.lower;
+    spec.domain.upper_bound = domain.upper;
+    spec.seed = seed;
+    spec.assigned_xopt = assigned_xopt;
+    spec.assigned_fopt = assigned_fopt;
+    spec.metadata.push_back("suite_label=" + suite_label);
+    spec.metadata.push_back("suite_role=" + suite_role);
+    return spec;
 }
 
 std::vector<BasicFunctionId> sample_base_functions(
@@ -720,10 +742,16 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
     const int coord_family_count = static_cast<int>(normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices()).size());
     const int value_family_count = static_cast<int>(normalize_choices(spec_.value_transforms, all_value_transform_choices()).size());
     const auto composition_choices = normalize_choices(spec_.compositions, all_composition_choices());
+    const int min_components = spec_.min_components;
     const int max_components = spec_.max_components;
-    require(max_components >= 2, "suite spec max_components must be at least 2");
+    require(min_components >= 2, "suite spec min_components must be at least 2");
+    require(max_components >= min_components, "suite spec max_components must be at least min_components");
+    require(spec_.max_nested_composition_depth >= 0, "suite spec max_nested_composition_depth must be nonnegative");
+    require(
+        spec_.nested_probability >= 0.0 && spec_.nested_probability <= 1.0,
+        "suite spec nested_probability must be in [0, 1]");
     std::uint64_t theoretical_composed = 0;
-    for (int component_count = 2; component_count <= max_components; ++component_count) {
+    for (int component_count = min_components; component_count <= max_components; ++component_count) {
         const std::uint64_t component_orders = saturating_pow(static_cast<std::uint64_t>(composition_pool.size()), component_count);
         const std::uint64_t coord_choices = saturating_pow(static_cast<std::uint64_t>(coord_family_count), component_count);
         const std::uint64_t value_choices = saturating_pow(static_cast<std::uint64_t>(value_family_count), component_count);
@@ -741,7 +769,6 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
     require(requested_count >= mandatory_count, "requested_number_of_functions is smaller than the mandatory base-function count");
 
     const auto coord_choices = normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices());
-    const auto value_choices = normalize_choices(spec_.value_transforms, all_value_transform_choices());
     if (requested_count > mandatory_count) {
         require(!composition_pool.empty(), "composition base-function pool must not be empty");
     }
@@ -761,21 +788,8 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
     }
 
     while (static_cast<int>(blueprints_.size()) < requested_count) {
-        std::mt19937_64 rng(mix_seed(spec_.master_seed + sequence + 0x3000ull));
-        const CompositionChoice& comp_choice = choose_weighted(composition_choices, rng);
-        const int max_components = spec_.max_components;
-        const int component_count = uniform_int(rng, 2, max_components);
         FunctionBlueprint blueprint;
         blueprint.composed = true;
-        blueprint.component_count = component_count;
-        blueprint.component_bases = sample_base_functions(composition_pool, component_count, rng);
-        blueprint.coordinate_transform_choices.reserve(static_cast<std::size_t>(component_count));
-        blueprint.value_transform_choices.reserve(static_cast<std::size_t>(component_count));
-        for (int i = 0; i < component_count; ++i) {
-            blueprint.coordinate_transform_choices.push_back(choose_weighted(coord_choices, rng));
-            blueprint.value_transform_choices.push_back(choose_weighted(value_choices, rng));
-        }
-        blueprint.composition_choice = comp_choice;
         blueprint.seed = mix_seed(spec_.master_seed + sequence + 0x4000ull);
 
         blueprints_.push_back(std::move(blueprint));
@@ -790,10 +804,10 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
               << ", dimension: " << dimension_ << '\n';
 }
 
-BenchmarkSuite::BenchmarkSuite(const std::string& yaml_path, int dimension)
-    : BenchmarkSuite(load_suite_spec_yaml(yaml_path), dimension) {
-    std::cout << "A benchmark suite configuration has been read successfully from YAML file: "
-              << yaml_path
+BenchmarkSuite::BenchmarkSuite(const std::string& spec_path, int dimension)
+    : BenchmarkSuite(load_suite_spec(spec_path), dimension) {
+    std::cout << "A benchmark suite configuration has been read successfully from file: "
+              << spec_path
               << " (dimension: " << dimension_
               << ", requested_functions: " << spec_.requested_number_of_functions
               << ")\n";
@@ -808,20 +822,23 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
 
     const Domain domain(dimension_, spec_.lower_bound, spec_.upper_bound);
     std::mt19937_64 rng(mix_seed(blueprint.seed ^ static_cast<std::uint64_t>(dimension_)));
-
-    FunctionSpec function_spec;
-    function_spec.dimension = dimension_;
-    function_spec.domain.dimension = dimension_;
-    function_spec.domain.lower_bound = domain.lower;
-    function_spec.domain.upper_bound = domain.upper;
-    function_spec.seed = blueprint.seed;
-    function_spec.assigned_fopt = spec_.assigned_fopt;
-    function_spec.metadata.push_back("suite_label=" + spec_.suite_label);
+    const auto coord_choices = normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices());
 
     if (!blueprint.composed) {
-        const auto x_star = latin_hypercube_centers(rng, domain, 1, spec_.xopt_domain_shrink_factor).front();
-        function_spec.assigned_xopt = x_star;
-        function_spec.metadata.push_back("suite_role=base");
+        const auto x_star = prefix_stable_latin_hypercube_centers(
+            blueprint.seed,
+            kAssignedXoptSeedRole,
+            domain,
+            1,
+            spec_.xopt_domain_shrink_factor).front();
+        FunctionSpec function_spec = make_suite_function_spec(
+            dimension_,
+            domain,
+            blueprint.seed,
+            x_star,
+            spec_.assigned_fopt,
+            spec_.suite_label,
+            "base");
         function_spec.composition.kind = CompositionKind::None;
 
         const std::vector<int> full_subspace = is_block_rotation_choice(blueprint.coordinate_transform_choice)
@@ -829,7 +846,6 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             : std::vector<int>{};
         ComponentSpec component;
         component.base_function = blueprint.base_function;
-        component.component_dimension = dimension_;
         component.coordinate_transform = make_coordinate_transform_spec(
             blueprint.coordinate_transform_choice,
             dimension_,
@@ -844,68 +860,99 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         return BenchmarkFunction(std::move(function_spec));
     }
 
-    const bool dpm_mode = is_deceptive_composition_choice(blueprint.composition_choice);
-    const int random_center_count = dpm_mode
-        ? 1 + std::max(0, blueprint.component_count - 2)
-        : 1;
-    const std::vector<std::vector<double>> random_centers = latin_hypercube_centers(
-        rng,
-        domain,
-        random_center_count,
-        spec_.xopt_domain_shrink_factor);
-    const auto x_star = random_centers.front();
-    std::vector<std::vector<double>> centers(static_cast<std::size_t>(blueprint.component_count), x_star);
-    std::vector<double> offsets(static_cast<std::size_t>(blueprint.component_count), 0.0);
-    const bool uses_block_rotation = std::any_of(
-        blueprint.coordinate_transform_choices.begin(),
-        blueprint.coordinate_transform_choices.end(),
-        is_block_rotation_choice);
-    std::vector<std::vector<int>> block_subspaces = uses_block_rotation
-        ? block_rotation_subspaces(blueprint.coordinate_transform_choices, dimension_, rng)
-        : std::vector<std::vector<int>>(static_cast<std::size_t>(blueprint.component_count));
-    if (dpm_mode && is_block_rotation_choice(blueprint.coordinate_transform_choices.front())) {
-        block_subspaces.front() = full_dimension_indices(dimension_);
-    }
-    if (dpm_mode) {
-        const double deceptive_step = 10.0 + 0.1 * spec_.assigned_fopt;
-        int random_center_index = 1;
-        for (int i = 1; i < blueprint.component_count; ++i) {
-            if (i == 1) {
-                centers[static_cast<std::size_t>(i)] = std::vector<double>(static_cast<std::size_t>(dimension_), 0.0);
-            } else {
-                centers[static_cast<std::size_t>(i)] = random_centers[static_cast<std::size_t>(random_center_index)];
-                ++random_center_index;
-            }
-            offsets[static_cast<std::size_t>(i)] = deceptive_step * static_cast<double>(i);
-        }
-    }
+    const std::vector<BasicFunctionId> mandatory_base_functions = normalize_base_functions(spec_.base_functions);
+    const std::vector<BasicFunctionId> composition_pool = normalize_composition_base_functions(
+        spec_.composition_base_functions,
+        mandatory_base_functions);
+    const auto value_choices = normalize_choices(spec_.value_transforms, all_value_transform_choices());
+    const auto composition_choices = normalize_choices(spec_.compositions, all_composition_choices());
 
-    function_spec.assigned_xopt = x_star;
-    function_spec.metadata.push_back("suite_role=composed");
-    function_spec.composition = make_composition_spec(blueprint.composition_choice);
-
-    for (int i = 0; i < blueprint.component_count; ++i) {
-        const auto pos = static_cast<std::size_t>(i);
-        const std::uint64_t component_seed = mix_seed(blueprint.seed + static_cast<std::uint64_t>(i) + 1ULL);
-        ComponentSpec component;
-        component.base_function = blueprint.component_bases[pos];
-        component.component_dimension = dimension_;
-        component.coordinate_transform = make_coordinate_transform_spec(
-            blueprint.coordinate_transform_choices[pos],
+    std::function<FunctionSpec(int, int, const std::vector<double>&, std::uint64_t)> make_composed_spec;
+    make_composed_spec = [&](int composition_level, int remaining_nested_depth, const std::vector<double>& x_star, std::uint64_t seed) {
+        std::mt19937_64 structure_rng(mix_seed(seed ^ static_cast<std::uint64_t>(composition_level + 1) ^ 0xA11CE5EEDULL));
+        std::mt19937_64 geometry_rng(mix_seed(
+            seed
+            ^ static_cast<std::uint64_t>(dimension_)
+            ^ (static_cast<std::uint64_t>(composition_level + 1) << 32)
+            ^ 0xD1A6A11BADC0FFEEULL));
+        const CompositionChoice& comp_choice = choose_weighted(composition_choices, structure_rng);
+        const int component_count = uniform_int(structure_rng, spec_.min_components, spec_.max_components);
+        FunctionSpec spec = make_suite_function_spec(
             dimension_,
-            centers[pos],
-            component_seed,
-            rng,
-            is_block_rotation_choice(blueprint.coordinate_transform_choices[pos])
-                ? &block_subspaces[pos]
-                : nullptr);
-        component.value_transform = make_value_transform_spec(blueprint.value_transform_choices[pos]);
-        component.f_bias = offsets[pos];
-        component.seed = component_seed;
-        function_spec.components.push_back(std::move(component));
-    }
+            domain,
+            seed,
+            x_star,
+            composition_level == 0 ? spec_.assigned_fopt : 0.0,
+            spec_.suite_label,
+            composition_level == 0 ? "composed" : "nested");
+        spec.composition = make_composition_spec(comp_choice);
 
-    return BenchmarkFunction(std::move(function_spec));
+        const bool dpm_mode = is_deceptive_composition_choice(comp_choice);
+        const std::vector<std::vector<double>> centers = composition_component_centers(
+            dpm_mode,
+            component_count,
+            x_star,
+            seed,
+            kDpmCenterSeedRole,
+            domain,
+            spec_.xopt_domain_shrink_factor);
+        if (dpm_mode) {
+            spec.composition.biases = dpm_component_biases(component_count, spec.assigned_fopt);
+        }
+
+        std::vector<CoordinateTransformChoice> component_coord_choices;
+        component_coord_choices.reserve(static_cast<std::size_t>(component_count));
+        for (int i = 0; i < component_count; ++i) {
+            component_coord_choices.push_back(choose_weighted(coord_choices, structure_rng));
+        }
+        std::vector<std::vector<int>> block_subspaces = std::any_of(
+            component_coord_choices.begin(),
+            component_coord_choices.end(),
+            is_block_rotation_choice)
+            ? block_rotation_subspaces(component_coord_choices, dimension_, geometry_rng)
+            : std::vector<std::vector<int>>(static_cast<std::size_t>(component_count));
+        if (dpm_mode && is_block_rotation_choice(component_coord_choices.front())) {
+            block_subspaces.front() = full_dimension_indices(dimension_);
+        }
+
+        for (int i = 0; i < component_count; ++i) {
+            const auto pos = static_cast<std::size_t>(i);
+            const std::uint64_t component_seed = mix_seed(seed + static_cast<std::uint64_t>(i) + 1ULL);
+            const bool use_composed_component = choose_nested_component(
+                remaining_nested_depth,
+                spec_.nested_probability,
+                structure_rng);
+            ComponentSpec component;
+            component.coordinate_transform = make_coordinate_transform_spec(
+                component_coord_choices[pos],
+                dimension_,
+                centers[pos],
+                component_seed,
+                geometry_rng,
+                is_block_rotation_choice(component_coord_choices[pos])
+                    ? &block_subspaces[pos]
+                    : nullptr);
+            component.value_transform = make_value_transform_spec(choose_weighted(value_choices, structure_rng));
+            component.seed = component_seed;
+            if (use_composed_component) {
+                const int child_nested_depth = sample_nested_depth_for_component(remaining_nested_depth, structure_rng);
+                component.composed_function = std::make_shared<FunctionSpec>(
+                    make_composed_spec(composition_level + 1, child_nested_depth - 1, centers[pos], component_seed));
+            } else {
+                component.base_function = sample_base_functions(composition_pool, 1, structure_rng).front();
+            }
+            spec.components.push_back(std::move(component));
+        }
+        return spec;
+    };
+
+    const auto x_star = prefix_stable_latin_hypercube_centers(
+        blueprint.seed,
+        kAssignedXoptSeedRole,
+        domain,
+        1,
+        spec_.xopt_domain_shrink_factor).front();
+    return BenchmarkFunction(make_composed_spec(0, spec_.max_nested_composition_depth, x_star, blueprint.seed));
 }
 
 int BenchmarkSuite::size() const {
@@ -977,7 +1024,7 @@ BenchmarkSuite make_benchmark_suite(SuiteSpec spec, int dimension) {
     return BenchmarkSuite(std::move(spec), dimension);
 }
 
-SuiteSpec load_suite_spec_yaml(const std::string& path) {
+SuiteSpec load_suite_spec(const std::string& path) {
     try {
         const YAML::Node root = YAML::LoadFile(path);
         if (root["suite_spec"]) {
@@ -985,12 +1032,12 @@ SuiteSpec load_suite_spec_yaml(const std::string& path) {
         }
         return suite_spec_from_yaml_node(root);
     } catch (const YAML::Exception& e) {
-        throw std::invalid_argument(std::string("failed to load suite spec from YAML: ") + e.what());
+        throw std::invalid_argument(std::string("failed to load suite spec: ") + e.what());
     }
 }
 
-BenchmarkSuite make_benchmark_suite_from_yaml(const std::string& path, int dimension) {
-    return BenchmarkSuite(load_suite_spec_yaml(path), dimension);
+BenchmarkSuite make_benchmark_suite(const std::string& path, int dimension) {
+    return BenchmarkSuite(load_suite_spec(path), dimension);
 }
 
 } // namespace FuncCraft

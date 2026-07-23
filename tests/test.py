@@ -11,7 +11,7 @@ try:
         BenchmarkFunction,
         BenchmarkSuite,
         CompositionKind,
-        load_suite_spec_yaml,
+        load_suite_spec,
         make_component,
         make_composition,
         make_composition_choice,
@@ -20,7 +20,9 @@ try:
         make_function_spec,
         make_suite_spec,
         make_value_transform,
-        make_benchmark_function_from_yaml,
+        make_benchmark_function,
+        suite_collection,
+        suite_collection_number_of_functions,
     )
 except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -29,7 +31,7 @@ except ModuleNotFoundError:
         BenchmarkFunction,
         BenchmarkSuite,
         CompositionKind,
-        load_suite_spec_yaml,
+        load_suite_spec,
         make_component,
         make_composition,
         make_composition_choice,
@@ -38,7 +40,9 @@ except ModuleNotFoundError:
         make_function_spec,
         make_suite_spec,
         make_value_transform,
-        make_benchmark_function_from_yaml,
+        make_benchmark_function,
+        suite_collection,
+        suite_collection_number_of_functions,
     )
 
 
@@ -75,7 +79,7 @@ def check_function_yaml_roundtrip(function, path):
     before = function.evaluate(points)
     function.export_spec(str(path))
 
-    imported_function = make_benchmark_function_from_yaml(str(path))
+    imported_function = make_benchmark_function(str(path))
     after = imported_function.evaluate(points)
     assert_close_sequence(after, before)
 
@@ -102,14 +106,12 @@ def alias_function_spec(kind):
         components=[
             make_component(
                 base_function=BasicFunctionId.Sphere,
-                component_dimension=2,
                 coordinate_transform=make_coordinate_transform(
                     kind="none",
                     dimension=2,
                     assigned_xopt=[float(index), 0.0],
                 ),
                 value_transform=make_value_transform("none"),
-                f_bias=10.0 * index,
                 seed=11 + index,
             )
             for index in range(2)
@@ -149,9 +151,17 @@ def check_composition_kinds():
 
 def main():
     dimension = 3
-    default_suite_path = Path(__file__).resolve().parents[1] / "BenchmarkSuites" / "default_suite.yaml"
+    default_suite_path = Path(__file__).resolve().parents[1] / "suites" / "2026_v1.yaml"
 
-    optimum_suite_spec = load_suite_spec_yaml(str(default_suite_path))
+    collection = suite_collection(2026, 1)
+    if collection.number_of_functions() != suite_collection_number_of_functions(2026, 1):
+        raise AssertionError("suite collection function count mismatch")
+    collection_suite = collection.benchmark_suite(2)
+    value = collection_suite.function(0).evaluate([collection_suite.function(0).spec.assigned_xopt])[0]
+    if not math.isfinite(value):
+        raise AssertionError("suite collection generated a nonfinite value")
+
+    optimum_suite_spec = load_suite_spec(str(default_suite_path))
     optimum_suite_spec.requested_number_of_functions = 36
     optimum_suite = BenchmarkSuite(optimum_suite_spec, 2)
     check_optima(optimum_suite)

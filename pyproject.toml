@@ -35,7 +35,7 @@ classifiers = [
 include = ["funccraft"]
 
 [tool.setuptools.package-data]
-"funccraft" = ["_funccraft*"]
+"funccraft" = ["_funccraft*", "suites/*.yaml", "suites/*.yml"]
 
 [tool.setuptools]
 include-package-data = false

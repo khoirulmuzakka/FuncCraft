@@ -1,3 +1,5 @@
+#include "benchmark_function.h"
+#include "suite.h"
 #include "support.h"
 
 #include <algorithm>
@@ -5,6 +7,7 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -129,6 +132,18 @@ std::uint64_t mix_seed(std::uint64_t x) {
     x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
     x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
     return x ^ (x >> 31);
+}
+
+std::uint64_t indexed_seed(
+    std::uint64_t seed,
+    std::uint64_t role,
+    std::uint64_t index0,
+    std::uint64_t index1) {
+    return mix_seed(
+        seed
+        ^ (role * 0x9E3779B97F4A7C15ULL)
+        ^ ((index0 + 1ULL) * 0xBF58476D1CE4E5B9ULL)
+        ^ ((index1 + 1ULL) * 0x94D049BB133111EBULL));
 }
 
 double uniform01(std::mt19937_64& rng) {
@@ -300,6 +315,93 @@ double normal01(std::mt19937_64& rng) {
     const double r = std::sqrt(-2.0 * std::log(u1));
     const double theta = 2.0 * kPi * u2;
     return r * std::cos(theta);
+}
+
+Domain centered_scaled_domain(const Domain& domain, double factor) {
+    require(factor > 0.0 && factor <= 1.0, "domain scale factor must be in (0, 1]");
+    Domain scaled = domain;
+    for (int i = 0; i < domain.dimension(); ++i) {
+        const auto idx = static_cast<std::size_t>(i);
+        const double center = 0.5 * (domain.lower[idx] + domain.upper[idx]);
+        const double half_width = 0.5 * (domain.upper[idx] - domain.lower[idx]) * factor;
+        scaled.lower[idx] = center - half_width;
+        scaled.upper[idx] = center + half_width;
+    }
+    return scaled;
+}
+
+std::vector<std::vector<double>> prefix_stable_latin_hypercube_points_in_domain(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const Domain& domain,
+    int count) {
+    require(count >= 0, "latin hypercube sample count must be nonnegative");
+    require(domain.dimension() > 0, "latin hypercube domain dimension must be positive");
+
+    std::vector<std::vector<double>> points(
+        static_cast<std::size_t>(count),
+        std::vector<double>(static_cast<std::size_t>(domain.dimension()), 0.0));
+    if (count == 0) {
+        return points;
+    }
+
+    for (int d = 0; d < domain.dimension(); ++d) {
+        std::vector<int> strata(static_cast<std::size_t>(count), 0);
+        for (int i = 0; i < count; ++i) {
+            strata[static_cast<std::size_t>(i)] = i;
+        }
+
+        std::mt19937_64 permutation_rng(indexed_seed(seed, role, static_cast<std::uint64_t>(d), 0xC0111A7EULL));
+        stable_shuffle(strata, permutation_rng);
+
+        const auto dim = static_cast<std::size_t>(d);
+        const double lo = domain.lower[dim];
+        const double hi = domain.upper[dim];
+        for (int i = 0; i < count; ++i) {
+            std::mt19937_64 jitter_rng(indexed_seed(
+                seed,
+                role,
+                static_cast<std::uint64_t>(d),
+                static_cast<std::uint64_t>(i)));
+            const double t = (static_cast<double>(strata[static_cast<std::size_t>(i)]) + uniform01(jitter_rng))
+                / static_cast<double>(count);
+            points[static_cast<std::size_t>(i)][dim] = lo + (hi - lo) * t;
+        }
+    }
+
+    return points;
+}
+
+std::vector<std::vector<double>> prefix_stable_latin_hypercube_centers(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const Domain& domain,
+    int count,
+    double shrink_factor) {
+    return prefix_stable_latin_hypercube_points_in_domain(
+        seed,
+        role,
+        centered_scaled_domain(domain, shrink_factor),
+        count);
+}
+
+std::vector<double> complete_prefix_stable_point(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const std::vector<double>& prefix,
+    const Domain& domain,
+    double shrink_factor) {
+    require(static_cast<int>(prefix.size()) <= domain.dimension(), "coordinate prefix is longer than the domain dimension");
+    std::vector<double> point = prefix_stable_latin_hypercube_centers(
+        seed,
+        role,
+        domain,
+        1,
+        shrink_factor).front();
+    for (std::size_t i = 0; i < prefix.size(); ++i) {
+        point[i] = prefix[i];
+    }
+    return point;
 }
 
 std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, int dimension) {
@@ -484,6 +586,7 @@ CompositionSpec composition_spec_from_yaml(const YAML::Node& node) {
     spec.kind = parse_composition_kind(node["kind"] ? node["kind"].as<std::string>() : "");
     spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.parameters = yaml_double_vector(node["parameters"], "composition parameters");
+    spec.biases = yaml_double_vector(node["biases"], "composition biases");
     return spec;
 }
 
@@ -492,11 +595,14 @@ ComponentSpec component_spec_from_yaml(const YAML::Node& node) {
         throw std::invalid_argument("component spec must be a map");
     }
     ComponentSpec spec;
-    spec.base_function = yaml_basic_function_id(node["base_function"]);
-    spec.component_dimension = node["component_dimension"] ? node["component_dimension"].as<int>() : 0;
+    if (node["composed_function"]) {
+        spec.composed_function = std::make_shared<FunctionSpec>(function_spec_from_yaml(node["composed_function"]));
+    } else {
+        require(static_cast<bool>(node["base_function"]), "basic component requires base_function");
+        spec.base_function = yaml_basic_function_id(node["base_function"]);
+    }
     spec.coordinate_transform = coordinate_transform_spec_from_yaml(node["coordinate_transform"]);
     spec.value_transform = value_transform_spec_from_yaml(node["value_transform"]);
-    spec.f_bias = node["f_bias"] ? node["f_bias"].as<double>() : 0.0;
     spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     return spec;
 }
@@ -563,17 +669,23 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
         node["kind"] = to_spec_name(composition.kind);
         node["seed"] = composition.seed;
         node["parameters"] = double_vector(composition.parameters);
+        if (!composition.biases.empty()) {
+            node["biases"] = double_vector(composition.biases);
+        }
         return node;
     };
 
     YAML::Node components(YAML::NodeType::Sequence);
     for (const ComponentSpec& component : spec.components) {
         YAML::Node node;
-        node["base_function"] = to_string(component.base_function);
-        node["component_dimension"] = component.component_dimension;
+        if (component.composed_function) {
+            node["composed_function"] = function_spec_to_yaml(*component.composed_function);
+        } else {
+            require(component.base_function.has_value(), "basic component requires base_function");
+            node["base_function"] = to_string(*component.base_function);
+        }
         node["coordinate_transform"] = transform_spec(component.coordinate_transform);
         node["value_transform"] = value_transform_spec(component.value_transform);
-        node["f_bias"] = component.f_bias;
         node["seed"] = component.seed;
         components.push_back(node);
     }
@@ -694,7 +806,10 @@ YAML::Node suite_spec_to_yaml(const SuiteSpec& spec) {
     node["coordinate_transforms"] = coordinate_choice_vector(spec.coordinate_transforms);
     node["value_transforms"] = value_choice_vector(spec.value_transforms);
     node["compositions"] = composition_choice_vector(spec.compositions);
+    node["min_components"] = spec.min_components;
     node["max_components"] = spec.max_components;
+    node["max_nested_composition_depth"] = spec.max_nested_composition_depth;
+    node["nested_probability"] = spec.nested_probability;
     node["requested_number_of_functions"] = spec.requested_number_of_functions;
     node["max_number_of_functions"] = spec.max_number_of_functions;
     node["master_seed"] = spec.master_seed;

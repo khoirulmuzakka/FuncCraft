@@ -11,6 +11,14 @@ from . import _funccraft
 from .benchmark_function import BenchmarkFunction
 from .spec import ChoiceSpec, SuiteSpec, suite_spec
 
+import os
+from pathlib import Path
+
+
+_PACKAGE_SUITE_DIR = Path(__file__).resolve().parent / "suites"
+if _PACKAGE_SUITE_DIR.is_dir() and not os.environ.get("FUNCCRAFT_SUITE_DIR"):
+    os.environ["FUNCCRAFT_SUITE_DIR"] = str(_PACKAGE_SUITE_DIR)
+
 
 def _as_native_suite_spec(spec):
     return suite_spec(spec)
@@ -21,14 +29,51 @@ def make_benchmark_suite(spec, dimension):
     return BenchmarkSuite(spec, dimension)
 
 
-def load_suite_spec_yaml(path):
-    """Load a native :class:`SuiteSpec` from a YAML file."""
-    return _funccraft.load_suite_spec_yaml(str(path))
+def load_suite_spec(path):
+    """Load a native :class:`SuiteSpec` from a file."""
+    return _funccraft.load_suite_spec(str(path))
 
 
-def make_benchmark_suite_from_yaml(path, dimension):
-    """Build a :class:`BenchmarkSuite` directly from a YAML file."""
-    return BenchmarkSuite(path, dimension)
+SuiteCollectionId = _funccraft.SuiteCollectionId
+
+
+def list_suite_collections():
+    """Return the built-in suite collections available in this package."""
+    return _funccraft.list_suite_collections()
+
+
+def suite_collection_spec(year, version):
+    """Return the native :class:`SuiteSpec` for a built-in collection."""
+    return _funccraft.suite_collection_spec(int(year), int(version))
+
+
+def suite_collection_number_of_functions(year, version):
+    """Return the default function count for a built-in collection."""
+    return _funccraft.suite_collection_number_of_functions(int(year), int(version))
+
+
+def suite_collection_number_of_function(year, version):
+    """Alias for :func:`suite_collection_number_of_functions`."""
+    return suite_collection_number_of_functions(year, version)
+
+
+def suite_collection(year, version):
+    """Return a :class:`SuiteCollection` wrapper for a built-in collection."""
+    return SuiteCollection(year, version)
+
+
+def suite_collection_benchmark_suite(
+    year,
+    version,
+    dimension,
+):
+    """Build a :class:`BenchmarkSuite` from a built-in suite collection."""
+    native = _funccraft.suite_collection_benchmark_suite(
+        int(year),
+        int(version),
+        int(dimension),
+    )
+    return BenchmarkSuite.from_cpp(native)
 
 
 class BenchmarkSuite:
@@ -123,11 +168,63 @@ class BenchmarkSuite:
         )
 
 
+class SuiteCollection:
+    """Built-in, versioned benchmark-suite collection."""
+
+    def __init__(self, year, version):
+        self._collection = _funccraft.SuiteCollection(int(year), int(version))
+
+    @property
+    def year(self):
+        return self._collection.year
+
+    @property
+    def version(self):
+        return self._collection.version
+
+    @property
+    def name(self):
+        return self._collection.name
+
+    def number_of_functions(self):
+        return self._collection.number_of_functions
+
+    def number_of_function(self):
+        return self.number_of_functions()
+
+    def spec(self):
+        return self._collection.spec()
+
+    def benchmark_suite(
+        self,
+        dimension,
+    ):
+        native = self._collection.benchmark_suite(
+            int(dimension),
+        )
+        return BenchmarkSuite.from_cpp(native)
+
+    def __repr__(self):
+        return (
+            "SuiteCollection("
+            f"year={self.year}, "
+            f"version={self.version}, "
+            f"name='{self.name}')"
+        )
+
+
 __all__ = [
     "BenchmarkSuite",
     "ChoiceSpec",
-    "load_suite_spec_yaml",
+    "list_suite_collections",
+    "load_suite_spec",
+    "suite_collection",
+    "suite_collection_benchmark_suite",
+    "suite_collection_number_of_function",
+    "suite_collection_number_of_functions",
+    "suite_collection_spec",
+    "SuiteCollection",
+    "SuiteCollectionId",
     "SuiteSpec",
     "make_benchmark_suite",
-    "make_benchmark_suite_from_yaml",
 ]

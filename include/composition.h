@@ -10,7 +10,6 @@
  * transforms.
  */
 
-#include "function_spec.h"
 #include "core.h"
 
 #include <memory>
@@ -29,7 +28,6 @@ public:
      * @brief Return the composition family used by this strategy.
      */
     virtual CompositionClass composition_class() const = 0;
-    virtual CompositionSpec export_spec() const = 0;
 
 protected:
     virtual double raw_apply(const std::vector<double>& x, const std::vector<double>& z) const = 0;
@@ -59,7 +57,6 @@ protected:
 class NoneComposition final : public CommonPointComposition {
 public:
     CompositionClass composition_class() const override;
-    CompositionSpec export_spec() const override;
 
 protected:
     double common_raw_apply(const std::vector<double>& z) const override;
@@ -76,7 +73,6 @@ public:
 
 private:
     double common_raw_apply(const std::vector<double>& z) const override;
-    CompositionSpec export_spec() const override;
     std::vector<double> weights_;
 };
 
@@ -91,7 +87,6 @@ public:
 
 private:
     double common_raw_apply(const std::vector<double>& z) const override;
-    CompositionSpec export_spec() const override;
     std::vector<double> weights_;
     double p_ = 1.0;
 };
@@ -107,7 +102,6 @@ public:
 
 private:
     double common_raw_apply(const std::vector<double>& z) const override;
-    CompositionSpec export_spec() const override;
     std::vector<double> weights_;
     double epsilon_ = 0.1;
     double alpha_ = 1.0;
@@ -116,7 +110,6 @@ private:
 /**
  * @brief Softmax-based deceptive composition.
  *
- * The output is computed by a smooth selective softmax blend. The softmax
  * The output is computed by a smooth selective softmax blend based on
  * distances to the component centers.
  */
@@ -124,15 +117,14 @@ class DeceptiveSoftmaxComposition final : public DeceptivePointComposition {
 public:
     DeceptiveSoftmaxComposition(
         std::vector<std::vector<double>> centers,
-        std::vector<double> offsets,
-        double sharpness = 0.01);
+        double sharpness = 0.01,
+        std::vector<double> biases = {});
     CompositionClass composition_class() const override;
 
 private:
     double deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
-    CompositionSpec export_spec() const override;
     std::vector<std::vector<double>> centers_;
-    std::vector<double> offsets_;
+    std::vector<double> biases_;
     double sharpness_ = 0.01;
 };
 
@@ -147,17 +139,16 @@ class DeceptiveBgSoftmaxComposition final : public DeceptivePointComposition {
 public:
     DeceptiveBgSoftmaxComposition(
         std::vector<std::vector<double>> centers,
-        std::vector<double> offsets,
         double sharpness = 0.01,
         double background_strength = 1.0,
-        double background_sharpness = 0.01);
+        double background_sharpness = 0.01,
+        std::vector<double> biases = {});
     CompositionClass composition_class() const override;
 
 private:
     double deceptive_raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
-    CompositionSpec export_spec() const override;
     std::vector<std::vector<double>> centers_;
-    std::vector<double> offsets_;
+    std::vector<double> biases_;
     double sharpness_ = 0.01;
     double background_strength_ = 1.0;
     double background_sharpness_ = 0.01;

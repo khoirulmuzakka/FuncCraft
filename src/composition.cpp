@@ -55,12 +55,6 @@ CompositionClass NoneComposition::composition_class() const {
     return CompositionClass::None;
 }
 
-CompositionSpec NoneComposition::export_spec() const {
-    CompositionSpec spec;
-    spec.kind = CompositionKind::None;
-    return spec;
-}
-
 WeightedSumComposition::WeightedSumComposition(std::vector<double> weights)
     : weights_(std::move(weights)) {
     require(!weights_.empty(), "weighted sum needs at least one weight");
@@ -79,12 +73,6 @@ double WeightedSumComposition::common_raw_apply(const std::vector<double>& z) co
 
 CompositionClass WeightedSumComposition::composition_class() const {
     return CompositionClass::CommonPointWeightedSum;
-}
-
-CompositionSpec WeightedSumComposition::export_spec() const {
-    CompositionSpec spec;
-    spec.kind = CompositionKind::CpmWeightedSum;
-    return spec;
 }
 
 PowerMeanComposition::PowerMeanComposition(std::vector<double> weights, double p)
@@ -116,13 +104,6 @@ CompositionClass PowerMeanComposition::composition_class() const {
     return CompositionClass::CommonPointPowerMean;
 }
 
-CompositionSpec PowerMeanComposition::export_spec() const {
-    CompositionSpec spec;
-    spec.kind = CompositionKind::CpmPowerMean;
-    spec.parameters = {p_};
-    return spec;
-}
-
 LevelWellComposition::LevelWellComposition(std::vector<double> weights, double epsilon, double alpha)
     : weights_(std::move(weights)),
       epsilon_(epsilon),
@@ -152,22 +133,15 @@ CompositionClass LevelWellComposition::composition_class() const {
     return CompositionClass::CommonPointLevelWell;
 }
 
-CompositionSpec LevelWellComposition::export_spec() const {
-    CompositionSpec spec;
-    spec.kind = CompositionKind::CpmLevelWell;
-    spec.parameters = {epsilon_, alpha_};
-    return spec;
-}
-
 DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
     std::vector<std::vector<double>> centers,
-    std::vector<double> offsets,
-    double sharpness)
+    double sharpness,
+    std::vector<double> biases)
     : centers_(std::move(centers)),
-      offsets_(std::move(offsets)),
+      biases_(std::move(biases)),
       sharpness_(sharpness) {
     require(!centers_.empty(), "deceptive softmax needs at least one center");
-    require(centers_.size() == offsets_.size(), "deceptive offsets must match centers");
+    require(biases_.empty() || biases_.size() == centers_.size(), "deceptive softmax bias/center size mismatch");
     require(sharpness_ >= 0.0, "softmax sharpness must be nonnegative");
     const std::size_t dimension = centers_.front().size();
     for (const auto& center : centers_) {
@@ -194,7 +168,7 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
         if (i > 0) {
             w *= selective_mask;
         }
-        numerator += w * (z[i] + offsets_[i]);
+        numerator += w * (z[i] + (biases_.empty() ? 0.0 : biases_[i]));
         denominator += w;
     }
     return numerator / denominator;
@@ -204,26 +178,19 @@ CompositionClass DeceptiveSoftmaxComposition::composition_class() const {
     return CompositionClass::DeceptivePointSoftmax;
 }
 
-CompositionSpec DeceptiveSoftmaxComposition::export_spec() const {
-    CompositionSpec spec;
-    spec.kind = CompositionKind::DpmSoftmax;
-    spec.parameters = {sharpness_};
-    return spec;
-}
-
 DeceptiveBgSoftmaxComposition::DeceptiveBgSoftmaxComposition(
     std::vector<std::vector<double>> centers,
-    std::vector<double> offsets,
     double sharpness,
     double background_strength,
-    double background_sharpness)
+    double background_sharpness,
+    std::vector<double> biases)
     : centers_(std::move(centers)),
-      offsets_(std::move(offsets)),
+      biases_(std::move(biases)),
       sharpness_(sharpness),
       background_strength_(background_strength),
       background_sharpness_(background_sharpness) {
     require(!centers_.empty(), "deceptive bg softmax needs at least one center");
-    require(centers_.size() == offsets_.size(), "deceptive bg offsets must match centers");
+    require(biases_.empty() || biases_.size() == centers_.size(), "deceptive bg softmax bias/center size mismatch");
     require(sharpness_ >= 0.0, "softmax sharpness must be nonnegative");
     require(background_strength_ >= 0.0, "background strength must be nonnegative");
     require(background_sharpness_ >= 0.0, "background sharpness must be nonnegative");
@@ -255,7 +222,7 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
         if (i > 0) {
             w *= selective_mask;
         }
-        numerator += (w + background) * (z[i] + offsets_[i]);
+        numerator += (w + background) * (z[i] + (biases_.empty() ? 0.0 : biases_[i]));
         denominator += w + background;
     }
     return numerator / denominator;
@@ -263,13 +230,6 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
 
 CompositionClass DeceptiveBgSoftmaxComposition::composition_class() const {
     return CompositionClass::DeceptivePointBgSoftmax;
-}
-
-CompositionSpec DeceptiveBgSoftmaxComposition::export_spec() const {
-    CompositionSpec spec;
-    spec.kind = CompositionKind::DpmBgSoftmax;
-    spec.parameters = {sharpness_, background_strength_, background_sharpness_};
-    return spec;
 }
 
 } // namespace FuncCraft

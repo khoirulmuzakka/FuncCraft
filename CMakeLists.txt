@@ -94,6 +94,9 @@ if(BUILD_LIBRARY)
     if(WIN32)
         target_compile_definitions(funccraft PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
     endif()
+    target_compile_definitions(funccraft PRIVATE
+        FUNCCRAFT_DEFAULT_SUITE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/suites"
+    )
 endif()
 
 if(BUILD_EXAMPLES)
@@ -224,6 +227,10 @@ if(DEFINED SKBUILD AND SKBUILD)
             RUNTIME DESTINATION funccraft
         )
     endif()
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/suites/
+        DESTINATION funccraft/suites
+        FILES_MATCHING PATTERN "*.yaml" PATTERN "*.yml"
+    )
 elseif(FUNCCRAFT_INSTALL)
     if(_funccraft_fetched_yaml_cpp)
         message(FATAL_ERROR "FUNCCRAFT_INSTALL requires yaml-cpp from find_package(yaml-cpp CONFIG). Disable FUNCCRAFT_INSTALL or install yaml-cpp first.")
@@ -240,6 +247,10 @@ elseif(FUNCCRAFT_INSTALL)
     install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING PATTERN "*.h"
+    )
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/suites/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/FuncCraft/suites
+        FILES_MATCHING PATTERN "*.yaml" PATTERN "*.yml"
     )
 
     write_basic_package_version_file(

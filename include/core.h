@@ -59,6 +59,53 @@ enum class CoordinateTransformClass {
 };
 
 /**
+ * @brief High-level coordinate-transform family.
+ */
+enum class CoordinateTransformKind {
+    None,
+    Rotation,
+    Affine,
+    BlockRotation,
+};
+
+/**
+ * @brief High-level value-transform family.
+ */
+enum class ValueTransformKind {
+    None,
+    Power,
+    Oscillatory,
+    CosineZero,
+};
+
+/**
+ * @brief High-level composition mode.
+ *
+ * `None` is used for the one-component case. CPM and DPM are the two
+ * multi-component composition modes.
+ */
+enum class CompositionMode {
+    None,
+    CPM,
+    DPM,
+};
+
+/**
+ * @brief Concrete composition family.
+ *
+ * There is no "single component" family. A function with one component uses
+ * no composition.
+ */
+enum class CompositionKind {
+    None,
+    CpmWeightedSum,
+    CpmPowerMean,
+    CpmLevelWell,
+    DpmSoftmax,
+    DpmBgSoftmax,
+};
+
+/**
  * @brief Axis-aligned rectangular domain for benchmark inputs.
  */
 struct Domain {

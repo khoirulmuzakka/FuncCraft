@@ -14,7 +14,7 @@ The library separates benchmark construction into primitive functions,
 coordinate transforms, value transforms, and composition rules. A generated
 function can be exported as YAML and rebuilt later with the same parameters,
 including transform matrices, selected subspaces, component optimum locations,
-component biases, and scale factors.
+component centers, DPM composition biases, and scale factors.
 
 ## Generating Mechanism
 
@@ -48,10 +48,13 @@ active benchmark domain. This lets users place a generated optimum at
 `assigned_xopt` without needing to know the primitive domain-scaling details.
 
 The usual suite generator chooses these ingredients from weighted
-choice lists, places the global optimum and deceptive centers deterministically
+choice lists, places the global optimum and component centers deterministically
 from the suite seed, and then materializes a
 `FunctionSpec`. A `FunctionSpec` is the reproducibility record: it is the data
 used to build a `BenchmarkFunction`, and it is also what is exported to YAML.
+For DPM compositions, component 0 is assigned to the constructed global
+optimum and every other component center is sampled from the shrunken search
+domain.
 
 ## Implemented Mechanisms
 
@@ -89,19 +92,45 @@ Composition functions:
   component.
 
 The default suite choices are in `include/suite_spec.h` and
-`BenchmarkSuites/default_suite.yaml`.
+`suites/2026_v1.yaml`.
+
+Suite generation can also nest composed functions inside components.
+`max_nested_composition_depth = 0` means composed suite functions use only
+primitive components. Larger values allow nested composed components, and
+`nested_probability` controls how often each component is sampled as a nested
+composition.
 
 ## Repository Layout
 
 - `include/`: public C++ headers.
 - `src/`: C++ implementation and Python bindings.
 - `funccraft/`: Python wrapper package.
-- `BenchmarkSuites/`: YAML suite specifications.
+- `suites/`: versioned YAML suite collections, named like `2026_v1.yaml`.
 - `tests/`: Python and C++ round-trip and cross-platform value checks.
 - `examples/`: optional examples; Minion-dependent examples are built only when
   `BUILD_EXAMPLES=ON`. See `examples/main_minimize.cpp` for an end-to-end
   example that minimizes functions from a generated benchmark suite.
 - `docs/`: paper source and plotting scripts.
+
+## Public C++ API
+
+Use `#include "funccraft.h"` for normal C++ code. This is the documented
+high-level entry point for `BasicF`, `BenchmarkFunction`, `BenchmarkSuite`,
+`SuiteCollection`, `FunctionSpec`, `SuiteSpec`, `load_function_spec`,
+`load_suite_spec`, and construction/export helpers. Lower-level builder,
+transform, and composition implementation headers are available separately for
+internal or advanced use.
+
+The built-in benchmark collections are versioned by year and version number
+and are defined by YAML files in `suites/`, for example `2026_v1.yaml`.
+For the current collection:
+
+```cpp
+FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
+int n = collection.number_of_functions();
+FuncCraft::SuiteSpec spec = collection.spec();
+FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(10);
+```
 
 ## Build Options
 
@@ -162,7 +191,7 @@ returns one value per point.
 Create one composed benchmark function from a `FunctionSpec`:
 
 ```cpp
-#include "benchmark.h"
+#include "funccraft.h"
 
 #include <random>
 #include <vector>
@@ -194,13 +223,11 @@ int main() {
 
     ComponentSpec sphere;
     sphere.base_function = BasicFunctionId::Sphere;
-    sphere.component_dimension = 2;
     sphere.coordinate_transform = sphere_transform;
     sphere.value_transform = no_value_transform;
 
     ComponentSpec rastrigin;
     rastrigin.base_function = BasicFunctionId::Rastrigin;
-    rastrigin.component_dimension = 2;
     rastrigin.coordinate_transform = rastrigin_transform;
     rastrigin.value_transform = power;
 
@@ -221,21 +248,21 @@ int main() {
     std::vector<double> values = f({x_star, {1.0, 1.0}});
 
     f.export_spec("function.yaml");
-    BenchmarkFunction same_f = make_benchmark_function_from_yaml("function.yaml");
+    BenchmarkFunction same_f = make_benchmark_function("function.yaml");
 }
 ```
 
 Create a benchmark suite and evaluate generated functions:
 
 ```cpp
-#include "benchmark.h"
+#include "funccraft.h"
 
 #include <vector>
 
 int main() {
     using namespace FuncCraft;
 
-    SuiteSpec spec = load_suite_spec_yaml("BenchmarkSuites/default_suite.yaml");
+    SuiteSpec spec = load_suite_spec("suites/2026_v1.yaml");
     spec.requested_number_of_functions = 500;
     spec.master_seed = 1;
 
@@ -270,7 +297,7 @@ a benchmark suite and minimizes each generated function with Minion.
 Minimize a suite function in C++ with Minion:
 
 ```cpp
-#include "benchmark.h"
+#include "funccraft.h"
 #include <minion.h>
 
 #include <utility>
@@ -278,7 +305,7 @@ Minimize a suite function in C++ with Minion:
 
 int main() {
     FuncCraft::SuiteSpec spec =
-        FuncCraft::load_suite_spec_yaml("BenchmarkSuites/default_suite.yaml");
+        FuncCraft::load_suite_spec("suites/2026_v1.yaml");
     spec.requested_number_of_functions = 40;
 
     FuncCraft::BenchmarkSuite suite(spec, 10);
@@ -328,7 +355,7 @@ Create one composed benchmark function:
 import numpy as np
 from funccraft import (
     BenchmarkFunction,
-    make_benchmark_function_from_yaml,
+    make_benchmark_function,
     make_component,
     make_composition,
     make_coordinate_transform,
@@ -346,7 +373,6 @@ spec = make_function_spec(
     components=[
         make_component(
             base_function="Sphere",
-            component_dimension=2,
             coordinate_transform=make_coordinate_transform(
                 kind="none",
                 dimension=2,
@@ -356,7 +382,6 @@ spec = make_function_spec(
         ),
         make_component(
             base_function="Rastrigin",
-            component_dimension=2,
             coordinate_transform=make_coordinate_transform(
                 kind="rotation",
                 dimension=2,
@@ -375,7 +400,7 @@ f = BenchmarkFunction(spec)
 before = f.evaluate([x_star, [1.0, 1.0]])
 
 f.export_spec("function.yaml")
-same_f = make_benchmark_function_from_yaml("function.yaml")
+same_f = make_benchmark_function("function.yaml")
 after = same_f.evaluate([x_star, [1.0, 1.0]])
 assert before == after
 ```
@@ -383,9 +408,9 @@ assert before == after
 Create and use a generated benchmark suite:
 
 ```python
-from funccraft import BenchmarkSuite, load_suite_spec_yaml
+from funccraft import BenchmarkSuite, load_suite_spec
 
-suite_spec = load_suite_spec_yaml("BenchmarkSuites/default_suite.yaml")
+suite_spec = load_suite_spec("suites/2026_v1.yaml")
 suite_spec.requested_number_of_functions = 500
 suite_spec.master_seed = 1
 
@@ -416,7 +441,10 @@ from funccraft import (
 
 suite_spec = make_suite_spec(
     requested_number_of_functions=500,
+    min_components=2,
     max_components=4,
+    max_nested_composition_depth=1,
+    nested_probability=0.05,
     master_seed=1,
     compositions=[
         make_composition_choice("dpm-bgsoftmax", 0.5, [0.01, 1.0, 0.01]),
@@ -456,9 +484,9 @@ Minimize one generated function with SciPy:
 ```python
 import numpy as np
 from scipy.optimize import minimize
-from funccraft import BenchmarkSuite, load_suite_spec_yaml
+from funccraft import BenchmarkSuite, load_suite_spec
 
-suite_spec = load_suite_spec_yaml("BenchmarkSuites/default_suite.yaml")
+suite_spec = load_suite_spec("suites/2026_v1.yaml")
 suite_spec.requested_number_of_functions = 40
 
 suite = BenchmarkSuite(suite_spec, 10)
@@ -496,8 +524,8 @@ one complete function spec. The exported YAML contains:
 - coordinate transform kind, seed, selected indices, `assigned_xopt`,
   parameters, and generated matrix when applicable;
 - value transform kind, seed, and parameters;
-- each component's `f_bias`;
-- composition kind, seed, and parameters;
+- each component's assigned center;
+- composition kind, seed, parameters, and DPM biases when applicable;
 - function-level `assigned_xopt` and `assigned_fopt`;
 - `scale_factor` when it has been materialized or explicitly set;
 - label and metadata.

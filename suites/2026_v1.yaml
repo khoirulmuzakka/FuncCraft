@@ -93,12 +93,15 @@ compositions:
     parameters : [0.01, 1.0, 0.01]
 
 composition_base_functions: [3, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 22, 28, 30, 31, 35, 34, 1, 4, 8, 27]
-max_components: 4
-requested_number_of_functions: 1000
+min_components: 2
+max_components: 5
+max_nested_composition_depth: 1
+nested_probability: 0.1
+requested_number_of_functions: 1000000
 max_number_of_functions: 0
 master_seed: 1
 lower_bound: -100
 upper_bound: 100
 assigned_fopt: 100.0
 xopt_domain_shrink_factor: 0.8
-suite_label: default
+suite_label: Funccraft-2026-benchmark-suite-v1

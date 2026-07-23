@@ -6,7 +6,7 @@
  * @brief High-level typed specification for benchmark suite generation.
  */
 
-#include "function_spec.h"
+#include "core.h"
 
 #include <cstdint>
 #include <utility>
@@ -120,7 +120,10 @@ struct SuiteSpec {
     std::vector<ValueTransformChoice> value_transforms = all_value_transform_choices();
     std::vector<CompositionChoice> compositions = all_composition_choices();
 
-    int max_components = 10;
+    int min_components = 2;
+    int max_components = 4;
+    int max_nested_composition_depth = 0;
+    double nested_probability = 0.0;
     int requested_number_of_functions = 0;
     int max_number_of_functions = 0;
     std::uint64_t master_seed = 1;

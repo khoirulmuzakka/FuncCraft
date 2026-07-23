@@ -16,11 +16,14 @@
 
 #include "core.h"
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace FuncCraft {
+
+struct FunctionSpec;
 
 /**
  * @brief Canonical public names used when serializing specs.
@@ -54,53 +57,6 @@ struct DomainSpec {
     int dimension = 0;
     std::vector<double> lower_bound;
     std::vector<double> upper_bound;
-};
-
-/**
- * @brief High-level coordinate-transform family.
- */
-enum class CoordinateTransformKind {
-    None,
-    Rotation,
-    Affine,
-    BlockRotation,
-};
-
-/**
- * @brief High-level value-transform family.
- */
-enum class ValueTransformKind {
-    None,
-    Power,
-    Oscillatory,
-    CosineZero,
-};
-
-/**
- * @brief High-level composition mode.
- *
- * `None` is used for the one-component case. CPM and DPM are the two
- * multi-component composition modes.
- */
-enum class CompositionMode {
-    None,
-    CPM,
-    DPM,
-};
-
-/**
- * @brief Concrete composition family.
- *
- * There is no "single component" family. A function with one component uses
- * no composition.
- */
-enum class CompositionKind {
-    None,
-    CpmWeightedSum,
-    CpmPowerMean,
-    CpmLevelWell,
-    DpmSoftmax,
-    DpmBgSoftmax,
 };
 
 /**
@@ -141,16 +97,15 @@ struct ValueTransformSpec {
 /**
  * @brief User-facing component request.
  *
- * A component is one primitive benchmark function plus one coordinate transform
- * and one value transform. `component_dimension` is optional for full-space
- * transforms and explicit for subspace/block use.
+ * A component uses `composed_function` when it is set; otherwise it uses
+ * `base_function` as a primitive component. The component input dimension is
+ * inferred from the coordinate transform output dimension.
  */
 struct ComponentSpec {
-    BasicFunctionId base_function = BasicFunctionId::Sphere;
-    int component_dimension = 0;
+    std::optional<BasicFunctionId> base_function;
+    std::shared_ptr<FunctionSpec> composed_function;
     CoordinateTransformSpec coordinate_transform;
     ValueTransformSpec value_transform;
-    double f_bias = 0.0;
     std::uint64_t seed = 0;
 };
 
@@ -178,13 +133,16 @@ struct ComponentSpec {
  *   `parameters[1] = background_strength`,
  *   `parameters[2] = background_sharpness`.
  *
+ * `biases` are used only by DPM families for local-minimum traps. Empty means
+ * all DPM trap biases are zero. Non-DPM families do not accept biases.
+ *
  * DPM families use each component coordinate transform's `assigned_xopt` as
- * the component center and each component's `f_bias` as the deceptive value
- * offset.
+ * the component center.
  */
 struct CompositionSpec {
     CompositionKind kind = CompositionKind::None;
     std::vector<double> parameters;
+    std::vector<double> biases;
     std::uint64_t seed = 0;
 };
 

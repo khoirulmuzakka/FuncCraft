@@ -57,13 +57,6 @@ ValueTransformClass IdentityValueTransform::transform_class() const {
     return ValueTransformClass::None;
 }
 
-ValueTransformSpec IdentityValueTransform::export_spec() const {
-    ValueTransformSpec spec;
-    spec.kind = ValueTransformKind::None;
-    spec.seed = 0;
-    return spec;
-}
-
 PowerValueTransform::PowerValueTransform(double alpha, double p)
     : alpha_(alpha),
       p_(p) {
@@ -82,11 +75,12 @@ ValueTransformClass PowerValueTransform::transform_class() const {
     return ValueTransformClass::Power;
 }
 
-ValueTransformSpec PowerValueTransform::export_spec() const {
-    ValueTransformSpec spec;
-    spec.kind = ValueTransformKind::Power;
-    spec.parameters = {alpha_, p_};
-    return spec;
+double PowerValueTransform::alpha() const {
+    return alpha_;
+}
+
+double PowerValueTransform::p() const {
+    return p_;
 }
 
 OscillatoryValueTransform::OscillatoryValueTransform(double epsilon, double alpha)
@@ -107,11 +101,12 @@ ValueTransformClass OscillatoryValueTransform::transform_class() const {
     return ValueTransformClass::Oscillatory;
 }
 
-ValueTransformSpec OscillatoryValueTransform::export_spec() const {
-    ValueTransformSpec spec;
-    spec.kind = ValueTransformKind::Oscillatory;
-    spec.parameters = {epsilon_, alpha_};
-    return spec;
+double OscillatoryValueTransform::epsilon() const {
+    return epsilon_;
+}
+
+double OscillatoryValueTransform::alpha() const {
+    return alpha_;
 }
 
 CosineZeroValueTransform::CosineZeroValueTransform(double alpha)
@@ -129,11 +124,8 @@ ValueTransformClass CosineZeroValueTransform::transform_class() const {
     return ValueTransformClass::CosineZero;
 }
 
-ValueTransformSpec CosineZeroValueTransform::export_spec() const {
-    ValueTransformSpec spec;
-    spec.kind = ValueTransformKind::CosineZero;
-    spec.parameters = {alpha_};
-    return spec;
+double CosineZeroValueTransform::alpha() const {
+    return alpha_;
 }
 
 } // namespace FuncCraft

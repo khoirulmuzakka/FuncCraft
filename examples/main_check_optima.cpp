@@ -1,9 +1,8 @@
-#include "suite.h"
+#include "funccraft.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
-#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -13,9 +12,7 @@ namespace {
 struct CheckConfig {
     int dimension = 10;
     int max_functions = 500;
-    unsigned long long seed = 1;
     double tolerance = 1.0e-8;
-    double assigned_fopt = 100.0;
 };
 
 bool is_integer_arg(const char* text) {
@@ -35,27 +32,8 @@ CheckConfig parse_cli(int argc, char* argv[]) {
     }
     if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
     if (argc > arg_index + 1) config.max_functions = std::max(1, std::atoi(argv[arg_index + 1]));
-    if (argc > arg_index + 2) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 2], nullptr, 10));
-    if (argc > arg_index + 3) config.tolerance = std::atof(argv[arg_index + 3]);
-    if (argc > arg_index + 4) config.assigned_fopt = std::atof(argv[arg_index + 4]);
+    if (argc > arg_index + 2) config.tolerance = std::atof(argv[arg_index + 2]);
     return config;
-}
-
-std::filesystem::path resolve_default_suite_yaml(const char* argv0) {
-    const std::filesystem::path cwd_candidate = std::filesystem::path("BenchmarkSuites") / "default_suite.yaml";
-    if (std::filesystem::exists(cwd_candidate)) {
-        return cwd_candidate;
-    }
-
-    if (argv0 != nullptr && *argv0 != '\0') {
-        const std::filesystem::path exe_path = std::filesystem::absolute(std::filesystem::path(argv0));
-        const std::filesystem::path exe_candidate = exe_path.parent_path() / ".." / "BenchmarkSuites" / "default_suite.yaml";
-        if (std::filesystem::exists(exe_candidate)) {
-            return exe_candidate;
-        }
-    }
-
-    return cwd_candidate;
 }
 
 std::array<std::string, 4> split_class_label(const std::string& label) {
@@ -96,26 +74,21 @@ std::string truncate_with_ellipsis(const std::string& text, std::size_t max_len)
 int main(int argc, char* argv[]) {
     try {
         const CheckConfig config = parse_cli(argc, argv);
-        const std::filesystem::path suite_yaml = resolve_default_suite_yaml(argc > 0 ? argv[0] : nullptr);
-        FuncCraft::SuiteSpec suite_spec = FuncCraft::load_suite_spec_yaml(suite_yaml.string());
-        suite_spec.requested_number_of_functions = config.max_functions;
-        suite_spec.master_seed = config.seed;
-        suite_spec.assigned_fopt = config.assigned_fopt;
-        suite_spec.suite_label = "check_optima";
-        const FuncCraft::BenchmarkSuite suite(suite_spec, config.dimension);
+        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
+        const FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(config.dimension);
 
         int failures = 0;
         double max_abs_error = 0.0;
 
         std::cout << "FuncCraft optimum check\n";
-        std::cout << "Suite yaml: " << suite_yaml.string() << "\n";
+        std::cout << "Suite collection: " << collection.name()
+                  << " (" << collection.year() << "_v" << collection.version() << ")\n";
         std::cout << "size=" << suite.size()
                   << ", max_number_of_functions=" << suite.max_number_of_functions()
                   << ", dimension=" << suite.dimension()
-                  << ", requested_functions=" << config.max_functions
-                  << ", seed=" << config.seed
+                  << ", checked_functions=" << std::min(config.max_functions, suite.size())
                   << ", tolerance=" << std::scientific << config.tolerance
-                  << ", assigned_fopt=" << config.assigned_fopt << "\n\n";
+                  << "\n\n";
 
         std::cout << std::left
                   << std::setw(6) << "idx"
