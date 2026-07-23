@@ -11,6 +11,13 @@ namespace FuncCraft {
 using namespace detail;
 
 namespace {
+constexpr double kTwoPi = 6.2831853071795864769252867665590057683943387987502;
+constexpr double kInvTwoPi = 0.15915494309189533576888376337251436203445964574046;
+
+double reduce_trig_phase(double phase) {
+    const double turns = std::nearbyint(phase * kInvTwoPi);
+    return phase - turns * kTwoPi;
+}
 
 void require_nonnegative_weights(const std::vector<double>& weights) {
     for (double weight : weights) {
@@ -126,7 +133,7 @@ LevelWellComposition::LevelWellComposition(std::size_t components, double epsilo
 double LevelWellComposition::common_raw_apply(const std::vector<double>& z) const {
     require(weights_.size() == z.size(), "weight/component size mismatch");
     const double s = weighted_sum_unchecked(weights_, z);
-    return s * (1.0 + epsilon_ * std::sin(alpha_ * s));
+    return s * (1.0 + epsilon_ * std::sin(reduce_trig_phase(alpha_ * s)));
 }
 
 CompositionClass LevelWellComposition::composition_class() const {

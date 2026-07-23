@@ -10,6 +10,13 @@ using namespace detail;
 
 namespace {
 constexpr double kValueTransformTolerance = 1.0e-12;
+constexpr double kTwoPi = 6.2831853071795864769252867665590057683943387987502;
+constexpr double kInvTwoPi = 0.15915494309189533576888376337251436203445964574046;
+
+double reduce_trig_phase(double phase) {
+    const double turns = std::nearbyint(phase * kInvTwoPi);
+    return phase - turns * kTwoPi;
+}
 
 double clamp_nonnegative(double value) {
     if (value < 0.0 && value >= -kValueTransformTolerance) {
@@ -93,7 +100,7 @@ OscillatoryValueTransform::OscillatoryValueTransform(double epsilon, double alph
 double OscillatoryValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    const double value = u * (1.0 + epsilon_ * std::sin(alpha_ * u));
+    const double value = u * (1.0 + epsilon_ * std::sin(reduce_trig_phase(alpha_ * u)));
     return clamp_finite_nonnegative(value);
 }
 
@@ -117,7 +124,7 @@ CosineZeroValueTransform::CosineZeroValueTransform(double alpha)
 double CosineZeroValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    return clamp_finite_nonnegative(1.0 - std::cos(alpha_ * u));
+    return clamp_finite_nonnegative(1.0 - std::cos(reduce_trig_phase(alpha_ * u)));
 }
 
 ValueTransformClass CosineZeroValueTransform::transform_class() const {

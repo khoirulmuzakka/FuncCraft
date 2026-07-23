@@ -153,9 +153,9 @@ Value transforms
    * - ``power``
      - Power-law value reshaping.
    * - ``oscillatory``
-     - Oscillatory nonlinearity for positive component values.
+     - Oscillatory nonlinearity for positive component values, with explicit ``2*pi`` phase reduction for cross-platform numerical stability.
    * - ``cosine-zero``
-     - Nonmonotone transform preserving zero.
+     - Nonmonotone transform preserving zero, with explicit ``2*pi`` phase reduction.
 
 Composition functions
 ---------------------
@@ -177,7 +177,7 @@ Composition functions
      - Common-point power-mean aggregation.
    * - ``cpm-level-well``
      - CPM
-     - Common-point level-well composition.
+     - Common-point level-well composition with explicit ``2*pi`` phase reduction.
    * - ``dpm-softmax``
      - DPM
      - Deceptive-point softmax composition.
