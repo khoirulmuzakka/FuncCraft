@@ -46,6 +46,10 @@ jobs:
           CIBW_ENVIRONMENT: >-
             CMAKE_ARGS="-DBUILD_PYTHON=ON"
             SKBUILD_CONFIGURE_OPTIONS="-DBUILD_PYTHON=ON"
+          CIBW_ENVIRONMENT_MACOS: >-
+            MACOSX_DEPLOYMENT_TARGET=10.15
+            CMAKE_ARGS="-DBUILD_PYTHON=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15"
+            SKBUILD_CONFIGURE_OPTIONS="-DBUILD_PYTHON=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15"
 
       - name: Upload wheels as artifacts
         uses: actions/upload-artifact@v4

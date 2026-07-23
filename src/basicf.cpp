@@ -13,6 +13,8 @@ namespace FuncCraft {
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
+constexpr double kTwoPi = 6.2831853071795864769252867665590057683943387987502;
+constexpr double kInvTwoPi = 0.15915494309189533576888376337251436203445964574046;
 constexpr double kSchwefelShift = 420.9687462275036;
 
 template <typename Engine>
@@ -62,6 +64,19 @@ double sign_of(double x) {
     return 0.0;
 }
 
+double reduce_trig_phase(double phase) {
+    const double turns = std::nearbyint(phase * kInvTwoPi);
+    return phase - turns * kTwoPi;
+}
+
+double stable_sin(double phase) {
+    return std::sin(reduce_trig_phase(phase));
+}
+
+double stable_cos(double phase) {
+    return std::cos(reduce_trig_phase(phase));
+}
+
 double osz_transform(double x) {
     if (x == 0.0) {
         return 0.0;
@@ -69,7 +84,7 @@ double osz_transform(double x) {
     const double hat = std::log(std::fabs(x));
     const double c1 = x > 0.0 ? 10.0 : 5.5;
     const double c2 = x > 0.0 ? 7.9 : 3.1;
-    return sign_of(x) * std::exp(hat + 0.049 * (std::sin(c1 * hat) + std::sin(c2 * hat)));
+    return sign_of(x) * std::exp(hat + 0.049 * (stable_sin(c1 * hat) + stable_sin(c2 * hat)));
 }
 
 double safe_pow_abs(double x, double exponent) {
@@ -177,7 +192,7 @@ double ackley_eval(const double* x, int dimension) {
     double sum_cos = 0.0;
     for (int i = 0; i < dimension; ++i) {
         sum_sq += sqr(x[i]);
-        sum_cos += std::cos(2.0 * kPi * x[i]);
+        sum_cos += stable_cos(2.0 * kPi * x[i]);
     }
     const double inv_dim = 1.0 / static_cast<double>(dimension);
     return -20.0 * std::exp(-0.2 * std::sqrt(sum_sq * inv_dim))
@@ -188,7 +203,7 @@ double ackley_eval(const double* x, int dimension) {
 double separable_rastrigin_eval(const double* x, int dimension) {
     double sum = 10.0 * static_cast<double>(dimension);
     for (int i = 0; i < dimension; ++i) {
-        sum += sqr(x[i]) - 10.0 * std::cos(2.0 * kPi * x[i]);
+        sum += sqr(x[i]) - 10.0 * stable_cos(2.0 * kPi * x[i]);
     }
     return sum;
 }
@@ -202,7 +217,7 @@ double bueche_rastrigin_eval(const double* x, int dimension) {
         if ((i % 2) == 0 && zi > 0.0) {
             zi *= 10.0;
         }
-        sum += sqr(zi) - 10.0 * std::cos(2.0 * kPi * zi);
+        sum += sqr(zi) - 10.0 * stable_cos(2.0 * kPi * zi);
     }
     return sum;
 }
@@ -242,7 +257,7 @@ double step_rastrigin_eval(const double* x, int dimension) {
         if (std::fabs(y) > 0.5) {
             y = std::floor(2.0 * y + 0.5) / 2.0;
         }
-        sum += sqr(y) - 10.0 * std::cos(2.0 * kPi * y) + 10.0;
+        sum += sqr(y) - 10.0 * stable_cos(2.0 * kPi * y) + 10.0;
     }
     return sum;
 }
@@ -250,7 +265,7 @@ double step_rastrigin_eval(const double* x, int dimension) {
 double rastrigin_eval(const double* x, int dimension) {
     double sum = 10.0 * static_cast<double>(dimension);
     for (int i = 0; i < dimension; ++i) {
-        sum += sqr(x[i]) - 10.0 * std::cos(2.0 * kPi * x[i]);
+        sum += sqr(x[i]) - 10.0 * stable_cos(2.0 * kPi * x[i]);
     }
     return sum;
 }
@@ -260,7 +275,7 @@ double griewank_eval(const double* x, int dimension) {
     double prod = 1.0;
     for (int i = 0; i < dimension; ++i) {
         sum += sqr(x[i]) / 4000.0;
-        prod *= std::cos(x[i] / std::sqrt(static_cast<double>(i + 1)));
+        prod *= stable_cos(x[i] / std::sqrt(static_cast<double>(i + 1)));
     }
     return sum - prod + 1.0;
 }
@@ -271,15 +286,15 @@ double schwefel_eval(const double* x, int dimension) {
     for (int i = 0; i < dimension; ++i) {
         double z = scale * x[i] + kSchwefelShift;
         if (z > 500.0) {
-            sum -= (500.0 - std::fmod(z, 500.0)) * std::sin(std::sqrt(500.0 - std::fmod(z, 500.0)));
+            sum -= (500.0 - std::fmod(z, 500.0)) * stable_sin(std::sqrt(500.0 - std::fmod(z, 500.0)));
             const double tmp = (z - 500.0) / 100.0;
             sum += tmp * tmp / static_cast<double>(dimension);
         } else if (z < -500.0) {
-            sum -= (-500.0 + std::fmod(std::fabs(z), 500.0)) * std::sin(std::sqrt(500.0 - std::fmod(std::fabs(z), 500.0)));
+            sum -= (-500.0 + std::fmod(std::fabs(z), 500.0)) * stable_sin(std::sqrt(500.0 - std::fmod(std::fabs(z), 500.0)));
             const double tmp = (z + 500.0) / 100.0;
             sum += tmp * tmp / static_cast<double>(dimension);
         } else {
-            sum -= z * std::sin(std::sqrt(std::fabs(z)));
+            sum -= z * stable_sin(std::sqrt(std::fabs(z)));
         }
     }
     return sum + 418.9828872724338 * static_cast<double>(dimension);
@@ -303,7 +318,7 @@ double schaffer_f7_cec_eval(const double* x, int dimension) {
     double sum = 0.0;
     for (int i = 0; i < dimension - 1; ++i) {
         const double zi = std::sqrt(sqr(x[i]) + sqr(x[i + 1]));
-        const double tmp = std::sin(50.0 * std::pow(zi, 0.2));
+        const double tmp = stable_sin(50.0 * std::pow(zi, 0.2));
         sum += std::sqrt(zi) + std::sqrt(zi) * tmp * tmp;
     }
     const double denom = static_cast<double>(dimension - 1);
@@ -318,11 +333,11 @@ double weierstrass_eval(const double* x, int dimension) {
     double sum = 0.0;
     double correction = 0.0;
     for (int k = 0; k <= kMax; ++k) {
-        correction += std::pow(a, k) * std::cos(2.0 * kPi * std::pow(b, k) * 0.5);
+        correction += std::pow(a, k) * stable_cos(2.0 * kPi * std::pow(b, k) * 0.5);
     }
     for (int i = 0; i < dimension; ++i) {
         for (int k = 0; k <= kMax; ++k) {
-            sum += std::pow(a, k) * std::cos(2.0 * kPi * std::pow(b, k) * (x[i] + 0.5));
+            sum += std::pow(a, k) * stable_cos(2.0 * kPi * std::pow(b, k) * (x[i] + 0.5));
         }
     }
     return sum - static_cast<double>(dimension) * correction;
@@ -339,7 +354,7 @@ double schaffer_f7_eval(const double* x, int dimension, double condition) {
         const double zi = std::pow(condition, 0.5 * exponent_i) * x[i];
         const double zj = std::pow(condition, 0.5 * exponent_j) * x[i + 1];
         const double s = std::sqrt(sqr(zi) + sqr(zj));
-        const double t = std::sin(50.0 * std::pow(s, 0.2));
+        const double t = stable_sin(50.0 * std::pow(s, 0.2));
         sum += std::sqrt(s) * (1.0 + t * t);
     }
     const double mean = sum / static_cast<double>(dimension - 1);
@@ -356,7 +371,7 @@ double griewank_rosenbrock_eval(const double* x, int dimension) {
         const double yi = 0.05 * x[i] + 1.0;
         const double yj = 0.05 * x[j] + 1.0;
         const double z = 100.0 * sqr(yi * yi - yj) + sqr(yi - 1.0);
-        sum += (z * z) / 4000.0 - std::cos(z) + 1.0;
+        sum += (z * z) / 4000.0 - stable_cos(z) + 1.0;
     }
     return sum;
 }
@@ -392,7 +407,7 @@ double lunacek_bi_rastrigin_eval(const double* x, int dimension) {
         const double z = std::pow(100.0, exponent) * diff0;
         sum1 += sqr(diff0);
         sum2 += sqr(diff1);
-        rastrigin += 10.0 * (1.0 - std::cos(2.0 * kPi * z));
+        rastrigin += 10.0 * (1.0 - stable_cos(2.0 * kPi * z));
     }
     return std::min(sum1, d * static_cast<double>(dimension) + s * sum2) + rastrigin;
 }
@@ -410,13 +425,13 @@ double zakharov_eval(const double* x, int dimension) {
 double levy_eval(const double* x, int dimension) {
     const auto w = [x](int i) { return 1.0 + x[i] / 4.0; };
 
-    const double term1 = sqr(std::sin(kPi * w(0)));
-    const double term3 = sqr(w(dimension - 1) - 1.0) * (1.0 + sqr(std::sin(2.0 * kPi * w(dimension - 1))));
+    const double term1 = sqr(stable_sin(kPi * w(0)));
+    const double term3 = sqr(w(dimension - 1) - 1.0) * (1.0 + sqr(stable_sin(2.0 * kPi * w(dimension - 1))));
 
     double sum = 0.0;
     for (int i = 0; i < dimension - 1; ++i) {
         const double wi = w(i);
-        sum += sqr(wi - 1.0) * (1.0 + 10.0 * sqr(std::sin(kPi * wi + 1.0)));
+        sum += sqr(wi - 1.0) * (1.0 + 10.0 * sqr(stable_sin(kPi * wi + 1.0)));
     }
     return term1 + sum + term3;
 }
@@ -425,18 +440,18 @@ double michalewicz_eval(const double* x, int dimension) {
     constexpr double m = 10.0;
     double sum = 0.0;
     for (int i = 0; i < dimension; ++i) {
-        const double a = std::sin(static_cast<double>(i + 1) * x[i] * x[i] / kPi);
+        const double a = stable_sin(static_cast<double>(i + 1) * x[i] * x[i] / kPi);
         const double a2 = a * a;
         // Use a nonnegative base for the even power to avoid libm edge cases on
         // negative bases while preserving the standard Michalewicz formula.
-        sum += std::sin(x[i]) * std::pow(a2, m);
+        sum += stable_sin(x[i]) * std::pow(a2, m);
     }
     return -sum;
 }
 
 double michalewicz_gain(int index, double x) {
-    const double s1 = std::sin(x);
-    const double s2 = std::sin(static_cast<double>(index + 1) * x * x / kPi);
+    const double s1 = stable_sin(x);
+    const double s2 = stable_sin(static_cast<double>(index + 1) * x * x / kPi);
     const double s2_sq = s2 * s2;
     return s1 * std::pow(s2_sq, 10.0);
 }
@@ -555,7 +570,7 @@ double schaffer_f6_eval(const double* x, int dimension) {
     double sum = 0.0;
     for (int i = 0; i < dimension - 1; ++i) {
         const double term1 = sqr(x[i]) + sqr(x[i + 1]);
-        const double sin_term = std::sin(std::sqrt(term1));
+        const double sin_term = stable_sin(std::sqrt(term1));
         const double denom_term = sqr(1.0 + 0.001 * term1);
         sum += 0.5 + (sqr(sin_term) - 0.5) / denom_term;
     }

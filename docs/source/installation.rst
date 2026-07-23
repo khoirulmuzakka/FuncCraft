@@ -31,6 +31,8 @@ Requirements:
 
 - CMake 3.18 or newer
 - a C++17 compiler
+- macOS 10.15 or newer when building on macOS, because FuncCraft uses
+  C++17 ``std::filesystem``
 - Python 3.9 or newer for the Python interface
 - ``pybind11`` for Python builds
 - ``yaml-cpp`` or network access so CMake can fetch ``yaml-cpp``
