@@ -18,9 +18,8 @@ component centers, DPM composition biases, and scale factors.
 
 ## Generating Mechanism
 
-FuncCraft follows the composition framework described in
-`docs/funccraft.tex`, section `A General Composition Framework`. A benchmark is
-assembled as
+FuncCraft follows the general composition framework described in the
+documentation. A benchmark is assembled as
 
 ```text
 f(x) = psi(phi_1(g_1(T_1(x))), ..., phi_m(g_m(T_m(x))))
@@ -110,7 +109,7 @@ composition.
 - `examples/`: optional examples; Minion-dependent examples are built only when
   `BUILD_EXAMPLES=ON`. See `examples/main_minimize.cpp` for an end-to-end
   example that minimizes functions from a generated benchmark suite.
-- `docs/`: paper source and plotting scripts.
+- `docs/`: Sphinx/Read the Docs-style documentation source and build scripts.
 
 ## Public C++ API
 
