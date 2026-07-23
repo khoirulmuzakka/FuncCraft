@@ -1,7 +1,12 @@
+<p align="center">
+  <img src="logo/logo.png" alt="FuncCraft logo" width="260">
+</p>
+
 # FuncCraft
 
 [![CI](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/ci.yml/badge.svg)](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/ci.yml)
 [![Wheel](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml/badge.svg)](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml)
+[![Documentation Status](https://readthedocs.org/projects/funccraft/badge/?version=latest)](https://funccraft.readthedocs.io/)
 
 FuncCraft is a C++17 library, with a Python interface, for scalable generation
 of reproducible continuous optimization benchmark functions. From one suite
