@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo/logo.png" alt="FuncCraft logo" width="260">
+  <img src="logo/logo.png" alt="FuncCraft logo" width="450">
 </p>
 
 # FuncCraft
