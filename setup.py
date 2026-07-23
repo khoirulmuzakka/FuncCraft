@@ -4,9 +4,9 @@ import shutil
 
 
 def _remove_stale_package_builds():
-    for path in Path("_skbuild").glob("*/setuptools/lib*/pyfunccraft"):
+    for path in Path("_skbuild").glob("*/setuptools/lib*/funccraft"):
         shutil.rmtree(path, ignore_errors=True)
-    for path in Path("_skbuild").glob("*/setuptools/bdist*/wheel/pyfunccraft"):
+    for path in Path("_skbuild").glob("*/setuptools/bdist*/wheel/funccraft"):
         shutil.rmtree(path, ignore_errors=True)
 
 
@@ -16,7 +16,7 @@ def _filter_wheel_manifest(files):
         "src/",
         "examples/",
         "docs/",
-        "BenchmarkSuites/",
+        "suites/",
     )
     return [path for path in files if not path.startswith(excluded_prefixes)]
 

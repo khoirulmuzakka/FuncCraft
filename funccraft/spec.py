@@ -1,16 +1,45 @@
-"""Thin Python helpers for FuncCraft specs.
+"""Python helpers for FuncCraft specs.
 
-The C++ bindings expose the actual spec structs. This module adds only two
-Python conveniences:
+The C++ bindings expose the actual plain-data spec structs. This module adds
+readable ``make_*`` factory functions and dict-to-spec conversion so Python
+users can construct FuncCraft functions without knowing the C++ headers.
 
-- readable ``make_*`` factory functions that return native C++ spec objects;
-- dict-to-spec conversion used by ``BenchmarkFunction`` and ``BenchmarkSuite``.
+Terminology
+-----------
+``DomainSpec``
+    Search bounds in the generated coordinates.
+``CoordinateTransformSpec``
+    Moves from generated/search coordinates into the component's primitive
+    coordinates. ``assigned_xopt`` is the desired optimum location in the
+    generated coordinates; the primitive optimum target is resolved internally
+    from the selected base function and domain scaling.
+``ValueTransformSpec``
+    Optional value-shape transform applied to a component output.
+``ComponentSpec``
+    One component in a function. A component is either a basic function such as
+    ``"Rastrigin"`` or a nested composed function via ``composed_function``.
+``CompositionSpec``
+    Combines component values. ``"none"`` is the identity/single-component
+    case, ``"cpm-..."`` choices are continuous composition methods, and
+    ``"dpm-..."`` choices are deceptive composition methods. DPM biases live
+    on the composition spec because they define deceptive local traps.
+``FunctionSpec``
+    Complete description of one benchmark function, including assigned global
+    optimum location/value and scale factor.
+``SuiteSpec``
+    Sampling rules for generating many distinct function specs.
 
-Typical manual function:
+Examples
+--------
+Create a single 2D function and evaluate it through ``BenchmarkFunction``::
 
-    from funccraft import *
-
-    xopt = [1.0, -2.0]
+    from funccraft import (
+        BenchmarkFunction,
+        make_component,
+        make_coordinate_transform,
+        make_domain,
+        make_function_spec,
+    )
 
     spec = make_function_spec(
         dimension=2,
@@ -19,33 +48,53 @@ Typical manual function:
             make_component(
                 base_function="Sphere",
                 coordinate_transform=make_coordinate_transform(
-                    kind="rotation",
-                    dimension=2,
-                    assigned_xopt=xopt,
+                    "rotation",
+                    assigned_xopt=[1.0, -1.0],
                     seed=1,
                 ),
             ),
         ],
-        composition=make_composition("none"),
-        assigned_xopt=xopt,
+        assigned_xopt=[1.0, -1.0],
         assigned_fopt=0.0,
+        scale_factor=1.0,
+        seed=10,
+    )
+    f = BenchmarkFunction(spec)
+    y = f([[1.0, -1.0], [0.0, 0.0]])
+
+Create a small deceptive composition from two base functions::
+
+    spec = make_function_spec(
+        dimension=2,
+        domain=make_domain(2, -10.0, 10.0),
+        components=[
+            make_component(base_function="Rastrigin"),
+            make_component(base_function="Ackley"),
+        ],
+        composition=make_composition(
+            "dpm-softmax",
+            parameters=[0.01],
+            biases=[0.0, 20.0],
+        ),
+        assigned_xopt=[2.0, -3.0],
+        scale_factor=1.0,
+        seed=11,
     )
 
-    f = BenchmarkFunction(spec)
-
-Typical suite:
+Create a suite spec. Choice probabilities in each choice table are fractions
+and should sum to one::
 
     suite_spec = make_suite_spec(
         requested_number_of_functions=500,
         max_components=4,
         master_seed=1,
         compositions=[
-            make_composition_choice("dpm-bgsoftmax", 0.5, [0.01, 1.0, 0.01]),
-            make_composition_choice("dpm-softmax", 0.5, [0.01]),
+            make_composition_choice("cpm-wsum", 0.25),
+            make_composition_choice("cpm-power-mean", 0.25),
+            make_composition_choice("dpm-softmax", 0.25, [0.01]),
+            make_composition_choice("dpm-bgsoftmax", 0.25, [0.01, 1.0, 0.01]),
         ],
     )
-
-    suite = BenchmarkSuite(suite_spec, dimension=10)
 """
 
 from __future__ import annotations
@@ -81,6 +130,16 @@ def make_domain(dimension, lower_bound=-100.0, upper_bound=100.0):
 
     ``lower_bound`` and ``upper_bound`` may be scalars or length-``dimension``
     sequences.
+
+    Examples
+    --------
+    Uniform bounds::
+
+        domain = make_domain(10, -100.0, 100.0)
+
+    Per-coordinate bounds::
+
+        domain = make_domain(2, lower_bound=[-5.0, -1.0], upper_bound=[5.0, 1.0])
     """
     spec = DomainSpec()
     spec.dimension = int(dimension)
@@ -109,6 +168,43 @@ def make_coordinate_transform(
     ``assigned_xopt`` is the desired optimum location in generated/search
     coordinates. The transform target is determined internally from the
     selected base function and domain scaling.
+
+    Parameters
+    ----------
+    kind:
+        One of ``"none"``, ``"rotation"``, ``"affine"``, or
+        ``"block-rotation"``. Names are normalized, so ``"Block Rotation"``,
+        ``"block_rotation"``, and ``"block-rotation"`` are equivalent.
+    dimension:
+        Output/subspace dimension. Leave as ``0`` to let FuncCraft infer it
+        from the ambient function dimension or selected indices.
+    assigned_xopt:
+        Desired component optimum in generated coordinates. If omitted,
+        FuncCraft uses the function-level assigned optimum or a generated
+        center, depending on the suite construction mode.
+    selected_indices:
+        Optional coordinate subset used by block rotation.
+    matrix:
+        Optional materialized transform matrix. Users normally omit this;
+        exported specs include it for exact reproducibility.
+
+    Examples
+    --------
+    Full-dimensional rotation with generated matrix::
+
+        transform = make_coordinate_transform(
+            "rotation",
+            assigned_xopt=[1.0, -1.0],
+            seed=123,
+        )
+
+    Block rotation on selected coordinates::
+
+        transform = make_coordinate_transform(
+            "block-rotation",
+            selected_indices=[0, 2, 4],
+            seed=123,
+        )
     """
     spec = CoordinateTransformSpec()
     spec.kind = coordinate_transform_kind(kind)
@@ -121,12 +217,21 @@ def make_coordinate_transform(
     return spec
 
 
-def make_value_transform(kind="none", parameters=None, seed=0):
-    """Create a native ``ValueTransformSpec``."""
+def make_value_transform(kind="none", parameters=None):
+    """Create a native ``ValueTransformSpec``.
+
+    Examples
+    --------
+    Use no value transform, or add an implemented value transform by name::
+
+        identity = make_value_transform("none")
+        warped = make_value_transform("oscillatory")
+
+    Names are normalized across case, spaces, hyphens, and underscores.
+    """
     spec = ValueTransformSpec()
     spec.kind = value_transform_kind(kind)
     spec.parameters = _list(parameters)
-    spec.seed = int(seed)
     return spec
 
 
@@ -145,6 +250,26 @@ def make_component(
     a ``spec`` attribute such as ``BenchmarkFunction``.
     ``coordinate_transform`` and ``value_transform`` may be native specs or
     dictionaries with the same field names.
+
+    Examples
+    --------
+    Basic-function component::
+
+        component = make_component(
+            base_function="Rosenbrock",
+            coordinate_transform=make_coordinate_transform("rotation", seed=5),
+            value_transform=make_value_transform("none"),
+        )
+
+    Nested composed-function component::
+
+        child = make_function_spec(
+            dimension=2,
+            components=[make_component(base_function="Sphere")],
+            assigned_xopt=[0.0, 0.0],
+            scale_factor=1.0,
+        )
+        component = make_component(composed_function=child)
     """
     spec = ComponentSpec()
     if composed_function is not None:
@@ -159,8 +284,34 @@ def make_component(
     return spec
 
 
-def make_composition(kind="none", parameters=None, biases=None, seed=0):
-    """Create a native ``CompositionSpec``."""
+def make_composition(kind="none", parameters=None, biases=None):
+    """Create a native ``CompositionSpec``.
+
+    Parameters
+    ----------
+    kind:
+        ``"none"`` for a single identity component, ``"cpm-wsum"``,
+        ``"cpm-power-mean"``, ``"cpm-level-well"``, ``"dpm-softmax"``, or
+        ``"dpm-bgsoftmax"``.
+    parameters:
+        Composition-specific numeric parameters.
+    biases:
+        DPM-only component biases used to create deceptive local traps.
+
+    Examples
+    --------
+    Identity/single-component composition::
+
+        composition = make_composition("none")
+
+    DPM composition with two component biases::
+
+        composition = make_composition(
+            "dpm-softmax",
+            parameters=[0.01],
+            biases=[0.0, 25.0],
+        )
+    """
     spec = CompositionSpec()
     kind = composition_kind(kind)
     bias_values = _list(biases)
@@ -169,7 +320,6 @@ def make_composition(kind="none", parameters=None, biases=None, seed=0):
     spec.kind = kind
     spec.parameters = _list(parameters)
     spec.biases = bias_values
-    spec.seed = int(seed)
     return spec
 
 
@@ -189,6 +339,36 @@ def make_function_spec(
 
     ``components`` may contain native ``ComponentSpec`` objects or dictionaries.
     ``scale_factor=None`` lets FuncCraft choose the scale internally.
+
+    Important fields
+    ----------------
+    ``assigned_xopt``
+        Desired global minimizer in generated/search coordinates. If omitted,
+        FuncCraft generates it from ``seed``.
+    ``assigned_fopt``
+        Desired objective value at the assigned global minimizer.
+    ``scale_factor``
+        Multiplicative value scale. Use ``None`` for internal estimation, or a
+        positive value when you want exact control.
+    ``seed``
+        Function-level seed used for generated runtime details such as missing
+        assigned optima and transform parameters.
+
+    Examples
+    --------
+    A single shifted Sphere::
+
+        spec = make_function_spec(
+            dimension=3,
+            domain=make_domain(3, -5.0, 5.0),
+            components=[make_component(base_function="Sphere")],
+            assigned_xopt=[1.0, 2.0, 3.0],
+            assigned_fopt=-100.0,
+            scale_factor=1.0,
+        )
+
+    A composition with nested components can be built by passing a
+    ``FunctionSpec`` to ``make_component(composed_function=...)``.
     """
     spec = FunctionSpec()
     spec.dimension = int(dimension)
@@ -205,7 +385,11 @@ def make_function_spec(
 
 
 def make_coordinate_transform_choice(kind, probability=1.0, parameters=None):
-    """Create a weighted coordinate-transform choice for ``SuiteSpec``."""
+    """Create a weighted coordinate-transform choice for ``SuiteSpec``.
+
+    Choice probabilities in the same table are interpreted as fractions and
+    should sum to one.
+    """
     spec = CoordinateTransformChoice()
     spec.kind = coordinate_transform_kind(kind)
     spec.probability = float(probability)
@@ -214,7 +398,11 @@ def make_coordinate_transform_choice(kind, probability=1.0, parameters=None):
 
 
 def make_value_transform_choice(kind, probability=1.0, parameters=None):
-    """Create a weighted value-transform choice for ``SuiteSpec``."""
+    """Create a weighted value-transform choice for ``SuiteSpec``.
+
+    Choice probabilities in the same table are interpreted as fractions and
+    should sum to one.
+    """
     spec = ValueTransformChoice()
     spec.kind = value_transform_kind(kind)
     spec.probability = float(probability)
@@ -223,7 +411,11 @@ def make_value_transform_choice(kind, probability=1.0, parameters=None):
 
 
 def make_composition_choice(kind, probability=1.0, parameters=None):
-    """Create a weighted composition choice for ``SuiteSpec``."""
+    """Create a weighted composition choice for ``SuiteSpec``.
+
+    Choice probabilities in the same table are interpreted as fractions and
+    should sum to one.
+    """
     spec = CompositionChoice()
     spec.kind = composition_kind(kind)
     spec.probability = float(probability)
@@ -267,6 +459,33 @@ def make_suite_spec(
     ``max_nested_composition_depth=0`` means composed suite functions use only
     primitive components. Larger values allow composed functions as components;
     ``nested_probability`` controls how often each component is nested.
+
+    Examples
+    --------
+    Generate 1,000 functions using default choices except for dimensions,
+    component count, and nesting::
+
+        spec = make_suite_spec(
+            supported_dimensions="2,5,10,20",
+            requested_number_of_functions=1000,
+            min_components=1,
+            max_components=5,
+            max_nested_composition_depth=2,
+            nested_probability=0.25,
+            master_seed=2026,
+        )
+
+    Replace the composition choice table explicitly. Probabilities should sum
+    to one::
+
+        spec = make_suite_spec(
+            requested_number_of_functions=200,
+            compositions=[
+                make_composition_choice("cpm-wsum", 0.4),
+                make_composition_choice("cpm-level-well", 0.2),
+                make_composition_choice("dpm-softmax", 0.4, [0.01]),
+            ],
+        )
     """
     spec = SuiteSpec()
     if supported_dimensions is not None:
@@ -444,7 +663,6 @@ def value_transform_spec(data):
     spec = ValueTransformSpec()
     spec.kind = value_transform_kind(data.get("kind", _NO_VALUE_TRANSFORM))
     spec.parameters = _list(data.get("parameters", []))
-    spec.seed = int(data.get("seed", 0))
     return spec
 
 
@@ -477,7 +695,6 @@ def composition_spec(data):
     spec.kind = kind
     spec.parameters = _list(data.get("parameters", []))
     spec.biases = bias_values
-    spec.seed = int(data.get("seed", 0))
     return spec
 
 
@@ -605,7 +822,7 @@ def spec_to_dict(spec):
             "seed": spec.seed,
         }
     if isinstance(spec, ValueTransformSpec):
-        return {"kind": spec.kind.name, "parameters": _list(spec.parameters), "seed": spec.seed}
+        return {"kind": spec.kind.name, "parameters": _list(spec.parameters)}
     if isinstance(spec, ComponentSpec):
         result = {
             "coordinate_transform": spec_to_dict(spec.coordinate_transform),
@@ -623,7 +840,6 @@ def spec_to_dict(spec):
         result = {
             "kind": spec.kind.name,
             "parameters": _list(spec.parameters),
-            "seed": spec.seed,
         }
         biases = _list(spec.biases)
         if biases:

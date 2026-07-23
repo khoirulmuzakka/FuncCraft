@@ -523,9 +523,9 @@ one complete function spec. The exported YAML contains:
 - component base functions;
 - coordinate transform kind, seed, selected indices, `assigned_xopt`,
   parameters, and generated matrix when applicable;
-- value transform kind, seed, and parameters;
+- value transform kind and parameters;
 - each component's assigned center;
-- composition kind, seed, parameters, and DPM biases when applicable;
+- composition kind, parameters, and DPM biases when applicable;
 - function-level `assigned_xopt` and `assigned_fopt`;
 - `scale_factor` when it has been materialized or explicitly set;
 - label and metadata.

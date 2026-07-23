@@ -43,6 +43,16 @@ std::vector<double> merge_coordinate_prefix(
     return generated;
 }
 
+void require_prefix_equal(
+    const std::vector<double>& prefix,
+    const std::vector<double>& full,
+    const std::string& name) {
+    detail::require(prefix.size() <= full.size(), name + " prefix is longer than resolved point");
+    for (std::size_t i = 0; i < prefix.size(); ++i) {
+        detail::require(prefix[i] == full[i], name + " prefix conflicts with resolved point");
+    }
+}
+
 std::shared_ptr<CoordinateTransform> make_coordinate_transform(
     const CoordinateTransformSpec& spec,
     const std::vector<double>& target_xopt) {
@@ -410,7 +420,10 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
         detail::require(
             static_cast<int>(transform.assigned_xopt.size()) <= transform.dimension,
             "coordinate transform assigned_xopt prefix is longer than the transform dimension");
-        if (dpm_mode && component_index > 0) {
+        if (dpm_mode && component_index == 0) {
+            require_prefix_equal(transform.assigned_xopt, resolved_spec.assigned_xopt, "DPM global component assigned_xopt");
+            transform.assigned_xopt = resolved_spec.assigned_xopt;
+        } else if (dpm_mode && component_index > 0) {
             transform.assigned_xopt = merge_coordinate_prefix(
                 transform.assigned_xopt,
                 generated_dpm_centers[component_index - 1],

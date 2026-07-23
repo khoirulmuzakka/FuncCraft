@@ -154,7 +154,7 @@ def main():
     default_suite_path = Path(__file__).resolve().parents[1] / "suites" / "2026_v1.yaml"
 
     collection = suite_collection(2026, 1)
-    if collection.number_of_functions() != suite_collection_number_of_functions(2026, 1):
+    if collection.number_of_functions != suite_collection_number_of_functions(2026, 1):
         raise AssertionError("suite collection function count mismatch")
     collection_suite = collection.benchmark_suite(2)
     value = collection_suite.function(0).evaluate([collection_suite.function(0).spec.assigned_xopt])[0]

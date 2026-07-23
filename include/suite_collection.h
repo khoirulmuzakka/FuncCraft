@@ -37,7 +37,6 @@ public:
     int year() const;
     int version() const;
     const std::string& name() const;
-    int number_of_function() const;
     int number_of_functions() const;
 
     SuiteSpec spec() const;
@@ -53,7 +52,6 @@ std::vector<SuiteCollectionId> list_suite_collections();
 SuiteCollection suite_collection(int year, int version);
 SuiteSpec suite_collection_spec(int year, int version);
 int suite_collection_number_of_functions(int year, int version);
-int suite_collection_number_of_function(int year, int version);
 BenchmarkSuite suite_collection_benchmark_suite(
     int year,
     int version,

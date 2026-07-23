@@ -103,7 +103,7 @@ from funccraft import suite_collection
 
 collection = suite_collection(2026, 1)
 print(collection.name)
-print(collection.number_of_functions())
+print(collection.number_of_functions)
 
 suite = collection.benchmark_suite(
     dimension=10,

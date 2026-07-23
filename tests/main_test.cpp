@@ -82,7 +82,6 @@ void check_suite_collection() {
     const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
     require(collection.year() == 2026, "suite collection year mismatch");
     require(collection.version() == 1, "suite collection version mismatch");
-    require(collection.number_of_function() == collection.number_of_functions(), "suite collection count alias mismatch");
     require(
         FuncCraft::suite_collection_number_of_functions(2026, 1) == collection.number_of_functions(),
         "suite collection free function count mismatch");
@@ -359,7 +358,6 @@ void require_same_generated_structure(
     require(lhs.seed == rhs.seed, path + ": function seed mismatch");
     require(lhs.components.size() == rhs.components.size(), path + ": component count mismatch");
     require(lhs.composition.kind == rhs.composition.kind, path + ": composition kind mismatch");
-    require(lhs.composition.seed == rhs.composition.seed, path + ": composition seed mismatch");
     require_same_double_vector(lhs.composition.parameters, rhs.composition.parameters, path + ": composition parameters mismatch");
     require_same_double_vector(lhs.composition.biases, rhs.composition.biases, path + ": composition biases mismatch");
 
@@ -392,9 +390,6 @@ void require_same_generated_structure(
         require(
             left_component.value_transform.kind == right_component.value_transform.kind,
             component_path + ": value transform kind mismatch");
-        require(
-            left_component.value_transform.seed == right_component.value_transform.seed,
-            component_path + ": value transform seed mismatch");
         require_same_double_vector(
             left_component.value_transform.parameters,
             right_component.value_transform.parameters,
@@ -514,6 +509,16 @@ FuncCraft::FunctionSpec make_seeded_direct_dpm_spec(int dimension) {
 void check_direct_function_geometry_prefix_stable_across_dimensions() {
     const FuncCraft::BenchmarkFunction function_1d(make_seeded_direct_dpm_spec(1));
     const FuncCraft::BenchmarkFunction function_4d(make_seeded_direct_dpm_spec(4));
+    require_close_vector(
+        function_1d.spec().components.front().coordinate_transform.assigned_xopt,
+        function_1d.spec().assigned_xopt,
+        0.0,
+        "direct DPM global component center mismatch");
+    require_close_vector(
+        function_4d.spec().components.front().coordinate_transform.assigned_xopt,
+        function_4d.spec().assigned_xopt,
+        0.0,
+        "direct DPM global component center mismatch");
     require_prefix_generated_geometry(function_1d.spec(), function_4d.spec(), "direct function");
 }
 

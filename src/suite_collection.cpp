@@ -27,6 +27,14 @@ fs::path default_suite_dir() {
 #endif
 }
 
+fs::path installed_suite_dir() {
+#ifdef FUNCCRAFT_INSTALLED_SUITE_DIR
+    return fs::path(FUNCCRAFT_INSTALLED_SUITE_DIR);
+#else
+    return {};
+#endif
+}
+
 std::vector<fs::path> candidate_suite_dirs() {
     std::vector<fs::path> dirs;
 
@@ -42,6 +50,11 @@ std::vector<fs::path> candidate_suite_dirs() {
     const fs::path compiled = default_suite_dir();
     if (!compiled.empty()) {
         dirs.push_back(compiled);
+    }
+
+    const fs::path installed = installed_suite_dir();
+    if (!installed.empty()) {
+        dirs.push_back(installed);
     }
 
     std::vector<fs::path> unique_dirs;
@@ -144,10 +157,6 @@ const std::string& SuiteCollection::name() const {
     return name_;
 }
 
-int SuiteCollection::number_of_function() const {
-    return number_of_functions();
-}
-
 int SuiteCollection::number_of_functions() const {
     return suite_collection_number_of_functions(year_, version_);
 }
@@ -180,10 +189,6 @@ SuiteSpec suite_collection_spec(int year, int version) {
 
 int suite_collection_number_of_functions(int year, int version) {
     return suite_collection_spec(year, version).requested_number_of_functions;
-}
-
-int suite_collection_number_of_function(int year, int version) {
-    return suite_collection_number_of_functions(year, version);
 }
 
 BenchmarkSuite suite_collection_benchmark_suite(

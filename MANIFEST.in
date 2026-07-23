@@ -7,10 +7,10 @@ recursive-include cmake *.cmake.in
 recursive-include include *.h
 recursive-include src *.cpp *.h
 recursive-include funccraft *.py
+recursive-include suites *.yaml *.yml
 recursive-include tests *.py *.cpp
 recursive-exclude funccraft _funccraft* *.pyd *.so *.dylib
 
 prune build
 prune _skbuild
 prune funccraft.egg-info
-prune pyfunccraft.egg-info

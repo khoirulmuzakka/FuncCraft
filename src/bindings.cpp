@@ -6,6 +6,9 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <cstdlib>
+#include <exception>
+#include <filesystem>
 #include <string>
 #include <utility>
 
@@ -22,10 +25,51 @@ void bind_choice(py::module_& m, const char* name) {
         .def_readwrite("parameters", &Choice::parameters);
 }
 
+void set_environment_variable(const std::string& name, const std::string& value) {
+#ifdef _WIN32
+    _putenv_s(name.c_str(), value.c_str());
+#else
+    setenv(name.c_str(), value.c_str(), 0);
+#endif
+}
+
+void configure_packaged_suite_dir(py::module_& m) {
+    if (std::getenv("FUNCCRAFT_SUITE_DIR") != nullptr) {
+        return;
+    }
+    try {
+        const std::filesystem::path module_path = m.attr("__file__").cast<std::string>();
+        const std::filesystem::path suite_dir = module_path.parent_path() / "suites";
+        if (std::filesystem::exists(suite_dir) && std::filesystem::is_directory(suite_dir)) {
+            set_environment_variable("FUNCCRAFT_SUITE_DIR", suite_dir.string());
+        }
+    } catch (const std::exception&) {
+    }
+}
+
+void configure_packaged_suite_dir() {
+    if (std::getenv("FUNCCRAFT_SUITE_DIR") != nullptr) {
+        return;
+    }
+    try {
+        py::dict modules = py::module_::import("sys").attr("modules");
+        py::object module = modules.contains("funccraft._funccraft")
+            ? modules["funccraft._funccraft"]
+            : modules["_funccraft"];
+        const std::filesystem::path module_path = module.attr("__file__").cast<std::string>();
+        const std::filesystem::path suite_dir = module_path.parent_path() / "suites";
+        if (std::filesystem::exists(suite_dir) && std::filesystem::is_directory(suite_dir)) {
+            set_environment_variable("FUNCCRAFT_SUITE_DIR", suite_dir.string());
+        }
+    } catch (const std::exception&) {
+    }
+}
+
 } // namespace
 
 PYBIND11_MODULE(_funccraft, m) {
     m.doc() = "FuncCraft Python bindings for benchmark suites";
+    configure_packaged_suite_dir(m);
 
     py::enum_<FuncCraft::BasicFunctionId>(m, "BasicFunctionId")
         .value("Sphere", FuncCraft::BasicFunctionId::Sphere)
@@ -129,8 +173,7 @@ PYBIND11_MODULE(_funccraft, m) {
     py::class_<FuncCraft::ValueTransformSpec>(m, "ValueTransformSpec")
         .def(py::init<>())
         .def_readwrite("kind", &FuncCraft::ValueTransformSpec::kind)
-        .def_readwrite("parameters", &FuncCraft::ValueTransformSpec::parameters)
-        .def_readwrite("seed", &FuncCraft::ValueTransformSpec::seed);
+        .def_readwrite("parameters", &FuncCraft::ValueTransformSpec::parameters);
 
     auto function_spec_binding = py::class_<FuncCraft::FunctionSpec, std::shared_ptr<FuncCraft::FunctionSpec>>(m, "FunctionSpec");
 
@@ -153,8 +196,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .def(py::init<>())
         .def_readwrite("kind", &FuncCraft::CompositionSpec::kind)
         .def_readwrite("parameters", &FuncCraft::CompositionSpec::parameters)
-        .def_readwrite("biases", &FuncCraft::CompositionSpec::biases)
-        .def_readwrite("seed", &FuncCraft::CompositionSpec::seed);
+        .def_readwrite("biases", &FuncCraft::CompositionSpec::biases);
 
     function_spec_binding
         .def(py::init<>())
@@ -241,11 +283,13 @@ PYBIND11_MODULE(_funccraft, m) {
         }, py::arg("path"));
 
     py::class_<FuncCraft::SuiteCollection>(m, "SuiteCollection")
-        .def(py::init<int, int>(), py::arg("year"), py::arg("version"))
+        .def(py::init([](int year, int version) {
+            configure_packaged_suite_dir();
+            return FuncCraft::SuiteCollection(year, version);
+        }), py::arg("year"), py::arg("version"))
         .def_property_readonly("year", &FuncCraft::SuiteCollection::year)
         .def_property_readonly("version", &FuncCraft::SuiteCollection::version)
         .def_property_readonly("name", &FuncCraft::SuiteCollection::name)
-        .def_property_readonly("number_of_function", &FuncCraft::SuiteCollection::number_of_function)
         .def_property_readonly("number_of_functions", &FuncCraft::SuiteCollection::number_of_functions)
         .def("spec", &FuncCraft::SuiteCollection::spec)
         .def("benchmark_suite", &FuncCraft::SuiteCollection::benchmark_suite,
@@ -263,14 +307,27 @@ PYBIND11_MODULE(_funccraft, m) {
         py::arg("path"), py::arg("dimension"));
     m.def("load_suite_spec", &FuncCraft::load_suite_spec, py::arg("path"));
     m.def("load_function_spec", &FuncCraft::load_function_spec, py::arg("path"));
-    m.def("list_suite_collections", &FuncCraft::list_suite_collections);
-    m.def("suite_collection", &FuncCraft::suite_collection, py::arg("year"), py::arg("version"));
-    m.def("suite_collection_spec", &FuncCraft::suite_collection_spec, py::arg("year"), py::arg("version"));
-    m.def("suite_collection_number_of_functions", &FuncCraft::suite_collection_number_of_functions,
+    m.def("list_suite_collections", []() {
+        configure_packaged_suite_dir();
+        return FuncCraft::list_suite_collections();
+    });
+    m.def("suite_collection", [](int year, int version) {
+        configure_packaged_suite_dir();
+        return FuncCraft::suite_collection(year, version);
+    }, py::arg("year"), py::arg("version"));
+    m.def("suite_collection_spec", [](int year, int version) {
+        configure_packaged_suite_dir();
+        return FuncCraft::suite_collection_spec(year, version);
+    }, py::arg("year"), py::arg("version"));
+    m.def("suite_collection_number_of_functions", [](int year, int version) {
+        configure_packaged_suite_dir();
+        return FuncCraft::suite_collection_number_of_functions(year, version);
+    },
         py::arg("year"), py::arg("version"));
-    m.def("suite_collection_number_of_function", &FuncCraft::suite_collection_number_of_function,
-        py::arg("year"), py::arg("version"));
-    m.def("suite_collection_benchmark_suite", &FuncCraft::suite_collection_benchmark_suite,
+    m.def("suite_collection_benchmark_suite", [](int year, int version, int dimension) {
+        configure_packaged_suite_dir();
+        return FuncCraft::suite_collection_benchmark_suite(year, version, dimension);
+    },
         py::arg("year"),
         py::arg("version"),
         py::arg("dimension"));

@@ -570,7 +570,6 @@ ValueTransformSpec value_transform_spec_from_yaml(const YAML::Node& node) {
     }
     ValueTransformSpec spec;
     spec.kind = parse_value_transform_kind(node["kind"] ? node["kind"].as<std::string>() : "");
-    spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.parameters = yaml_double_vector(node["parameters"], "value transform parameters");
     return spec;
 }
@@ -584,7 +583,6 @@ CompositionSpec composition_spec_from_yaml(const YAML::Node& node) {
     }
     CompositionSpec spec;
     spec.kind = parse_composition_kind(node["kind"] ? node["kind"].as<std::string>() : "");
-    spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.parameters = yaml_double_vector(node["parameters"], "composition parameters");
     spec.biases = yaml_double_vector(node["biases"], "composition biases");
     return spec;
@@ -660,14 +658,12 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
     auto value_transform_spec = [&double_vector](const ValueTransformSpec& transform) {
         YAML::Node node;
         node["kind"] = to_spec_name(transform.kind);
-        node["seed"] = transform.seed;
         node["parameters"] = double_vector(transform.parameters);
         return node;
     };
     auto composition_spec = [&](const CompositionSpec& composition) {
         YAML::Node node;
         node["kind"] = to_spec_name(composition.kind);
-        node["seed"] = composition.seed;
         node["parameters"] = double_vector(composition.parameters);
         if (!composition.biases.empty()) {
             node["biases"] = double_vector(composition.biases);

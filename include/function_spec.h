@@ -91,7 +91,6 @@ struct CoordinateTransformSpec {
 struct ValueTransformSpec {
     ValueTransformKind kind = ValueTransformKind::None;
     std::vector<double> parameters;
-    std::uint64_t seed = 0;
 };
 
 /**
@@ -143,7 +142,6 @@ struct CompositionSpec {
     CompositionKind kind = CompositionKind::None;
     std::vector<double> parameters;
     std::vector<double> biases;
-    std::uint64_t seed = 0;
 };
 
 /**

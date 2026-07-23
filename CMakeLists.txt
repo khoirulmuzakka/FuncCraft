@@ -96,6 +96,7 @@ if(BUILD_LIBRARY)
     endif()
     target_compile_definitions(funccraft PRIVATE
         FUNCCRAFT_DEFAULT_SUITE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/suites"
+        FUNCCRAFT_INSTALLED_SUITE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/FuncCraft/suites"
     )
 endif()
 
