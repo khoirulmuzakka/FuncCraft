@@ -21,38 +21,6 @@ double uniform_signed01(std::mt19937_64& rng) {
     return 2.0 * uniform01(rng) - 1.0;
 }
 
-double matrix_determinant(std::vector<std::vector<double>> matrix) {
-    const std::size_t n = matrix.size();
-    double det = 1.0;
-    for (std::size_t i = 0; i < n; ++i) {
-        std::size_t pivot = i;
-        double pivot_abs = std::fabs(matrix[i][i]);
-        for (std::size_t r = i + 1; r < n; ++r) {
-            const double candidate = std::fabs(matrix[r][i]);
-            if (candidate > pivot_abs) {
-                pivot_abs = candidate;
-                pivot = r;
-            }
-        }
-        if (pivot_abs < 1.0e-15) {
-            return 0.0;
-        }
-        if (pivot != i) {
-            std::swap(matrix[pivot], matrix[i]);
-            det = -det;
-        }
-        const double pivot_value = matrix[i][i];
-        det *= pivot_value;
-        for (std::size_t r = i + 1; r < n; ++r) {
-            const double factor = matrix[r][i] / pivot_value;
-            for (std::size_t c = i; c < n; ++c) {
-                matrix[r][c] -= factor * matrix[i][c];
-            }
-        }
-    }
-    return det;
-}
-
 } // namespace
 
 void require(bool condition, const std::string& message) {
@@ -410,49 +378,26 @@ std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, in
     std::vector<std::vector<double>> q(
         static_cast<std::size_t>(dimension),
         std::vector<double>(static_cast<std::size_t>(dimension), 0.0));
-    std::vector<double> column(static_cast<std::size_t>(dimension), 0.0);
-
-    for (int col = 0; col < dimension; ++col) {
-        bool accepted = false;
-        for (int attempt = 0; attempt < 128 && !accepted; ++attempt) {
-            for (double& value : column) {
-                value = uniform_signed01(rng);
-            }
-            for (int prev = 0; prev < col; ++prev) {
-                double dot = 0.0;
-                for (int row = 0; row < dimension; ++row) {
-                    dot += column[static_cast<std::size_t>(row)] *
-                        q[static_cast<std::size_t>(row)][static_cast<std::size_t>(prev)];
-                }
-                for (int row = 0; row < dimension; ++row) {
-                    column[static_cast<std::size_t>(row)] -=
-                        dot * q[static_cast<std::size_t>(row)][static_cast<std::size_t>(prev)];
-                }
-            }
-
-            double norm_sq = 0.0;
-            for (double value : column) {
-                norm_sq += value * value;
-            }
-            if (norm_sq <= 1.0e-14) {
-                continue;
-            }
-
-            const double inv_norm = 1.0 / std::sqrt(norm_sq);
-            for (int row = 0; row < dimension; ++row) {
-                q[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)] =
-                    column[static_cast<std::size_t>(row)] * inv_norm;
-            }
-            accepted = true;
-        }
-        require(accepted, "could not generate a stable rotation matrix");
+    for (int i = 0; i < dimension; ++i) {
+        q[static_cast<std::size_t>(i)][static_cast<std::size_t>(i)] = 1.0;
     }
 
-    if (matrix_determinant(q) < 0.0) {
-        for (int row = 0; row < dimension; ++row) {
-            q[static_cast<std::size_t>(row)][0] = -q[static_cast<std::size_t>(row)][0];
+    for (int plane = 0; plane < dimension - 1; ++plane) {
+        const double theta = uniform_signed01(rng) * kPi;
+        const double c = std::cos(theta);
+        const double s = std::sin(theta);
+        const auto i = static_cast<std::size_t>(plane);
+        const auto j = static_cast<std::size_t>(plane + 1);
+
+        for (int col = 0; col < dimension; ++col) {
+            const auto k = static_cast<std::size_t>(col);
+            const double qi = q[i][k];
+            const double qj = q[j][k];
+            q[i][k] = c * qi - s * qj;
+            q[j][k] = s * qi + c * qj;
         }
     }
+
     return q;
 }
 
