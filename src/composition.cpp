@@ -11,6 +11,7 @@ namespace FuncCraft {
 using namespace detail;
 
 namespace {
+constexpr double kCompositionTolerance = 1.0e-12;
 constexpr double kTwoPi = 6.2831853071795864769252867665590057683943387987502;
 constexpr double kInvTwoPi = 0.15915494309189533576888376337251436203445964574046;
 
@@ -21,7 +22,19 @@ double reduce_trig_phase(double phase) {
 
 void require_nonnegative_weights(const std::vector<double>& weights) {
     for (double weight : weights) {
+        require(std::isfinite(weight), "weights must be finite");
         require(weight >= 0.0, "weights must be nonnegative");
+    }
+}
+
+void require_dpm_biases(const std::vector<double>& biases) {
+    if (biases.empty()) {
+        return;
+    }
+    require(std::abs(biases.front()) <= kCompositionTolerance, "first DPM bias must be zero");
+    for (double bias : biases) {
+        require(std::isfinite(bias), "DPM biases must be finite");
+        require(bias >= 0.0, "DPM biases must be nonnegative");
     }
 }
 
@@ -87,6 +100,7 @@ PowerMeanComposition::PowerMeanComposition(std::vector<double> weights, double p
       p_(p) {
     require(!weights_.empty(), "power mean needs at least one weight");
     require_nonnegative_weights(weights_);
+    require(std::isfinite(p), "power mean exponent must be finite");
     require(p > 0.0, "power mean exponent must be positive");
 }
 
@@ -94,6 +108,7 @@ PowerMeanComposition::PowerMeanComposition(std::size_t components, double p)
     : weights_(components, 1.0),
       p_(p) {
     require(components > 0, "power mean needs at least one component");
+    require(std::isfinite(p), "power mean exponent must be finite");
     require(p > 0.0, "power mean exponent must be positive");
 }
 
@@ -117,6 +132,8 @@ LevelWellComposition::LevelWellComposition(std::vector<double> weights, double e
       alpha_(alpha) {
     require(!weights_.empty(), "level well needs at least one weight");
     require_nonnegative_weights(weights_);
+    require(std::isfinite(epsilon), "level-well epsilon must be finite");
+    require(std::isfinite(alpha), "level-well alpha must be finite");
     require(epsilon >= 0.0 && epsilon < 1.0, "level-well epsilon must be in [0, 1)");
     require(alpha >= 0.0, "level-well alpha must be nonnegative");
 }
@@ -126,6 +143,8 @@ LevelWellComposition::LevelWellComposition(std::size_t components, double epsilo
       epsilon_(epsilon),
       alpha_(alpha) {
     require(components > 0, "level well needs at least one component");
+    require(std::isfinite(epsilon), "level-well epsilon must be finite");
+    require(std::isfinite(alpha), "level-well alpha must be finite");
     require(epsilon >= 0.0 && epsilon < 1.0, "level-well epsilon must be in [0, 1)");
     require(alpha >= 0.0, "level-well alpha must be nonnegative");
 }
@@ -149,10 +168,15 @@ DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
       sharpness_(sharpness) {
     require(!centers_.empty(), "deceptive softmax needs at least one center");
     require(biases_.empty() || biases_.size() == centers_.size(), "deceptive softmax bias/center size mismatch");
+    require_dpm_biases(biases_);
+    require(std::isfinite(sharpness_), "softmax sharpness must be finite");
     require(sharpness_ >= 0.0, "softmax sharpness must be nonnegative");
     const std::size_t dimension = centers_.front().size();
     for (const auto& center : centers_) {
         require(center.size() == dimension, "deceptive centers must have common dimension");
+        for (double value : center) {
+            require(std::isfinite(value), "deceptive centers must be finite");
+        }
     }
 }
 
@@ -198,12 +222,19 @@ DeceptiveBgSoftmaxComposition::DeceptiveBgSoftmaxComposition(
       background_sharpness_(background_sharpness) {
     require(!centers_.empty(), "deceptive bg softmax needs at least one center");
     require(biases_.empty() || biases_.size() == centers_.size(), "deceptive bg softmax bias/center size mismatch");
+    require_dpm_biases(biases_);
+    require(std::isfinite(sharpness_), "softmax sharpness must be finite");
+    require(std::isfinite(background_strength_), "background strength must be finite");
+    require(std::isfinite(background_sharpness_), "background sharpness must be finite");
     require(sharpness_ >= 0.0, "softmax sharpness must be nonnegative");
     require(background_strength_ >= 0.0, "background strength must be nonnegative");
     require(background_sharpness_ >= 0.0, "background sharpness must be nonnegative");
     const std::size_t dimension = centers_.front().size();
     for (const auto& center : centers_) {
         require(center.size() == dimension, "deceptive bg centers must have common dimension");
+        for (double value : center) {
+            require(std::isfinite(value), "deceptive bg centers must be finite");
+        }
     }
 }
 

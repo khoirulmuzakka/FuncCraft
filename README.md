@@ -39,14 +39,26 @@ where:
 - `psi` is the composition function that combines all transformed component
   values.
 
-For the implemented linear coordinate transforms, the convention is:
+The runtime `BenchmarkFunction` returns the final shifted/scaled value
+`assigned_fopt + scale_factor * raw_value`, where `raw_value` is the composed
+value above.
+
+For full-dimensional linear coordinate transforms, the convention is:
 
 ```text
 T(x) = target_xopt + M * (x - assigned_xopt)
 ```
 
-Here `assigned_xopt` is the desired minimum location in the generated/search
-coordinates. `target_xopt` is runtime-only and is filled internally by
+Block rotation applies the same convention after selecting a subspace:
+
+```text
+x_sub = x[selected_indices]
+T(x) = target_xopt_sub + M * (x_sub - assigned_xopt_sub)
+```
+
+Here `assigned_xopt` is the desired minimum location in the transform output
+coordinates: full-dimensional for none/rotation/affine, and subspace-sized for
+block rotation. `target_xopt` is runtime-only and is filled internally by
 `BenchmarkFunction` from the selected base function's native `x_opt` and the
 active benchmark domain. This lets users place a generated optimum at
 `assigned_xopt` without needing to know the primitive domain-scaling details.
@@ -209,12 +221,14 @@ int main() {
 
     CoordinateTransformSpec sphere_transform;
     sphere_transform.kind = CoordinateTransformKind::None;
-    sphere_transform.dimension = 2;
+    sphere_transform.input_dimension = 2;
+    sphere_transform.output_dimension = 2;
     sphere_transform.assigned_xopt = x_star;
 
     CoordinateTransformSpec rastrigin_transform;
     rastrigin_transform.kind = CoordinateTransformKind::Rotation;
-    rastrigin_transform.dimension = 2;
+    rastrigin_transform.input_dimension = 2;
+    rastrigin_transform.output_dimension = 2;
     rastrigin_transform.seed = 17;
     rastrigin_transform.assigned_xopt = x_star;
 
@@ -379,7 +393,8 @@ spec = make_function_spec(
             base_function="Sphere",
             coordinate_transform=make_coordinate_transform(
                 kind="none",
-                dimension=2,
+                input_dimension=2,
+                output_dimension=2,
                 assigned_xopt=x_star,
             ),
             value_transform=make_value_transform("none"),
@@ -388,7 +403,8 @@ spec = make_function_spec(
             base_function="Rastrigin",
             coordinate_transform=make_coordinate_transform(
                 kind="rotation",
-                dimension=2,
+                input_dimension=2,
+                output_dimension=2,
                 assigned_xopt=x_star,
                 seed=17,
             ),
@@ -525,13 +541,12 @@ one complete function spec. The exported YAML contains:
 
 - dimension and bounds;
 - component base functions;
-- coordinate transform kind, seed, selected indices, `assigned_xopt`,
-  parameters, and generated matrix when applicable;
+- coordinate transform kind, seed, input/output dimensions, selected indices,
+  `assigned_xopt`, parameters, and generated matrix when applicable;
 - value transform kind and parameters;
-- each component's assigned center;
-- composition kind, parameters, and DPM biases when applicable;
+- composition kind, parameters, DPM centers, and DPM biases when applicable;
 - function-level `assigned_xopt` and `assigned_fopt`;
-- `scale_factor` when it has been materialized or explicitly set;
+- materialized `scale_factor`;
 - label and metadata.
 
 `BenchmarkSuite::export_manifest()` and `BenchmarkSuite.export_manifest()` write

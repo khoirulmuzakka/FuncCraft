@@ -41,14 +41,25 @@ where `g_i` is a primitive benchmark function, `T_i` is a coordinate transform,
 `phi_i` is a value transform, and `psi` combines the transformed component
 values.
 
-For implemented linear coordinate transforms:
+The runtime function returns `assigned_fopt + scale_factor * raw_value`, where
+`raw_value` is the composed value above.
+
+For full-dimensional linear coordinate transforms:
 
 ```text
 T(x) = target_xopt + M * (x - assigned_xopt)
 ```
 
-`assigned_xopt` is the desired optimum location in generated/search
-coordinates. `target_xopt` is runtime-only and is determined internally from
+Block rotation applies the same convention after selecting a subspace:
+
+```text
+x_sub = x[selected_indices]
+T(x) = target_xopt_sub + M * (x_sub - assigned_xopt_sub)
+```
+
+`assigned_xopt` is the desired optimum location in the transform output
+coordinates: full-dimensional for none/rotation/affine, and subspace-sized for
+block rotation. `target_xopt` is runtime-only and is determined internally from
 the selected base function optimum and active benchmark domain scaling.
 
 ## Implemented Mechanisms
@@ -154,7 +165,8 @@ spec = make_function_spec(
             base_function="Sphere",
             coordinate_transform=make_coordinate_transform(
                 kind="none",
-                dimension=2,
+                input_dimension=2,
+                output_dimension=2,
                 assigned_xopt=x_star,
             ),
             value_transform=make_value_transform("none"),
@@ -163,7 +175,8 @@ spec = make_function_spec(
             base_function="Rastrigin",
             coordinate_transform=make_coordinate_transform(
                 kind="rotation",
-                dimension=2,
+                input_dimension=2,
+                output_dimension=2,
                 assigned_xopt=x_star,
                 seed=17,
             ),

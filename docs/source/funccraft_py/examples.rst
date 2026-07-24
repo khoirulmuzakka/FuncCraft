@@ -115,6 +115,7 @@ MinionPy supports multiple initial guesses as a list of lists:
    dimension = 2
    suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
    f = suite.function(0)
+   domain = f.domain
 
    optimizer = mpy.Minimizer(
        func=f.evaluate,
@@ -123,7 +124,7 @@ MinionPy supports multiple initial guesses as a list of lists:
            [1.0] * dimension,
            [-0.5] * dimension,
        ],
-       bounds=[(-10, 10)] * dimension,
+       bounds=list(zip(domain.lower_bound, domain.upper_bound)),
        algo="ARRDE",
        maxevals=10000,
        callback=None,

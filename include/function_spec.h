@@ -62,9 +62,12 @@ struct DomainSpec {
 /**
  * @brief Coordinate-transform request/materialization for one component.
  *
- * `assigned_xopt` is the desired component optimizer in the generated/search
- * coordinates. The corresponding transform target is computed internally from
- * the selected base function and benchmark domain.
+ * `input_dimension` is the parent/search dimension. `output_dimension` is the
+ * dimension seen by the component function after the transform. `assigned_xopt`
+ * is output-dimensional: for full transforms this is the full generated/search
+ * coordinate, while for block rotation it is the selected subspace coordinate.
+ * The corresponding transform target is computed internally from the selected
+ * base function and benchmark domain.
  *
  * `selected_indices` is only meaningful for block rotation. If it is empty,
  * suite generation may choose the subspace. `matrix` is empty until the
@@ -72,7 +75,8 @@ struct DomainSpec {
  */
 struct CoordinateTransformSpec {
     CoordinateTransformKind kind = CoordinateTransformKind::None;
-    int dimension = 0;
+    int input_dimension = 0;
+    int output_dimension = 0;
     std::vector<double> assigned_xopt;
     std::vector<int> selected_indices;
     std::vector<double> parameters;
@@ -135,21 +139,24 @@ struct ComponentSpec {
  * `biases` are used only by DPM families for local-minimum traps. Empty means
  * all DPM trap biases are zero. Non-DPM families do not accept biases.
  *
- * DPM families use each component coordinate transform's `assigned_xopt` as
- * the component center.
+ * DPM families use `centers` as full-dimensional softmax centers. Empty means
+ * the builder should resolve centers internally. This is separate from
+ * block-rotation component `assigned_xopt`, which may be subspace-dimensional.
  */
 struct CompositionSpec {
     CompositionKind kind = CompositionKind::None;
     std::vector<double> parameters;
     std::vector<double> biases;
+    std::vector<std::vector<double>> centers;
 };
 
 /**
  * @brief Public high-level specification for one benchmark function.
  *
  * This is the object a user should write by hand, construct from Python, or
- * provide in a concise YAML file. It intentionally omits runtime-only details
- * such as generated matrices and primitive target points.
+ * provide in a concise YAML file. User-authored specs may omit materialized
+ * details such as generated matrices, DPM centers, and scale factors; exported
+ * specs include them for reproducibility.
  *
  * `assigned_xopt` and `assigned_fopt` control the constructed optimum location
  * and value. `scale_factor = std::nullopt` means the builder should determine

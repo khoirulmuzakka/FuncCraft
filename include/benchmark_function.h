@@ -60,6 +60,12 @@ public:
      */
     double assigned_fopt() const;
     /**
+     * @brief Return a compact summary of immediate component source types.
+     *
+     * Example: `2 basic, 2 level-1 nested`.
+     */
+    const std::string& component_types() const;
+    /**
      * @brief Return the complete specification used to build this function.
      *
      * The returned spec is the normalized source record, including the
@@ -80,6 +86,7 @@ private:
     Domain domain_;
     double scale_factor_ = 1.0;
     double assigned_fopt_ = 0.0;
+    std::string component_types_;
     ComposedFunction function_;
 };
 

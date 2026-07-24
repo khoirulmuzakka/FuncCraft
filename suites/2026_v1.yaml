@@ -49,13 +49,13 @@ coordinate_transforms:
     probability: 0.0
     parameters: []
   - kind: rotation
-    probability: 0.5
+    probability: 0.34
     parameters: []
   - kind: affine
-    probability: 0.0
+    probability: 0.33
     parameters: []
   - kind: blockrotation
-    probability: 0.5
+    probability: 0.33
     parameters: []
 value_transforms:
   - kind: none
@@ -86,13 +86,13 @@ compositions:
   - kind: dpmsoftmax
     probability: 0.25
     # parameters = [sharpness]
-    parameters: [0.01]
+    parameters: [0.005]
   - kind: dpmbgsoftmax
     probability: 0.25
     #parameters = [sharpness, background_strength, background_sharpness]
-    parameters : [0.01, 1.0, 0.01]
+    parameters : [0.005, 1.0, 0.01]
 
-composition_base_functions: [3, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 22, 28, 30, 31, 35, 34, 1, 4, 8, 27]
+composition_base_functions: [3, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 22, 28, 30, 31, 35, 34, 1, 2, 4, 8, 25, 27]
 min_components: 2
 max_components: 5
 max_nested_composition_depth: 1

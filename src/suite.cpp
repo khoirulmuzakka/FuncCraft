@@ -36,6 +36,28 @@ std::vector<int> unique_sorted(std::vector<int> values) {
     return values;
 }
 
+std::vector<double> select_coordinates(const std::vector<double>& x, const std::vector<int>& indices) {
+    std::vector<double> selected;
+    selected.reserve(indices.size());
+    for (int idx : indices) {
+        require(idx >= 0 && static_cast<std::size_t>(idx) < x.size(), "selected coordinate index out of range");
+        selected.push_back(x[static_cast<std::size_t>(idx)]);
+    }
+    return selected;
+}
+
+Domain selected_domain(const Domain& domain, const std::vector<int>& indices) {
+    require(!indices.empty(), "selected domain needs at least one index");
+    Domain subdomain(static_cast<int>(indices.size()));
+    for (std::size_t i = 0; i < indices.size(); ++i) {
+        const int idx = indices[i];
+        require(idx >= 0 && idx < domain.dimension(), "selected domain index out of range");
+        subdomain.lower[i] = domain.lower[static_cast<std::size_t>(idx)];
+        subdomain.upper[i] = domain.upper[static_cast<std::size_t>(idx)];
+    }
+    return subdomain;
+}
+
 std::vector<double> yaml_number_sequence_to_double_vector(const YAML::Node& node, const std::string& field) {
     require(node && node.IsSequence(), field + " must be a YAML sequence");
     std::vector<double> values;
@@ -453,7 +475,8 @@ CoordinateTransformSpec make_coordinate_transform_spec(
     const std::vector<int>* selected_indices) {
     CoordinateTransformSpec spec;
     spec.kind = choice.kind;
-    spec.dimension = dimension;
+    spec.input_dimension = dimension;
+    spec.output_dimension = dimension;
     spec.seed = seed;
     spec.assigned_xopt = assigned_xopt;
 
@@ -470,9 +493,11 @@ CoordinateTransformSpec make_coordinate_transform_spec(
         if (selected_indices != nullptr) {
             require(!selected_indices->empty(), "block rotation selected indices must not be empty");
             spec.selected_indices = *selected_indices;
+            spec.output_dimension = static_cast<int>(spec.selected_indices.size());
             for (int idx : spec.selected_indices) {
                 require(idx >= 0 && idx < dimension, "block rotation selected index out of range");
             }
+            spec.assigned_xopt = select_coordinates(assigned_xopt, spec.selected_indices);
             return spec;
         }
         const int selected_size = uniform_int(rng, 1, dimension);
@@ -481,6 +506,8 @@ CoordinateTransformSpec make_coordinate_transform_spec(
             indices.insert(uniform_int(rng, 0, dimension - 1));
         }
         spec.selected_indices.assign(indices.begin(), indices.end());
+        spec.output_dimension = static_cast<int>(spec.selected_indices.size());
+        spec.assigned_xopt = select_coordinates(assigned_xopt, spec.selected_indices);
         return spec;
     }
     throw std::logic_error("unhandled coordinate transform kind in suite spec");
@@ -867,19 +894,25 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
     const auto value_choices = normalize_choices(spec_.value_transforms, all_value_transform_choices());
     const auto composition_choices = normalize_choices(spec_.compositions, all_composition_choices());
 
-    std::function<FunctionSpec(int, int, const std::vector<double>&, std::uint64_t)> make_composed_spec;
-    make_composed_spec = [&](int composition_level, int remaining_nested_depth, const std::vector<double>& x_star, std::uint64_t seed) {
+    std::function<FunctionSpec(int, int, int, const Domain&, const std::vector<double>&, std::uint64_t)> make_composed_spec;
+    make_composed_spec = [&](
+        int composition_level,
+        int remaining_nested_depth,
+        int function_dimension,
+        const Domain& function_domain,
+        const std::vector<double>& x_star,
+        std::uint64_t seed) {
         std::mt19937_64 structure_rng(mix_seed(seed ^ static_cast<std::uint64_t>(composition_level + 1) ^ 0xA11CE5EEDULL));
         std::mt19937_64 geometry_rng(mix_seed(
             seed
-            ^ static_cast<std::uint64_t>(dimension_)
+            ^ static_cast<std::uint64_t>(function_dimension)
             ^ (static_cast<std::uint64_t>(composition_level + 1) << 32)
             ^ 0xD1A6A11BADC0FFEEULL));
         const CompositionChoice& comp_choice = choose_weighted(composition_choices, structure_rng);
         const int component_count = uniform_int(structure_rng, spec_.min_components, spec_.max_components);
         FunctionSpec spec = make_suite_function_spec(
-            dimension_,
-            domain,
+            function_dimension,
+            function_domain,
             seed,
             x_star,
             composition_level == 0 ? spec_.assigned_fopt : 0.0,
@@ -894,7 +927,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             x_star,
             seed,
             kDpmCenterSeedRole,
-            domain,
+            function_domain,
             spec_.xopt_domain_shrink_factor);
         if (dpm_mode) {
             spec.composition.biases = dpm_component_biases(component_count, spec.assigned_fopt);
@@ -909,10 +942,10 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             component_coord_choices.begin(),
             component_coord_choices.end(),
             is_block_rotation_choice)
-            ? block_rotation_subspaces(component_coord_choices, dimension_, geometry_rng)
+            ? block_rotation_subspaces(component_coord_choices, function_dimension, geometry_rng)
             : std::vector<std::vector<int>>(static_cast<std::size_t>(component_count));
         if (dpm_mode && is_block_rotation_choice(component_coord_choices.front())) {
-            block_subspaces.front() = full_dimension_indices(dimension_);
+            block_subspaces.front() = full_dimension_indices(function_dimension);
         }
 
         for (int i = 0; i < component_count; ++i) {
@@ -925,7 +958,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             ComponentSpec component;
             component.coordinate_transform = make_coordinate_transform_spec(
                 component_coord_choices[pos],
-                dimension_,
+                function_dimension,
                 centers[pos],
                 component_seed,
                 geometry_rng,
@@ -936,8 +969,24 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             component.seed = component_seed;
             if (use_composed_component) {
                 const int child_nested_depth = sample_nested_depth_for_component(remaining_nested_depth, structure_rng);
+                const bool block_component = is_block_rotation_choice(component_coord_choices[pos]);
+                const int child_dimension = block_component
+                    ? static_cast<int>(block_subspaces[pos].size())
+                    : function_dimension;
+                const Domain child_domain = block_component
+                    ? selected_domain(function_domain, block_subspaces[pos])
+                    : function_domain;
+                const std::vector<double> child_x_star = block_component
+                    ? select_coordinates(centers[pos], block_subspaces[pos])
+                    : centers[pos];
                 component.composed_function = std::make_shared<FunctionSpec>(
-                    make_composed_spec(composition_level + 1, child_nested_depth - 1, centers[pos], component_seed));
+                    make_composed_spec(
+                        composition_level + 1,
+                        child_nested_depth - 1,
+                        child_dimension,
+                        child_domain,
+                        child_x_star,
+                        component_seed));
             } else {
                 component.base_function = sample_base_functions(composition_pool, 1, structure_rng).front();
             }
@@ -952,7 +1001,13 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         domain,
         1,
         spec_.xopt_domain_shrink_factor).front();
-    return BenchmarkFunction(make_composed_spec(0, spec_.max_nested_composition_depth, x_star, blueprint.seed));
+    return BenchmarkFunction(make_composed_spec(
+        0,
+        spec_.max_nested_composition_depth,
+        dimension_,
+        domain,
+        x_star,
+        blueprint.seed));
 }
 
 int BenchmarkSuite::size() const {

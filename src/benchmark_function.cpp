@@ -6,8 +6,10 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <memory>
 #include <random>
+#include <sstream>
 #include <utility>
 
 namespace FuncCraft {
@@ -15,11 +17,35 @@ namespace {
 
 constexpr double kDefaultGeneratedXoptShrinkFactor = 0.8;
 
-std::vector<double> dpm_component_center(const ComponentSpec& component) {
-    detail::require(
-        !component.coordinate_transform.assigned_xopt.empty(),
-        "DPM component centers are obtained from component.coordinate_transform.assigned_xopt");
-    return component.coordinate_transform.assigned_xopt;
+std::vector<double> select_coordinates(const std::vector<double>& x, const std::vector<int>& indices, const std::string& name) {
+    std::vector<double> selected;
+    selected.reserve(indices.size());
+    for (int idx : indices) {
+        detail::require(idx >= 0 && static_cast<std::size_t>(idx) < x.size(), name + " selected index out of range");
+        selected.push_back(x[static_cast<std::size_t>(idx)]);
+    }
+    return selected;
+}
+
+void assign_selected_coordinates(std::vector<double>& x, const std::vector<int>& indices, const std::vector<double>& values, const std::string& name) {
+    detail::require(indices.size() == values.size(), name + " selected value dimension mismatch");
+    for (std::size_t i = 0; i < indices.size(); ++i) {
+        const int idx = indices[i];
+        detail::require(idx >= 0 && static_cast<std::size_t>(idx) < x.size(), name + " selected index out of range");
+        x[static_cast<std::size_t>(idx)] = values[i];
+    }
+}
+
+Domain selected_domain(const Domain& domain, const std::vector<int>& indices) {
+    detail::require(!indices.empty(), "selected domain needs at least one index");
+    Domain subdomain(static_cast<int>(indices.size()));
+    for (std::size_t i = 0; i < indices.size(); ++i) {
+        const int idx = indices[i];
+        detail::require(idx >= 0 && idx < domain.dimension(), "selected domain index out of range");
+        subdomain.lower[i] = domain.lower[static_cast<std::size_t>(idx)];
+        subdomain.upper[i] = domain.upper[static_cast<std::size_t>(idx)];
+    }
+    return subdomain;
 }
 
 std::vector<std::vector<double>> identity_matrix(int dimension) {
@@ -53,35 +79,62 @@ void require_prefix_equal(
     }
 }
 
+void require_finite_vector(const std::vector<double>& values, const std::string& name) {
+    for (double value : values) {
+        detail::require(std::isfinite(value), name + " entries must be finite");
+    }
+}
+
+void require_finite_domain(const Domain& domain, const std::string& name) {
+    for (int i = 0; i < domain.dimension(); ++i) {
+        const auto idx = static_cast<std::size_t>(i);
+        detail::require(std::isfinite(domain.lower[idx]), name + " lower bounds must be finite");
+        detail::require(std::isfinite(domain.upper[idx]), name + " upper bounds must be finite");
+        detail::require(domain.lower[idx] <= domain.upper[idx], name + " lower bound must not exceed upper bound");
+    }
+}
+
 std::shared_ptr<CoordinateTransform> make_coordinate_transform(
     const CoordinateTransformSpec& spec,
     const std::vector<double>& target_xopt) {
     const CoordinateTransformKind kind = spec.kind;
-    detail::require(spec.dimension > 0, "coordinate transform dimension must be positive");
-    detail::require(static_cast<int>(spec.assigned_xopt.size()) == spec.dimension, "coordinate transform assigned_xopt dimension mismatch");
-    detail::require(static_cast<int>(target_xopt.size()) == spec.dimension, "coordinate transform target_xopt dimension mismatch");
+    detail::require(spec.input_dimension > 0, "coordinate transform input_dimension must be positive");
+    detail::require(spec.output_dimension > 0, "coordinate transform output_dimension must be positive");
+    if (kind != CoordinateTransformKind::BlockRotation) {
+        detail::require(
+            spec.input_dimension == spec.output_dimension,
+            "full coordinate transforms require input_dimension == output_dimension");
+    } else {
+        detail::require(
+            static_cast<int>(spec.selected_indices.size()) == spec.output_dimension,
+            "block rotation output_dimension must match selected_indices size");
+    }
+    const int output_dimension = spec.output_dimension;
+    detail::require(output_dimension > 0, "coordinate transform output dimension must be positive");
+    detail::require(static_cast<int>(spec.assigned_xopt.size()) == output_dimension, "coordinate transform assigned_xopt dimension mismatch");
+    detail::require(static_cast<int>(target_xopt.size()) == output_dimension, "coordinate transform target_xopt dimension mismatch");
 
     const std::uint64_t seed = spec.seed;
     if (kind == CoordinateTransformKind::None) {
-        return std::make_shared<IdentityTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed);
+        return std::make_shared<IdentityTransform>(spec.input_dimension, spec.assigned_xopt, target_xopt, seed);
     }
     if (kind == CoordinateTransformKind::Rotation) {
         if (!spec.matrix.empty()) {
-            return std::make_shared<RotationTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed, spec.matrix);
+            return std::make_shared<RotationTransform>(spec.input_dimension, spec.assigned_xopt, target_xopt, seed, spec.matrix);
         }
-        return std::make_shared<RotationTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed);
+        return std::make_shared<RotationTransform>(spec.input_dimension, spec.assigned_xopt, target_xopt, seed);
     }
     if (kind == CoordinateTransformKind::Affine) {
         if (!spec.matrix.empty()) {
-            return std::make_shared<AffineTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed, spec.matrix);
+            return std::make_shared<AffineTransform>(spec.input_dimension, spec.assigned_xopt, target_xopt, seed, spec.matrix);
         }
-        return std::make_shared<AffineTransform>(spec.dimension, spec.assigned_xopt, target_xopt, seed);
+        return std::make_shared<AffineTransform>(spec.input_dimension, spec.assigned_xopt, target_xopt, seed);
     }
     if (kind == CoordinateTransformKind::BlockRotation) {
         detail::require(!spec.selected_indices.empty(), "block rotation transform needs selected indices");
         if (!spec.matrix.empty()) {
             return std::make_shared<BlockRotationTransform>(
-                spec.dimension,
+                spec.input_dimension,
                 spec.selected_indices,
                 spec.assigned_xopt,
                 target_xopt,
@@ -89,7 +142,7 @@ std::shared_ptr<CoordinateTransform> make_coordinate_transform(
                 spec.matrix);
         }
         return std::make_shared<BlockRotationTransform>(
-            spec.dimension,
+            spec.input_dimension,
             spec.selected_indices,
             spec.assigned_xopt,
             target_xopt,
@@ -123,11 +176,12 @@ CoordinateTransformSpec materialized_coordinate_transform_spec(
     const CoordinateTransformSpec& requested,
     const CoordinateTransform& transform) {
     CoordinateTransformSpec spec = requested;
-    spec.dimension = transform.input_dimension();
+    spec.input_dimension = transform.input_dimension();
+    spec.output_dimension = transform.output_dimension();
     spec.assigned_xopt = transform.assigned_xopt();
     spec.seed = transform.seed();
     if (spec.kind == CoordinateTransformKind::None) {
-        spec.matrix = identity_matrix(spec.dimension);
+        spec.matrix = identity_matrix(spec.output_dimension);
         return spec;
     }
     if (spec.kind == CoordinateTransformKind::Rotation) {
@@ -183,22 +237,26 @@ CompositionSpec materialized_composition_spec(const CompositionSpec& requested, 
     if (spec.kind == CompositionKind::None) {
         detail::require(component_count == 1, "no composition requires exactly one component");
         detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
         spec.parameters.clear();
         return spec;
     }
     if (spec.kind == CompositionKind::CpmWeightedSum) {
         detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
         spec.parameters.clear();
         return spec;
     }
     if (spec.kind == CompositionKind::CpmPowerMean) {
         detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
         const double p = spec.parameters.empty() ? 2.0 : spec.parameters[0];
         spec.parameters = {p};
         return spec;
     }
     if (spec.kind == CompositionKind::CpmLevelWell) {
         detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
         const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.1;
         const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
         spec.parameters = {epsilon, alpha};
@@ -206,12 +264,14 @@ CompositionSpec materialized_composition_spec(const CompositionSpec& requested, 
     }
     if (spec.kind == CompositionKind::DpmSoftmax) {
         detail::require(spec.biases.empty() || spec.biases.size() == component_count, "DPM composition bias/component size mismatch");
+        detail::require(spec.centers.empty() || spec.centers.size() == component_count, "DPM composition center/component size mismatch");
         const double sharpness = spec.parameters.empty() ? 0.01 : spec.parameters[0];
         spec.parameters = {sharpness};
         return spec;
     }
     if (spec.kind == CompositionKind::DpmBgSoftmax) {
         detail::require(spec.biases.empty() || spec.biases.size() == component_count, "DPM composition bias/component size mismatch");
+        detail::require(spec.centers.empty() || spec.centers.size() == component_count, "DPM composition center/component size mismatch");
         const double sharpness = spec.parameters.size() > 0 ? spec.parameters[0] : 0.01;
         const double background_strength = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
         const double background_sharpness = spec.parameters.size() > 2 ? spec.parameters[2] : 0.01;
@@ -252,10 +312,9 @@ std::shared_ptr<CompositionFunction> make_resolved_composition(const FunctionSpe
         "DPM composition bias/component size mismatch");
 
     std::vector<std::vector<double>> centers;
-    centers.reserve(spec.components.size());
-    for (const ComponentSpec& component : spec.components) {
-        centers.push_back(dpm_component_center(component));
-    }
+    detail::require(!composition.centers.empty(), "DPM composition centers must be materialized");
+    detail::require(composition.centers.size() == spec.components.size(), "DPM composition center/component size mismatch");
+    centers = composition.centers;
 
     if (composition.kind == CompositionKind::DpmSoftmax) {
         const double sharpness = composition.parameters.size() > 0 ? composition.parameters[0] : 0.01;
@@ -280,6 +339,9 @@ std::shared_ptr<CompositionFunction> make_resolved_composition(const FunctionSpe
 
 Domain make_domain_from_spec(const FunctionSpec& spec) {
     detail::require(spec.dimension > 0, "function dimension must be positive");
+    detail::require(
+        spec.domain.dimension == 0 || spec.domain.dimension == spec.dimension,
+        "domain dimension must match function dimension");
 
     Domain domain(spec.dimension);
     if (!spec.domain.lower_bound.empty() || !spec.domain.upper_bound.empty()) {
@@ -289,9 +351,7 @@ Domain make_domain_from_spec(const FunctionSpec& spec) {
         domain.upper = spec.domain.upper_bound;
     }
     detail::require(domain.lower.size() == domain.upper.size(), "domain bound size mismatch");
-    for (std::size_t i = 0; i < domain.lower.size(); ++i) {
-        detail::require(domain.lower[i] <= domain.upper[i], "domain lower bound must not exceed upper bound");
-    }
+    require_finite_domain(domain, "domain");
     return domain;
 }
 
@@ -304,6 +364,48 @@ void append_leaf_base_functions(const ComponentSpec& component, std::vector<Basi
     }
     detail::require(component.base_function.has_value(), "basic component requires base_function");
     ids.push_back(*component.base_function);
+}
+
+int nested_function_depth(const FunctionSpec& spec) {
+    int depth = 0;
+    for (const ComponentSpec& component : spec.components) {
+        if (component.composed_function) {
+            depth = std::max(depth, 1 + nested_function_depth(*component.composed_function));
+        }
+    }
+    return depth;
+}
+
+std::string summarize_component_types(const std::vector<ComponentSpec>& components) {
+    int basic_count = 0;
+    std::map<int, int> nested_counts;
+    for (const ComponentSpec& component : components) {
+        if (component.composed_function) {
+            const int level = 1 + nested_function_depth(*component.composed_function);
+            ++nested_counts[level];
+        } else {
+            ++basic_count;
+        }
+    }
+
+    std::ostringstream out;
+    bool first = true;
+    auto append = [&](int count, const std::string& label) {
+        if (count == 0) {
+            return;
+        }
+        if (!first) {
+            out << ", ";
+        }
+        out << count << ' ' << label;
+        first = false;
+    };
+
+    append(basic_count, "basic");
+    for (const auto& [level, count] : nested_counts) {
+        append(count, "level-" + std::to_string(level) + " nested");
+    }
+    return out.str();
 }
 
 std::vector<double> random_point_in_domain(std::mt19937_64& rng, const Domain& domain) {
@@ -382,15 +484,15 @@ double saturating_apply_scale_and_bias(double raw_value, double lambda, double b
 
 } // namespace
 
-int coordinate_transform_output_dimension(const CoordinateTransformSpec& transform) {
-    detail::require(transform.dimension > 0, "coordinate transform dimension must be positive");
-    return transform.dimension;
-}
-
 BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
     FunctionSpec resolved_spec = std::move(spec);
     const Domain input_domain = make_domain_from_spec(resolved_spec);
     detail::require(!resolved_spec.components.empty(), "benchmark function needs at least one component");
+    detail::require(std::isfinite(resolved_spec.assigned_fopt), "assigned_fopt must be finite");
+    if (resolved_spec.scale_factor.has_value()) {
+        detail::require(std::isfinite(*resolved_spec.scale_factor), "scale_factor must be finite");
+        detail::require(*resolved_spec.scale_factor > 0.0, "scale_factor must be positive");
+    }
 
     resolved_spec.assigned_xopt = detail::complete_prefix_stable_point(
         resolved_spec.seed,
@@ -398,48 +500,112 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
         resolved_spec.assigned_xopt,
         input_domain,
         kDefaultGeneratedXoptShrinkFactor);
+    require_finite_vector(resolved_spec.assigned_xopt, "assigned_xopt");
 
     const bool dpm_mode = detail::composition_mode(resolved_spec.composition.kind) == CompositionMode::DPM;
     std::vector<std::vector<double>> generated_dpm_centers;
-    if (dpm_mode && resolved_spec.components.size() > 1) {
-        generated_dpm_centers = detail::prefix_stable_latin_hypercube_centers(
-            resolved_spec.seed,
-            detail::kDpmCenterSeedRole,
-            input_domain,
-            static_cast<int>(resolved_spec.components.size()) - 1,
-            kDefaultGeneratedXoptShrinkFactor);
+    if (dpm_mode) {
+        detail::require(
+            resolved_spec.composition.centers.empty()
+                || resolved_spec.composition.centers.size() == resolved_spec.components.size(),
+            "DPM composition center/component size mismatch");
+        if (resolved_spec.composition.centers.empty()) {
+            resolved_spec.composition.centers.reserve(resolved_spec.components.size());
+            resolved_spec.composition.centers.push_back(resolved_spec.assigned_xopt);
+            if (resolved_spec.components.size() > 1) {
+                generated_dpm_centers = detail::prefix_stable_latin_hypercube_centers(
+                    resolved_spec.seed,
+                    detail::kDpmCenterSeedRole,
+                    input_domain,
+                    static_cast<int>(resolved_spec.components.size()) - 1,
+                    kDefaultGeneratedXoptShrinkFactor);
+                resolved_spec.composition.centers.insert(
+                    resolved_spec.composition.centers.end(),
+                    generated_dpm_centers.begin(),
+                    generated_dpm_centers.end());
+            }
+        }
+        for (const auto& center : resolved_spec.composition.centers) {
+            detail::require_dimension(center, resolved_spec.dimension, "DPM composition center");
+        }
     }
 
     for (std::size_t component_index = 0; component_index < resolved_spec.components.size(); ++component_index) {
         ComponentSpec& component_spec = resolved_spec.components[component_index];
-        CoordinateTransformSpec& transform = component_spec.coordinate_transform;
-        if (transform.dimension == 0) {
-            transform.dimension = resolved_spec.dimension;
-        }
-        detail::require(transform.dimension == resolved_spec.dimension, "coordinate transform dimension must match function dimension");
         detail::require(
-            static_cast<int>(transform.assigned_xopt.size()) <= transform.dimension,
-            "coordinate transform assigned_xopt prefix is longer than the transform dimension");
+            static_cast<bool>(component_spec.composed_function) != component_spec.base_function.has_value(),
+            "component must specify exactly one of base_function or composed_function");
+        CoordinateTransformSpec& transform = component_spec.coordinate_transform;
+        if (transform.input_dimension == 0) {
+            transform.input_dimension = resolved_spec.dimension;
+        }
+        detail::require(transform.input_dimension == resolved_spec.dimension, "coordinate transform input_dimension must match function dimension");
+        if (transform.kind == CoordinateTransformKind::BlockRotation) {
+            detail::require(!transform.selected_indices.empty(), "block rotation selected indices must not be empty");
+            if (transform.output_dimension == 0) {
+                transform.output_dimension = static_cast<int>(transform.selected_indices.size());
+            }
+            detail::require(
+                transform.output_dimension == static_cast<int>(transform.selected_indices.size()),
+                "block rotation output_dimension must match selected_indices size");
+        } else {
+            if (transform.output_dimension == 0) {
+                transform.output_dimension = transform.input_dimension;
+            }
+            detail::require(
+                transform.output_dimension == transform.input_dimension,
+                "full coordinate transforms require input_dimension == output_dimension");
+        }
+        const int assigned_dimension = transform.output_dimension;
+        detail::require(
+            static_cast<int>(transform.assigned_xopt.size()) <= assigned_dimension,
+            "coordinate transform assigned_xopt prefix is longer than the transform output dimension");
+        require_finite_vector(transform.assigned_xopt, "coordinate transform assigned_xopt");
+
+        std::vector<double> assigned_base = transform.kind == CoordinateTransformKind::BlockRotation
+            ? select_coordinates(
+                dpm_mode ? resolved_spec.composition.centers[component_index] : resolved_spec.assigned_xopt,
+                transform.selected_indices,
+                "block rotation assigned_xopt")
+            : (dpm_mode ? resolved_spec.composition.centers[component_index] : resolved_spec.assigned_xopt);
+
         if (dpm_mode && component_index == 0) {
-            require_prefix_equal(transform.assigned_xopt, resolved_spec.assigned_xopt, "DPM global component assigned_xopt");
-            transform.assigned_xopt = resolved_spec.assigned_xopt;
-        } else if (dpm_mode && component_index > 0) {
+            require_prefix_equal(transform.assigned_xopt, assigned_base, "DPM global component assigned_xopt");
+            transform.assigned_xopt = assigned_base;
+        } else if (dpm_mode) {
             transform.assigned_xopt = merge_coordinate_prefix(
                 transform.assigned_xopt,
-                generated_dpm_centers[component_index - 1],
+                assigned_base,
                 "DPM component assigned_xopt");
+            require_finite_vector(transform.assigned_xopt, "coordinate transform assigned_xopt");
+            if (transform.kind == CoordinateTransformKind::BlockRotation) {
+                assign_selected_coordinates(
+                    resolved_spec.composition.centers[component_index],
+                    transform.selected_indices,
+                    transform.assigned_xopt,
+                    "DPM block component center");
+            } else {
+                resolved_spec.composition.centers[component_index] = transform.assigned_xopt;
+            }
         } else if (transform.assigned_xopt.empty()) {
-            transform.assigned_xopt = resolved_spec.assigned_xopt;
-        } else if (static_cast<int>(transform.assigned_xopt.size()) < transform.dimension) {
+            transform.assigned_xopt = assigned_base;
+        } else if (static_cast<int>(transform.assigned_xopt.size()) < assigned_dimension) {
+            const Domain assignment_domain = transform.kind == CoordinateTransformKind::BlockRotation
+                ? selected_domain(input_domain, transform.selected_indices)
+                : input_domain;
             transform.assigned_xopt = detail::complete_prefix_stable_point(
                 component_spec.seed != 0 ? component_spec.seed : transform.seed,
                 detail::kAssignedXoptSeedRole,
                 transform.assigned_xopt,
-                input_domain,
+                assignment_domain,
                 kDefaultGeneratedXoptShrinkFactor);
         }
-        const int component_dimension = coordinate_transform_output_dimension(transform);
+        require_finite_vector(transform.assigned_xopt, "coordinate transform assigned_xopt");
+        const int component_dimension = transform.output_dimension;
         if (component_spec.composed_function) {
+            detail::require(
+                std::abs(component_spec.composed_function->assigned_fopt) <= 1.0e-12,
+                "composed component assigned_fopt must be zero");
             detail::require(
                 component_spec.composed_function->dimension == component_dimension,
                 "composed component dimension must match coordinate transform output dimension");
@@ -466,12 +632,22 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             child_domain = child->domain();
             child_xopt = child->spec().assigned_xopt;
             child_fopt = child->assigned_fopt();
+            detail::require(
+                std::abs(child_fopt) <= 1.0e-12,
+                "materialized composed component assigned_fopt must be zero");
+            detail::require(
+                child_domain.dimension() == component_spec.coordinate_transform.output_dimension,
+                "composed component domain dimension must match coordinate transform output dimension");
+            detail::require_dimension(
+                child_xopt,
+                component_spec.coordinate_transform.output_dimension,
+                "composed component assigned_xopt");
             child_eval = [child](const std::vector<std::vector<double>>& X) {
                 return (*child)(X);
             };
         } else {
             detail::require(component_spec.base_function.has_value(), "basic component requires base_function");
-            const int component_dimension = coordinate_transform_output_dimension(component_spec.coordinate_transform);
+            const int component_dimension = component_spec.coordinate_transform.output_dimension;
             auto primitive = std::make_shared<BasicF>(*component_spec.base_function, component_dimension);
             child_domain = primitive->default_domain();
             child_xopt = primitive->x_opt;
@@ -481,10 +657,13 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             };
         }
 
+        const Domain transform_domain = component_spec.coordinate_transform.kind == CoordinateTransformKind::BlockRotation
+            ? selected_domain(input_domain, component_spec.coordinate_transform.selected_indices)
+            : input_domain;
         const std::vector<double> target_xopt = detail::map_point_between_domains(
             child_xopt,
             child_domain,
-            input_domain);
+            transform_domain);
         auto coordinate_transform = make_coordinate_transform(component_spec.coordinate_transform, target_xopt);
         auto value_transform = make_value_transform(component_spec.value_transform);
         const CoordinateTransformClass t_class = coordinate_transform->transform_class();
@@ -522,6 +701,7 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
     }
     spec_ = std::move(resolved_spec);
     domain_ = input_domain;
+    component_types_ = summarize_component_types(spec_.components);
 
     scale_factor_ = spec_.scale_factor.value_or(estimate_lambda(raw_function, domain_, spec_.seed));
     assigned_fopt_ = spec_.assigned_fopt;
@@ -554,6 +734,10 @@ double BenchmarkFunction::scale_factor() const {
 
 double BenchmarkFunction::assigned_fopt() const {
     return assigned_fopt_;
+}
+
+const std::string& BenchmarkFunction::component_types() const {
+    return component_types_;
 }
 
 const FunctionSpec& BenchmarkFunction::spec() const {

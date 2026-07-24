@@ -163,7 +163,8 @@ PYBIND11_MODULE(_funccraft, m) {
     py::class_<FuncCraft::CoordinateTransformSpec>(m, "CoordinateTransformSpec")
         .def(py::init<>())
         .def_readwrite("kind", &FuncCraft::CoordinateTransformSpec::kind)
-        .def_readwrite("dimension", &FuncCraft::CoordinateTransformSpec::dimension)
+        .def_readwrite("input_dimension", &FuncCraft::CoordinateTransformSpec::input_dimension)
+        .def_readwrite("output_dimension", &FuncCraft::CoordinateTransformSpec::output_dimension)
         .def_readwrite("assigned_xopt", &FuncCraft::CoordinateTransformSpec::assigned_xopt)
         .def_readwrite("selected_indices", &FuncCraft::CoordinateTransformSpec::selected_indices)
         .def_readwrite("parameters", &FuncCraft::CoordinateTransformSpec::parameters)
@@ -196,7 +197,8 @@ PYBIND11_MODULE(_funccraft, m) {
         .def(py::init<>())
         .def_readwrite("kind", &FuncCraft::CompositionSpec::kind)
         .def_readwrite("parameters", &FuncCraft::CompositionSpec::parameters)
-        .def_readwrite("biases", &FuncCraft::CompositionSpec::biases);
+        .def_readwrite("biases", &FuncCraft::CompositionSpec::biases)
+        .def_readwrite("centers", &FuncCraft::CompositionSpec::centers);
 
     function_spec_binding
         .def(py::init<>())
@@ -254,6 +256,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_property_readonly("dimension", &FuncCraft::BenchmarkFunction::dimension)
         .def_property_readonly("scale_factor", &FuncCraft::BenchmarkFunction::scale_factor)
         .def_property_readonly("assigned_fopt", &FuncCraft::BenchmarkFunction::assigned_fopt)
+        .def_property_readonly("component_types", &FuncCraft::BenchmarkFunction::component_types)
         .def_property_readonly("spec", &FuncCraft::BenchmarkFunction::spec, py::return_value_policy::reference_internal)
         .def("export_spec", [](const FuncCraft::BenchmarkFunction& self, const std::string& path) {
             self.export_spec(path);

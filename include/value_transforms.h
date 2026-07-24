@@ -21,9 +21,9 @@ public:
     /**
  * @brief Transform one scalar function value.
  *
- * The base class rejects materially negative inputs, rejects materially
- * negative transformed outputs, and enforces the origin-preserving rule by
- * checking `raw_apply(0.0) == 0.0` up to numerical error.
+ * The base class rejects materially negative inputs and materially negative
+ * transformed outputs. Concrete transforms are parameterized so that
+ * `raw_apply(0.0) == 0.0`.
  */
     double apply(double u) const;
     /**

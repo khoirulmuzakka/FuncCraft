@@ -10,6 +10,29 @@
 namespace FuncCraft {
 using namespace detail;
 
+namespace {
+
+Domain transform_output_domain(const Domain& domain, const CoordinateTransform& transform) {
+    const auto* block = dynamic_cast<const BlockRotationTransform*>(&transform);
+    if (block != nullptr) {
+        const auto& indices = block->selected_indices();
+        Domain subdomain(static_cast<int>(indices.size()));
+        for (std::size_t i = 0; i < indices.size(); ++i) {
+            const int idx = indices[i];
+            require(idx >= 0 && idx < domain.dimension(), "block rotation selected index out of range");
+            subdomain.lower[i] = domain.lower[static_cast<std::size_t>(idx)];
+            subdomain.upper[i] = domain.upper[static_cast<std::size_t>(idx)];
+        }
+        return subdomain;
+    }
+    if (transform.output_dimension() == domain.dimension()) {
+        return domain;
+    }
+    return Domain(transform.output_dimension());
+}
+
+} // namespace
+
 BasicFunctionId parse_basic_function_id(const std::string& name) {
     const std::string normalized = normalize_spec_name(name);
     for (BasicFunctionId id : list_basic_functions()) {
@@ -73,6 +96,8 @@ FunctionBuilder& FunctionBuilder::add_component(
     require(static_cast<bool>(coordinate_transform), "coordinate transform is null");
     require(static_cast<bool>(value_transform), "value transform is null");
     require(coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
+    Domain transform_domain = transform_output_domain(domain_, *coordinate_transform);
+    require(coordinate_transform->output_dimension() == transform_domain.dimension(), "component transform domain dimension mismatch");
     require(coordinate_transform->output_dimension() == child_domain.dimension(), "component transform output dimension mismatch");
     require_dimension(child_xopt, child_domain.dimension(), "component child_xopt");
 
@@ -80,6 +105,7 @@ FunctionBuilder& FunctionBuilder::add_component(
         std::move(evaluator),
         coordinate_transform,
         value_transform,
+        std::move(transform_domain),
         std::move(child_domain),
         coordinate_transform->target_xopt(),
         std::move(child_xopt),
@@ -111,7 +137,7 @@ ComposedFunction FunctionBuilder::build() const {
         values.reserve(X.size());
         std::vector<double> component_values(components->size(), 0.0);
         std::vector<double> transformed(static_cast<std::size_t>(dimension), 0.0);
-        std::vector<double> child_input(static_cast<std::size_t>(dimension), 0.0);
+        std::vector<double> child_input;
         for (const auto& x : X) {
             require_dimension(x, dimension, "benchmark function input");
             bool invalid = false;
@@ -121,7 +147,7 @@ ComposedFunction FunctionBuilder::build() const {
                 if (detail::squared_distance(transformed, component.target_xopt) <= 1.0e-24) {
                     child_input = component.child_xopt;
                 } else {
-                    detail::map_point_between_domains(transformed, domain, component.child_domain, child_input);
+                    detail::map_point_between_domains(transformed, component.domain, component.child_domain, child_input);
                 }
                 const std::vector<double> child_values = component.evaluate({child_input});
                 if (child_values.size() != 1 || !std::isfinite(child_values.front())) {

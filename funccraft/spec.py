@@ -10,9 +10,10 @@ Terminology
     Search bounds in the generated coordinates.
 ``CoordinateTransformSpec``
     Moves from generated/search coordinates into the component's primitive
-    coordinates. ``assigned_xopt`` is the desired optimum location in the
-    generated coordinates; the primitive optimum target is resolved internally
-    from the selected base function and domain scaling.
+    coordinates. ``input_dimension`` is the parent/search dimension,
+    ``output_dimension`` is the component dimension after transformation, and
+    ``assigned_xopt`` is output-dimensional. The primitive optimum target is
+    resolved internally from the selected base function and domain scaling.
 ``ValueTransformSpec``
     Optional value-shape transform applied to a component output.
 ``ComponentSpec``
@@ -21,8 +22,9 @@ Terminology
 ``CompositionSpec``
     Combines component values. ``"none"`` is the identity/single-component
     case, ``"cpm-..."`` choices are continuous composition methods, and
-    ``"dpm-..."`` choices are deceptive composition methods. DPM biases live
-    on the composition spec because they define deceptive local traps.
+    ``"dpm-..."`` choices are deceptive composition methods. DPM centers and
+    biases live on the composition spec because they define deceptive local
+    traps.
 ``FunctionSpec``
     Complete description of one benchmark function, including assigned global
     optimum location/value and scale factor.
@@ -156,7 +158,8 @@ def make_domain(dimension, lower_bound=-100.0, upper_bound=100.0):
 
 def make_coordinate_transform(
     kind="none",
-    dimension=0,
+    input_dimension=0,
+    output_dimension=0,
     assigned_xopt=None,
     selected_indices=None,
     parameters=None,
@@ -165,9 +168,11 @@ def make_coordinate_transform(
 ):
     """Create a native ``CoordinateTransformSpec``.
 
-    ``assigned_xopt`` is the desired optimum location in generated/search
-    coordinates. The transform target is determined internally from the
-    selected base function and domain scaling.
+    ``assigned_xopt`` is the desired optimum location in the transform output
+    coordinates. For full transforms this is the full generated/search point;
+    for block rotation this is the selected subspace point. The transform
+    target is determined internally from the selected base function and domain
+    scaling.
 
     Parameters
     ----------
@@ -175,9 +180,12 @@ def make_coordinate_transform(
         One of ``"none"``, ``"rotation"``, ``"affine"``, or
         ``"block-rotation"``. Names are normalized, so ``"Block Rotation"``,
         ``"block_rotation"``, and ``"block-rotation"`` are equivalent.
-    dimension:
-        Output/subspace dimension. Leave as ``0`` to let FuncCraft infer it
-        from the ambient function dimension or selected indices.
+    input_dimension:
+        Ambient/search dimension. Leave as ``0`` to let FuncCraft infer it
+        from the parent function dimension.
+    output_dimension:
+        Component input dimension after transformation. Leave as ``0`` to let
+        FuncCraft infer it from ``input_dimension`` or ``selected_indices``.
     assigned_xopt:
         Desired component optimum in generated coordinates. If omitted,
         FuncCraft uses the function-level assigned optimum or a generated
@@ -208,7 +216,8 @@ def make_coordinate_transform(
     """
     spec = CoordinateTransformSpec()
     spec.kind = coordinate_transform_kind(kind)
-    spec.dimension = int(dimension)
+    spec.input_dimension = int(input_dimension)
+    spec.output_dimension = int(output_dimension)
     spec.assigned_xopt = _list(assigned_xopt)
     spec.selected_indices = _list(selected_indices)
     spec.parameters = _list(parameters)
@@ -284,7 +293,7 @@ def make_component(
     return spec
 
 
-def make_composition(kind="none", parameters=None, biases=None):
+def make_composition(kind="none", parameters=None, biases=None, centers=None):
     """Create a native ``CompositionSpec``.
 
     Parameters
@@ -297,6 +306,9 @@ def make_composition(kind="none", parameters=None, biases=None):
         Composition-specific numeric parameters.
     biases:
         DPM-only component biases used to create deceptive local traps.
+    centers:
+        DPM-only full-dimensional component centers. Users normally omit this;
+        exported specs include resolved centers for reproducibility.
 
     Examples
     --------
@@ -317,9 +329,13 @@ def make_composition(kind="none", parameters=None, biases=None):
     bias_values = _list(biases)
     if bias_values and kind not in (CompositionKind.DpmSoftmax, CompositionKind.DpmBgSoftmax):
         raise ValueError("composition biases are only valid for DPM compositions")
+    center_values = _matrix(centers)
+    if center_values and kind not in (CompositionKind.DpmSoftmax, CompositionKind.DpmBgSoftmax):
+        raise ValueError("composition centers are only valid for DPM compositions")
     spec.kind = kind
     spec.parameters = _list(parameters)
     spec.biases = bias_values
+    spec.centers = center_values
     return spec
 
 
@@ -468,7 +484,7 @@ def make_suite_spec(
         spec = make_suite_spec(
             supported_dimensions="2,5,10,20",
             requested_number_of_functions=1000,
-            min_components=1,
+            min_components=2,
             max_components=5,
             max_nested_composition_depth=2,
             nested_probability=0.25,
@@ -647,7 +663,8 @@ def coordinate_transform_spec(data):
     data = data or {}
     spec = CoordinateTransformSpec()
     spec.kind = coordinate_transform_kind(data.get("kind", _NO_COORDINATE_TRANSFORM))
-    spec.dimension = int(data.get("dimension", 0))
+    spec.input_dimension = int(data.get("input_dimension", 0))
+    spec.output_dimension = int(data.get("output_dimension", 0))
     spec.assigned_xopt = _list(data.get("assigned_xopt", []))
     spec.selected_indices = _list(data.get("selected_indices", []))
     spec.parameters = _list(data.get("parameters", []))
@@ -692,9 +709,13 @@ def composition_spec(data):
     bias_values = _list(data.get("biases", []))
     if bias_values and kind not in (CompositionKind.DpmSoftmax, CompositionKind.DpmBgSoftmax):
         raise ValueError("composition biases are only valid for DPM compositions")
+    center_values = _matrix(data.get("centers", []))
+    if center_values and kind not in (CompositionKind.DpmSoftmax, CompositionKind.DpmBgSoftmax):
+        raise ValueError("composition centers are only valid for DPM compositions")
     spec.kind = kind
     spec.parameters = _list(data.get("parameters", []))
     spec.biases = bias_values
+    spec.centers = center_values
     return spec
 
 
@@ -814,7 +835,8 @@ def spec_to_dict(spec):
     if isinstance(spec, CoordinateTransformSpec):
         return {
             "kind": spec.kind.name,
-            "dimension": spec.dimension,
+            "input_dimension": spec.input_dimension,
+            "output_dimension": spec.output_dimension,
             "assigned_xopt": _list(spec.assigned_xopt),
             "selected_indices": _list(spec.selected_indices),
             "parameters": _list(spec.parameters),
@@ -844,6 +866,9 @@ def spec_to_dict(spec):
         biases = _list(spec.biases)
         if biases:
             result["biases"] = biases
+        centers = _matrix(spec.centers)
+        if centers:
+            result["centers"] = centers
         return result
     if isinstance(spec, FunctionSpec):
         return {

@@ -108,7 +108,8 @@ def alias_function_spec(kind):
                 base_function=BasicFunctionId.Sphere,
                 coordinate_transform=make_coordinate_transform(
                     kind="none",
-                    dimension=2,
+                    input_dimension=2,
+                    output_dimension=2,
                     assigned_xopt=[float(index), 0.0],
                 ),
                 value_transform=make_value_transform("none"),

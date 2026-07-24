@@ -79,6 +79,7 @@ private:
         ComponentEvaluator evaluate;
         std::shared_ptr<CoordinateTransform> coordinate_transform;
         std::shared_ptr<ValueTransform> value_transform;
+        Domain domain;
         Domain child_domain;
         std::vector<double> target_xopt;
         std::vector<double> child_xopt;

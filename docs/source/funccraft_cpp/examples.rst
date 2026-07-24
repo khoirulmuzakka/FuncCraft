@@ -21,12 +21,16 @@ Create one function
        ComponentSpec sphere;
        sphere.base_function = BasicFunctionId::Sphere;
        sphere.coordinate_transform.kind = CoordinateTransformKind::None;
+       sphere.coordinate_transform.input_dimension = 2;
+       sphere.coordinate_transform.output_dimension = 2;
        sphere.coordinate_transform.assigned_xopt = x_star;
        sphere.value_transform.kind = ValueTransformKind::None;
 
        ComponentSpec rastrigin;
        rastrigin.base_function = BasicFunctionId::Rastrigin;
        rastrigin.coordinate_transform.kind = CoordinateTransformKind::Rotation;
+       rastrigin.coordinate_transform.input_dimension = 2;
+       rastrigin.coordinate_transform.output_dimension = 2;
        rastrigin.coordinate_transform.seed = 17;
        rastrigin.coordinate_transform.assigned_xopt = x_star;
        rastrigin.value_transform.kind = ValueTransformKind::Power;

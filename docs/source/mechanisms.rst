@@ -1,6 +1,10 @@
 Implemented mechanisms
 ======================
 
+This page is the compact registry of implemented mechanism names. For the
+mathematical formulas and complete ``FunctionSpec``/``SuiteSpec`` examples,
+see :doc:`construction`.
+
 Base functions
 --------------
 

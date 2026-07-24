@@ -110,7 +110,8 @@ void check_identity_transform_assigned_optimum() {
     FuncCraft::ComponentSpec component;
     component.base_function = FuncCraft::BasicFunctionId::Sphere;
     component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::None;
-    component.coordinate_transform.dimension = 2;
+    component.coordinate_transform.input_dimension = 2;
+    component.coordinate_transform.output_dimension = 2;
     component.coordinate_transform.assigned_xopt = spec.assigned_xopt;
     component.value_transform.kind = FuncCraft::ValueTransformKind::None;
     spec.components = {component};
@@ -134,7 +135,8 @@ void check_native_domain_scaled_optimum() {
     FuncCraft::ComponentSpec component;
     component.base_function = FuncCraft::BasicFunctionId::HappyCat;
     component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::None;
-    component.coordinate_transform.dimension = 2;
+    component.coordinate_transform.input_dimension = 2;
+    component.coordinate_transform.output_dimension = 2;
     component.coordinate_transform.assigned_xopt = spec.assigned_xopt;
     component.value_transform.kind = FuncCraft::ValueTransformKind::None;
     spec.components = {component};
@@ -143,6 +145,25 @@ void check_native_domain_scaled_optimum() {
     const FuncCraft::BenchmarkFunction function(spec);
     const double value = function({spec.assigned_xopt}).front();
     require_close(value, spec.assigned_fopt, 1.0e-12, "native-domain scaled optimum mismatch");
+}
+
+void check_block_rotation_outputs_selected_subspace() {
+    FuncCraft::BlockRotationTransform transform(
+        4,
+        {0, 3},
+        {1.0, 4.0},
+        {10.0, 40.0},
+        0,
+        {{1.0, 0.0}, {0.0, 1.0}});
+
+    std::vector<double> out;
+    transform.apply({1.0, 2.0, 3.0, 4.0}, out);
+    require_close_vector(out, std::vector<double>{10.0, 40.0}, 0.0, "block rotation selected optimum mismatch");
+
+    transform.apply({2.0, -200.0, 300.0, 6.0}, out);
+    require_close_vector(out, std::vector<double>{11.0, 42.0}, 0.0, "block rotation selected subspace output mismatch");
+    require(transform.input_dimension() == 4, "block rotation input dimension mismatch");
+    require(transform.output_dimension() == 2, "block rotation output dimension mismatch");
 }
 
 void check_native_domain_scaled_optimum_high_dimension() {
@@ -167,7 +188,8 @@ void check_native_domain_scaled_optimum_high_dimension() {
             FuncCraft::ComponentSpec component;
             component.base_function = FuncCraft::BasicFunctionId::HappyCat;
             component.coordinate_transform.kind = kind;
-            component.coordinate_transform.dimension = dimension;
+            component.coordinate_transform.input_dimension = dimension;
+            component.coordinate_transform.output_dimension = dimension;
             component.coordinate_transform.assigned_xopt = spec.assigned_xopt;
             if (kind == FuncCraft::CoordinateTransformKind::BlockRotation) {
                 component.coordinate_transform.selected_indices.resize(static_cast<std::size_t>(dimension));
@@ -199,7 +221,8 @@ FuncCraft::FunctionSpec make_nested_child_spec() {
     FuncCraft::ComponentSpec component;
     component.base_function = FuncCraft::BasicFunctionId::HappyCat;
     component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::Rotation;
-    component.coordinate_transform.dimension = 2;
+    component.coordinate_transform.input_dimension = 2;
+    component.coordinate_transform.output_dimension = 2;
     component.coordinate_transform.assigned_xopt = child.assigned_xopt;
     component.coordinate_transform.seed = 123;
     component.value_transform.kind = FuncCraft::ValueTransformKind::None;
@@ -223,7 +246,8 @@ void check_composed_function_component(const std::filesystem::path& path) {
     FuncCraft::ComponentSpec composed_component;
     composed_component.composed_function = std::make_shared<FuncCraft::FunctionSpec>(child);
     composed_component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::Rotation;
-    composed_component.coordinate_transform.dimension = 2;
+    composed_component.coordinate_transform.input_dimension = 2;
+    composed_component.coordinate_transform.output_dimension = 2;
     composed_component.coordinate_transform.assigned_xopt = parent.assigned_xopt;
     composed_component.coordinate_transform.seed = 456;
     composed_component.value_transform.kind = FuncCraft::ValueTransformKind::None;
@@ -233,6 +257,9 @@ void check_composed_function_component(const std::filesystem::path& path) {
     const FuncCraft::BenchmarkFunction function(parent);
     const double value = function({parent.assigned_xopt}).front();
     require_close(value, parent.assigned_fopt, 1.0e-12, "composed function component optimum mismatch");
+    require(
+        function.component_types() == "1 level-1 nested",
+        "composed function component type summary mismatch");
 
     function.export_spec(path.string());
     const FuncCraft::BenchmarkFunction imported = FuncCraft::make_benchmark_function(path.string());
@@ -241,6 +268,38 @@ void check_composed_function_component(const std::filesystem::path& path) {
         value,
         1.0e-12,
         "composed function component YAML roundtrip mismatch");
+}
+
+void check_composed_component_requires_zero_assigned_fopt() {
+    FuncCraft::FunctionSpec child = make_nested_child_spec();
+    child.assigned_fopt = 10.0;
+
+    FuncCraft::FunctionSpec parent;
+    parent.dimension = 2;
+    parent.domain.dimension = 2;
+    parent.domain.lower_bound = {-100.0, -100.0};
+    parent.domain.upper_bound = {100.0, 100.0};
+    parent.assigned_xopt = {30.0, -20.0};
+    parent.assigned_fopt = 100.0;
+    parent.scale_factor = 1.0;
+
+    FuncCraft::ComponentSpec composed_component;
+    composed_component.composed_function = std::make_shared<FuncCraft::FunctionSpec>(child);
+    composed_component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::Rotation;
+    composed_component.coordinate_transform.input_dimension = 2;
+    composed_component.coordinate_transform.output_dimension = 2;
+    composed_component.coordinate_transform.assigned_xopt = parent.assigned_xopt;
+    composed_component.value_transform.kind = FuncCraft::ValueTransformKind::None;
+    parent.components = {composed_component};
+    parent.composition.kind = FuncCraft::CompositionKind::None;
+
+    bool rejected = false;
+    try {
+        FuncCraft::BenchmarkFunction function(parent);
+    } catch (const std::exception&) {
+        rejected = true;
+    }
+    require(rejected, "nonzero composed component assigned_fopt was accepted");
 }
 
 void check_suite_yaml_accepts_base_function_names(const std::filesystem::path& path) {
@@ -293,7 +352,8 @@ FuncCraft::FunctionSpec make_alias_function_spec(FuncCraft::CompositionKind comp
         component.base_function = FuncCraft::BasicFunctionId::Sphere;
         component.seed = 11 + i;
         component.coordinate_transform.kind = FuncCraft::CoordinateTransformKind::None;
-        component.coordinate_transform.dimension = 2;
+        component.coordinate_transform.input_dimension = 2;
+        component.coordinate_transform.output_dimension = 2;
         component.coordinate_transform.assigned_xopt = {static_cast<double>(i), 0.0};
         component.value_transform.kind = FuncCraft::ValueTransformKind::None;
         spec.components.push_back(component);
@@ -348,6 +408,16 @@ void require_same_double_vector(
     require(lhs.size() == rhs.size(), message + ": size mismatch");
     for (std::size_t i = 0; i < lhs.size(); ++i) {
         require(lhs[i] == rhs[i], message + " at index " + std::to_string(i));
+    }
+}
+
+void require_same_matrix(
+    const std::vector<std::vector<double>>& lhs,
+    const std::vector<std::vector<double>>& rhs,
+    const std::string& message) {
+    require(lhs.size() == rhs.size(), message + ": row count mismatch");
+    for (std::size_t i = 0; i < lhs.size(); ++i) {
+        require_same_double_vector(lhs[i], rhs[i], message + " row " + std::to_string(i));
     }
 }
 
@@ -418,6 +488,13 @@ void require_prefix_generated_geometry(
     const FuncCraft::FunctionSpec& high_dimension,
     const std::string& path) {
     require_prefix_vector(low_dimension.assigned_xopt, high_dimension.assigned_xopt, path + ": assigned_xopt prefix mismatch");
+    require(low_dimension.composition.centers.size() == high_dimension.composition.centers.size(), path + ": composition center count mismatch");
+    for (std::size_t i = 0; i < low_dimension.composition.centers.size(); ++i) {
+        require_prefix_vector(
+            low_dimension.composition.centers[i],
+            high_dimension.composition.centers[i],
+            path + ": composition center prefix mismatch");
+    }
     require(low_dimension.components.size() == high_dimension.components.size(), path + ": component count mismatch");
     for (std::size_t i = 0; i < low_dimension.components.size(); ++i) {
         const FuncCraft::ComponentSpec& low_component = low_dimension.components[i];
@@ -606,8 +683,10 @@ int run_tests() {
     check_suite_collection();
     check_identity_transform_assigned_optimum();
     check_native_domain_scaled_optimum();
+    check_block_rotation_outputs_selected_subspace();
     check_native_domain_scaled_optimum_high_dimension();
     check_composed_function_component(temp / "composed_function.yaml");
+    check_composed_component_requires_zero_assigned_fopt();
     check_suite_yaml_accepts_base_function_names(temp / "suite_names.yaml");
     check_composition_kind_aliases();
     check_suite_structure_stable_across_dimensions();

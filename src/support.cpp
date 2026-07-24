@@ -21,6 +21,16 @@ double uniform_signed01(std::mt19937_64& rng) {
     return 2.0 * uniform01(rng) - 1.0;
 }
 
+std::size_t uniform_index(std::mt19937_64& rng, std::size_t upper_exclusive) {
+    require(upper_exclusive > 0, "random index range must not be empty");
+    const auto limit = std::mt19937_64::max() - (std::mt19937_64::max() % upper_exclusive);
+    auto value = rng();
+    while (value >= limit) {
+        value = rng();
+    }
+    return static_cast<std::size_t>(value % upper_exclusive);
+}
+
 } // namespace
 
 void require(bool condition, const std::string& message) {
@@ -403,11 +413,20 @@ std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, in
 
 std::vector<std::vector<double>> random_affine_matrix(std::mt19937_64& rng, int dimension) {
     auto matrix = random_rotation_matrix(rng, dimension);
+    std::vector<double> row_scales(static_cast<std::size_t>(dimension), 1.0);
     for (int row = 0; row < dimension; ++row) {
         const double exponent = dimension > 1
             ? static_cast<double>(row) / static_cast<double>(dimension - 1)
             : 0.0;
-        const double scale = std::pow(10.0, 2.0 * exponent);
+        row_scales[static_cast<std::size_t>(row)] = std::pow(10.0, 2.0 * exponent);
+    }
+    for (std::size_t i = row_scales.size(); i > 1; --i) {
+        const std::size_t j = uniform_index(rng, i);
+        std::swap(row_scales[i - 1], row_scales[j]);
+    }
+
+    for (int row = 0; row < dimension; ++row) {
+        const double scale = row_scales[static_cast<std::size_t>(row)];
         for (int col = 0; col < dimension; ++col) {
             matrix[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)] *= scale;
         }
@@ -500,7 +519,8 @@ CoordinateTransformSpec coordinate_transform_spec_from_yaml(const YAML::Node& no
     }
     CoordinateTransformSpec spec;
     spec.kind = parse_coordinate_transform_kind(node["kind"] ? node["kind"].as<std::string>() : "");
-    spec.dimension = node["dimension"] ? node["dimension"].as<int>() : 0;
+    spec.input_dimension = node["input_dimension"] ? node["input_dimension"].as<int>() : 0;
+    spec.output_dimension = node["output_dimension"] ? node["output_dimension"].as<int>() : 0;
     spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     spec.selected_indices = yaml_int_vector(node["selected_indices"], "selected_indices");
     spec.assigned_xopt = yaml_double_vector(node["assigned_xopt"], "assigned_xopt");
@@ -530,6 +550,7 @@ CompositionSpec composition_spec_from_yaml(const YAML::Node& node) {
     spec.kind = parse_composition_kind(node["kind"] ? node["kind"].as<std::string>() : "");
     spec.parameters = yaml_double_vector(node["parameters"], "composition parameters");
     spec.biases = yaml_double_vector(node["biases"], "composition biases");
+    spec.centers = yaml_double_matrix(node["centers"], "composition centers");
     return spec;
 }
 
@@ -592,7 +613,8 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
     auto transform_spec = [&](const CoordinateTransformSpec& transform) {
         YAML::Node node;
         node["kind"] = to_spec_name(transform.kind);
-        node["dimension"] = transform.dimension;
+        node["input_dimension"] = transform.input_dimension;
+        node["output_dimension"] = transform.output_dimension;
         node["seed"] = transform.seed;
         node["selected_indices"] = int_vector(transform.selected_indices);
         node["assigned_xopt"] = double_vector(transform.assigned_xopt);
@@ -612,6 +634,9 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
         node["parameters"] = double_vector(composition.parameters);
         if (!composition.biases.empty()) {
             node["biases"] = double_vector(composition.biases);
+        }
+        if (!composition.centers.empty()) {
+            node["centers"] = double_matrix(composition.centers);
         }
         return node;
     };

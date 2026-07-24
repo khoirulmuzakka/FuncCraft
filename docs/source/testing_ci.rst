@@ -1,9 +1,10 @@
 Testing and CI
 ==============
 
-The standard CI builds the C++ library and Python interface on supported
-platforms, runs the C++ and Python tests, validates generated benchmark values,
-and checks that the package can be built as a wheel.
+The standard CI builds the C++ library, Python interface, and C++ test binary
+on supported platforms, runs the C++ and Python tests, validates generated
+benchmark values across platforms, and checks that the source package can be
+built. The separate wheel workflow builds and tests installable wheels.
 
 Local checks
 ------------

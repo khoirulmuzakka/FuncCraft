@@ -22,19 +22,20 @@ public:
     virtual int output_dimension() const = 0;
     virtual CoordinateTransformClass transform_class() const = 0;
 
-    int dimension() const;
     std::uint64_t seed() const;
     const std::vector<double>& assigned_xopt() const;
     const std::vector<double>& target_xopt() const;
 
 protected:
     CoordinateTransform(
-        int dimension,
+        int input_dimension,
+        int output_dimension,
         std::vector<double> assigned_xopt,
         std::vector<double> target_xopt,
         std::uint64_t seed);
 
-    int dimension_ = 0;
+    int input_dimension_ = 0;
+    int output_dimension_ = 0;
     std::vector<double> assigned_xopt_;
     std::vector<double> target_xopt_;
     std::uint64_t seed_ = 0;
@@ -124,9 +125,10 @@ private:
 /**
  * @brief Selects coordinates from the full vector and rotates only that block.
  *
- * `selected_indices` uses 0-based indices into the full input vector. The full
- * vector dimension is preserved; only the selected coordinates are replaced by
- * the rotated block. Unselected coordinates pass through unchanged.
+ * `selected_indices` uses 0-based indices into the full input vector. The
+ * transform maps a full `D`-dimensional input into an `m`-dimensional selected
+ * subspace, where `m = selected_indices.size()`. `assigned_xopt`,
+ * `target_xopt`, and `matrix` are all subspace-sized.
  */
 class BlockRotationTransform final : public CoordinateTransform {
 public:

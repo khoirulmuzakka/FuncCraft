@@ -172,6 +172,14 @@ class BenchmarkFunction:
         return self._function.assigned_fopt
 
     @property
+    def component_types(self):
+        """Return a compact summary of immediate component source types.
+
+        Examples include ``"3 basic"`` or ``"2 basic, 1 level-1 nested"``.
+        """
+        return self._function.component_types
+
+    @property
     def spec(self):
         """Return the normalized function specification used to build it."""
         return self._spec
@@ -226,6 +234,7 @@ class BenchmarkFunction:
             "BenchmarkFunction("
             f"dimension={self.dimension}, "
             f"label='{self.spec.label}', "
+            f"component_types='{self.component_types}', "
             f"scale_factor={self.scale_factor})"
         )
 

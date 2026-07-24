@@ -67,7 +67,9 @@ ValueTransformClass IdentityValueTransform::transform_class() const {
 PowerValueTransform::PowerValueTransform(double alpha, double p)
     : alpha_(alpha),
       p_(p) {
-    require(alpha >= 0.0, "power transform alpha must be nonnegative");
+    require(std::isfinite(alpha), "power transform alpha must be finite");
+    require(std::isfinite(p), "power transform exponent must be finite");
+    require(alpha > 0.0, "power transform alpha must be positive");
     require(p > 0.0, "power transform exponent must be positive");
 }
 
@@ -93,6 +95,8 @@ double PowerValueTransform::p() const {
 OscillatoryValueTransform::OscillatoryValueTransform(double epsilon, double alpha)
     : epsilon_(epsilon),
       alpha_(alpha) {
+    require(std::isfinite(epsilon), "oscillatory epsilon must be finite");
+    require(std::isfinite(alpha), "oscillatory alpha must be finite");
     require(epsilon >= 0.0 && epsilon < 1.0, "oscillatory epsilon must be in [0, 1)");
     require(alpha >= 0.0, "oscillatory alpha must be nonnegative");
 }
@@ -118,7 +122,8 @@ double OscillatoryValueTransform::alpha() const {
 
 CosineZeroValueTransform::CosineZeroValueTransform(double alpha)
     : alpha_(alpha) {
-    require(alpha >= 0.0, "cosine-zero alpha must be nonnegative");
+    require(std::isfinite(alpha), "cosine-zero alpha must be finite");
+    require(alpha > 0.0, "cosine-zero alpha must be positive");
 }
 
 double CosineZeroValueTransform::raw_apply(double u) const {
