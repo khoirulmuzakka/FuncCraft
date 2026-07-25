@@ -1,8 +1,60 @@
 C++ examples
 ============
 
-Create one function
--------------------
+Use ``#include "funccraft.h"`` for the public C++ API. All evaluations are
+batched: pass ``std::vector<std::vector<double>>`` and receive one value per
+point.
+
+Load a suite YAML
+-----------------
+
+.. code-block:: cpp
+
+   #include "funccraft.h"
+
+   #include <iostream>
+   #include <vector>
+
+   int main() {
+       const int dimension = 10;
+       const int function_index = 0;
+
+       FuncCraft::SuiteSpec spec =
+           FuncCraft::load_suite_spec("my_suite.yaml");
+       FuncCraft::BenchmarkSuite suite(spec, dimension);
+
+       const FuncCraft::BenchmarkFunction& f =
+           suite.function(function_index);
+       std::vector<std::vector<double>> points = {
+           std::vector<double>(dimension, 0.0),
+           std::vector<double>(dimension, 1.0),
+       };
+       std::vector<double> values = f(points);
+
+       std::cout << f.spec().label << '\n';
+       std::cout << values.front() << '\n';
+   }
+
+Use a packaged suite collection
+-------------------------------
+
+.. code-block:: cpp
+
+   #include "funccraft.h"
+
+   int main() {
+       const int dimension = 10;
+       FuncCraft::SuiteCollection collection =
+           FuncCraft::suite_collection(2026, 1);
+       FuncCraft::BenchmarkSuite suite =
+           collection.benchmark_suite(dimension);
+   }
+
+Create one function in C++
+--------------------------
+
+For frequent editing, a YAML ``FunctionSpec`` is usually easier. Direct struct
+construction is useful in C++ programs that generate specs:
 
 .. code-block:: cpp
 
@@ -48,49 +100,79 @@ Create one function
 
        BenchmarkFunction f(spec);
        std::vector<double> values = f({x_star, {1.0, 1.0}});
-
-       f.export_spec("function.yaml");
-       BenchmarkFunction same = make_benchmark_function("function.yaml");
    }
 
-Use a suite collection
+Load one function YAML
 ----------------------
 
 .. code-block:: cpp
 
    #include "funccraft.h"
 
-   #include <vector>
-
    int main() {
-       FuncCraft::SuiteCollection collection =
-           FuncCraft::suite_collection(2026, 1);
-
-       FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(10);
-       std::vector<std::vector<double>> points = {
-           std::vector<double>(10, 0.0),
-           std::vector<double>(10, 1.0),
-       };
-
-       for (int i = 0; i < suite.size(); ++i) {
-           const FuncCraft::BenchmarkFunction& f = suite.function(i);
-           std::vector<double> values = f(points);
-       }
-
-       suite.export_manifest("suite_manifest.yaml");
+       FuncCraft::FunctionSpec spec =
+           FuncCraft::load_function_spec("my_function.yaml");
+       FuncCraft::BenchmarkFunction f(spec);
    }
 
 Minimize with Minion
 --------------------
 
-``examples/main_minimize.cpp`` contains the full example used by the project.
-The key pattern is to wrap the batched FuncCraft objective in the callback
-expected by Minion:
+Build examples with ``BUILD_EXAMPLES=ON`` to fetch and build the Minion
+dependency. ``examples/main_minimize.cpp`` contains a fuller program.
 
 .. code-block:: cpp
 
-   auto objective = [&f](const std::vector<std::vector<double>>& X, void*) {
-       return f(X);
-   };
+   #include "funccraft.h"
+   #include <minion.h>
 
-Build examples with ``BUILD_EXAMPLES=ON``. This enables the Minion dependency.
+   #include <utility>
+   #include <vector>
+
+   int main() {
+       const int dimension = 10;
+       const int function_index = 0;
+
+       FuncCraft::BenchmarkSuite suite =
+           FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);
+       const FuncCraft::BenchmarkFunction& f =
+           suite.function(function_index);
+       const FuncCraft::Domain& domain = f.domain();
+
+       std::vector<std::pair<double, double>> bounds;
+       for (int i = 0; i < domain.dimension(); ++i) {
+           bounds.emplace_back(domain.lower[i], domain.upper[i]);
+       }
+
+       std::vector<double> x0(dimension, 0.0);
+       auto objective = [&f](
+           const std::vector<std::vector<double>>& X,
+           void*) {
+           return f(X);
+       };
+
+       auto settings =
+           minion::DefaultSettings().getDefaultSettings("ARRDE");
+       settings["convergence_tol"] = 1e-8;
+
+       minion::Minimizer optimizer(
+           objective,
+           bounds,
+           x0,
+           nullptr,
+           nullptr,
+           "ARRDE",
+           10000,
+           1,
+           settings);
+
+       minion::MinionResult result = optimizer.optimize();
+   }
+
+Export materialized YAML
+------------------------
+
+.. code-block:: cpp
+
+   f.export_spec("function_materialized.yaml");
+   suite.export_manifest("suite_manifest.yaml");

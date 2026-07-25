@@ -5,238 +5,171 @@
 [![Documentation Status](https://readthedocs.org/projects/funccraft/badge/?version=latest)](https://funccraft.readthedocs.io/)
 
 FuncCraft is a Python package backed by a C++17 benchmark-function generator
-for continuous optimization research. It is designed for scalable generation
-of reproducible benchmark suites across dimensions: one suite specification can
-generate hundreds, thousands, or practically unbounded numbers of distinct
-benchmark functions while preserving the metadata needed to reproduce each
-function and control the constructed optimum location.
+for continuous optimization research. It is designed for scalable benchmark
+suite generation across dimensions: one editable suite specification can
+generate hundreds, thousands, or very large numbers of distinct benchmark
+functions while controlling the constructed optimum location and optimum
+value.
 
-FuncCraft functions are built from primitive benchmark landscapes, coordinate
-transforms, value transforms, and composition rules. Each generated function can
-be exported to YAML and rebuilt later with the same parameters, including
-transform matrices, selected subspaces, component centers, DPM composition
-biases, and scale factors.
-
-## Installation
+## Install
 
 ```bash
 python -m pip install --upgrade funccraft
+python -m pip install numpy scipy minionpy
 ```
 
-For optional optimization examples:
+## YAML-First Workflow
 
-```bash
-python -m pip install funccraft numpy scipy
+Suite YAML is the easiest way to configure FuncCraft:
+
+```yaml
+base_functions: [0, 8, 9, 10, 11]
+composition_base_functions: [8, 9, 10, 11]
+coordinate_transforms:
+  - kind: rotation
+    probability: 0.5
+  - kind: blockrotation
+    probability: 0.5
+value_transforms:
+  - kind: none
+    probability: 0.5
+  - kind: osc
+    probability: 0.5
+compositions:
+  - kind: cpmsum
+    probability: 0.5
+  - kind: dpmsoftmax
+    probability: 0.5
+    parameters: [0.005]
+min_components: 2
+max_components: 4
+requested_number_of_functions: 500
+master_seed: 1
+lower_bound: -100
+upper_bound: 100
+assigned_fopt: 100.0
 ```
 
-## Core Idea
-
-FuncCraft follows a general composition framework:
-
-```text
-f(x) = psi(phi_1(g_1(T_1(x))), ..., phi_m(g_m(T_m(x))))
-```
-
-where `g_i` is a primitive benchmark function, `T_i` is a coordinate transform,
-`phi_i` is a value transform, and `psi` combines the transformed component
-values.
-
-The runtime function returns `assigned_fopt + scale_factor * raw_value`, where
-`raw_value` is the composed value above.
-
-For full-dimensional linear coordinate transforms:
-
-```text
-T(x) = target_xopt + M * (x - assigned_xopt)
-```
-
-Block rotation applies the same convention after selecting a subspace:
-
-```text
-x_sub = x[selected_indices]
-T(x) = target_xopt_sub + M * (x_sub - assigned_xopt_sub)
-```
-
-`assigned_xopt` is the desired optimum location in the transform output
-coordinates: full-dimensional for none/rotation/affine, and subspace-sized for
-block rotation. `target_xopt` is runtime-only and is determined internally from
-the selected base function optimum and active benchmark domain scaling.
-
-## Implemented Mechanisms
-
-Primitive functions are exposed through `BasicFunctionId`. The package includes
-36 base landscapes such as Sphere, Ellipsoidal, Rosenbrock, Ackley, Rastrigin,
-Griewank, Schwefel, Schaffer variants, Gallagher21, Katsuura, Levy,
-Michalewicz, BentCigar, Discus, Step, Quartic, Exponential, and
-StyblinskiTang.
-
-Coordinate transforms:
-
-- `none`
-- `rotation`
-- `affine`
-- `block-rotation`
-
-Value transforms:
-
-- `none`
-- `power`
-- `oscillatory`
-- `cosine-zero`
-
-Composition functions:
-
-- `none`: no composition for exactly one component.
-- `cpm-wsum`: common-point weighted sum.
-- `cpm-power-mean`: common-point power-mean aggregation.
-- `cpm-level-well`: common-point level-well composition.
-- `dpm-softmax`: deceptive-point softmax composition.
-- `dpm-bgsoftmax`: deceptive-point softmax with a smooth background term.
-
-Names are parsed permissively: case, spaces, hyphens, and underscores are
-normalized before matching, so `DPM BG Softmax`, `dpm-bgsoftmax`, and
-`dpmbgsoftmax` are equivalent.
-
-## Batched Evaluation
-
-All FuncCraft evaluations are batched over points. Pass a list of points, not
-one flat point vector:
+Load the YAML and evaluate a function:
 
 ```python
-values = f.evaluate([[0.0] * dimension, [1.0] * dimension])
+import funccraft as fc
+
+dimension = 10
+function_index = 0
+
+spec = fc.load_suite_spec("my_suite.yaml")
+suite = fc.BenchmarkSuite(spec, dimension)
+f = suite.function(function_index)
+
+points = [[0.0] * dimension, [1.0] * dimension]
+values = f.evaluate(points)
+print(values)
 ```
 
-The return value contains one function value per input point.
-
-## Generate A Suite
+The packaged 2026 suite is also YAML-backed and exposed through a shortcut:
 
 ```python
-from funccraft import suite_collection
+import funccraft as fc
 
-collection = suite_collection(2026, 1)
-print(collection.name)
-print(collection.number_of_functions)
-
-suite = collection.benchmark_suite(
-    dimension=10,
-)
-points = [[0.0] * 10, [1.0] * 10]
-
-for i in range(suite.size):
-    f = suite.function(i)
-    values = f.evaluate(points)
-    x_star = f.spec.assigned_xopt
-    f_star = f.spec.assigned_fopt
-    label = f.spec.label
+dimension = 10
+function_index = 0
+suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+values = suite.evaluate(function_index, [[0.0] * dimension])
 ```
 
-`max_nested_composition_depth = 0` means composed suite functions use only
-primitive components. Larger values allow components to be composed functions;
-`nested_probability` controls how often a component is nested.
+All evaluations are batched: pass a list of points, not one flat point vector.
 
-Export the exact suite used in an experiment:
+## Optimization
 
-```python
-suite.export_manifest("suite_manifest.yaml")
-```
-
-## Create One Function Manually
+SciPy:
 
 ```python
 import numpy as np
-from funccraft import (
-    BenchmarkFunction,
-    make_component,
-    make_composition,
-    make_coordinate_transform,
-    make_domain,
-    make_function_spec,
-    make_value_transform,
-)
+from scipy.optimize import differential_evolution
+import funccraft as fc
 
-rng = np.random.default_rng(1)
-x_star = rng.uniform(-4.0, 4.0, size=2).tolist()
-
-spec = make_function_spec(
-    dimension=2,
-    domain=make_domain(2, -5.0, 5.0),
-    components=[
-        make_component(
-            base_function="Sphere",
-            coordinate_transform=make_coordinate_transform(
-                kind="none",
-                input_dimension=2,
-                output_dimension=2,
-                assigned_xopt=x_star,
-            ),
-            value_transform=make_value_transform("none"),
-        ),
-        make_component(
-            base_function="Rastrigin",
-            coordinate_transform=make_coordinate_transform(
-                kind="rotation",
-                input_dimension=2,
-                output_dimension=2,
-                assigned_xopt=x_star,
-                seed=17,
-            ),
-            value_transform=make_value_transform("power", parameters=[1.25, 1.0]),
-        ),
-    ],
-    composition=make_composition("cpm-wsum"),
-    assigned_xopt=x_star,
-    assigned_fopt=0.0,
-)
-
-f = BenchmarkFunction(spec)
-values = f.evaluate([x_star, [1.0, 1.0]])
-f.export_spec("function.yaml")
-```
-
-## Minimize With SciPy
-
-```python
-import numpy as np
-from scipy.optimize import minimize
-from funccraft import BenchmarkSuite, load_suite_spec
-
-spec = load_suite_spec("suites/2026_v1.yaml")
-spec.requested_number_of_functions = 10
-suite = BenchmarkSuite(spec, 10)
-
-f = suite.function(0)
+dimension = 10
+function_index = 0
+suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+f = suite.function(function_index)
 domain = f.domain
 bounds = list(zip(domain.lower_bound, domain.upper_bound))
-x0 = np.zeros(domain.dimension)
 
 def objective(x):
-    return f.evaluate([x.tolist()])[0]
+    return f.evaluate([np.asarray(x, dtype=float).tolist()])[0]
 
-result = minimize(objective, x0, method="L-BFGS-B", bounds=bounds)
-print(result.fun, result.x)
+result = differential_evolution(objective, bounds, seed=1, polish=False)
+print(result.x, result.fun)
 ```
 
-## YAML Reproducibility
-
-One function:
+MinionPy:
 
 ```python
-from funccraft import BenchmarkFunction, load_function_spec
+import funccraft as fc
+import minionpy as mpy
 
-f.export_spec("function.yaml")
-same_f = BenchmarkFunction(load_function_spec("function.yaml"))
+dimension = 10
+function_index = 0
+suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+f = suite.function(function_index)
+domain = f.domain
+
+optimizer = mpy.Minimizer(
+    func=f.evaluate,
+    x0=[
+        [0.0] * dimension,
+        [1.0] * dimension,
+        [-0.5] * dimension,
+    ],
+    bounds=list(zip(domain.lower_bound, domain.upper_bound)),
+    algo="ARRDE",
+    maxevals=10000,
+    callback=None,
+    seed=None,
+    options=None,
+)
+result = optimizer.optimize()
+print(result.x, result.fun)
 ```
 
-One suite:
+## Mechanism Summary
+
+FuncCraft builds functions from primitive benchmark landscapes, coordinate
+transforms, value transforms, and composition rules:
+
+```text
+f(x) = assigned_fopt + scale_factor * psi(x, z_1(x), ..., z_m(x))
+```
+
+Implemented mechanism families include:
+
+- 36 primitive base functions, including Sphere, Rosenbrock, Ackley,
+  Rastrigin, Griewank, Schwefel, Katsuura, Levy, BentCigar, Discus, HappyCat,
+  HGBat, and StyblinskiTang.
+- coordinate transforms: `none`, `rotation`, `affine`, `block-rotation`.
+- value transforms: `none`, `power`, `oscillatory`, `cosine-zero`.
+- compositions: `none`, `cpm-wsum`, `cpm-power-mean`, `cpm-level-well`,
+  `dpm-softmax`, `dpm-bgsoftmax`.
+
+Names are parsed permissively: case, spaces, hyphens, and underscores are
+normalized before matching.
+
+## Exported Manifests
+
+Input YAML is for configuration and editing. Exported YAML is a materialized
+record of what FuncCraft built:
 
 ```python
+f.export_spec("function_materialized.yaml")
 suite.export_manifest("suite_manifest.yaml")
 ```
 
-The exported YAML stores the normalized suite/function specification and the
-runtime values needed to reproduce evaluations.
+Exported specs include generated matrices, selected subspaces, DPM centers and
+biases, assigned optima, scale factors, labels, and metadata.
 
 ## Links
 
+- Documentation: https://funccraft.readthedocs.io/
 - Source: https://github.com/khoirulmuzakka/FuncCraft
 - Issues: https://github.com/khoirulmuzakka/FuncCraft/issues

@@ -1,21 +1,11 @@
 Suite collections
 =================
 
-Suite collections are versioned benchmark-suite definitions shipped as YAML.
-The current package contains ``suites/2026_v1.yaml`` and exposes it through
-``SuiteCollection``.
+Suite collections are versioned benchmark-suite definitions shipped with
+FuncCraft. They are backed by YAML files in ``suites/`` and exposed through a
+stable API.
 
-Why collections exist
----------------------
-
-A ``SuiteSpec`` is a generator recipe. It defines the base-function pool,
-choice probabilities, component-count range, nesting policy, bounds, optimum
-placement policy, and number of requested functions. A ``SuiteCollection`` is
-a stable named access point for a published recipe, identified by year and
-version.
-
-Python
-------
+The current packaged collection is ``2026_v1``:
 
 .. code-block:: python
 
@@ -26,11 +16,8 @@ Python
    print(collection.number_of_functions)
 
    suite = collection.benchmark_suite(10)
-   f0 = suite.function(0)
-   values = suite.evaluate(0, [[0.0] * 10])
 
-C++
----
+C++:
 
 .. code-block:: cpp
 
@@ -41,20 +28,28 @@ C++
            FuncCraft::suite_collection(2026, 1);
 
        int n = collection.number_of_functions();
-       FuncCraft::SuiteSpec spec = collection.spec();
-       FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(10);
+       FuncCraft::BenchmarkSuite suite =
+           collection.benchmark_suite(10);
    }
 
-Dimension and seed behavior
----------------------------
+When to use a collection
+------------------------
 
-For a given suite collection and function index, FuncCraft keeps the structural
-choices stable across dimensions: base/composed decision, base-function choices,
+Use ``suite_collection(year, version)`` when you want a published FuncCraft
+suite exactly as shipped.
+
+Use ``load_suite_spec("my_suite.yaml")`` when you want to edit the suite
+recipe yourself. The YAML fields are described in :doc:`yaml_specs`.
+
+Dimension and seeds
+-------------------
+
+The suite YAML defines the number of generated functions. You choose the
+dimension when materializing a runtime ``BenchmarkSuite``.
+
+For a given collection and function index, FuncCraft keeps structural choices
+stable across dimensions: base/composed decision, base-function choices,
 composition kind, coordinate-transform kind, value-transform kind, and the
-relevant seeds. Geometry details such as generated coordinate vectors are
-dimension-dependent but use prefix-stable generation where applicable, so
-higher-dimensional runs extend lower-dimensional coordinates for assigned
-optimum locations and DPM centers.
-
-The number of functions is defined by the suite YAML. Users choose only the
-dimension when materializing a collection into a runtime ``BenchmarkSuite``.
+relevant seeds. Generated coordinate vectors use prefix-stable generation
+where applicable, so higher-dimensional assigned optima and DPM centers extend
+lower-dimensional ones.

@@ -1,15 +1,15 @@
 Implemented mechanisms
 ======================
 
-This page is the compact registry of implemented mechanism names. For the
-mathematical formulas and complete ``FunctionSpec``/``SuiteSpec`` examples,
-see :doc:`construction`.
+This page lists the implemented primitive functions, transforms, value
+transforms, and composition modes. YAML/spec parsers normalize case, spaces,
+hyphens, and underscores before matching names.
 
 Base functions
 --------------
 
-Primitive functions are exposed through ``BasicFunctionId``. The current
-registry contains:
+Primitive functions are exposed through ``BasicFunctionId``. Numeric IDs and
+names can both be used in YAML.
 
 .. list-table::
    :header-rows: 1
@@ -130,69 +130,180 @@ registry contains:
 Coordinate transforms
 ---------------------
 
-.. list-table::
-   :header-rows: 1
+Let :math:`x` be the parent point, :math:`a` be the assigned component optimum
+stored in ``assigned_xopt``, and :math:`t` be the internally resolved child
+optimum. The transform maps parent coordinates into child coordinates.
 
-   * - Name
-     - Description
-   * - ``none``
-     - Identity transform.
-   * - ``rotation``
-     - Dense orthogonal rotation with reproducible matrix.
-   * - ``affine``
-     - Reproducible affine linear transform.
-   * - ``block-rotation``
-     - Rotation on a selected coordinate subspace.
+``none``
+   Full-dimensional shift:
+
+   .. math::
+
+      T(x) = t + (x-a).
+
+``rotation``
+   Full-dimensional shifted rotation with orthogonal matrix :math:`R`:
+
+   .. math::
+
+      T(x) = t + R(x-a).
+
+``affine``
+   Full-dimensional shifted affine transform with matrix :math:`A`:
+
+   .. math::
+
+      T(x) = t + A(x-a).
+
+``block-rotation``
+   Subspace transform. If ``selected_indices`` defines projection :math:`P`,
+   then :math:`x_{\mathrm{sub}} = Px` and
+
+   .. math::
+
+      T(x) = t + R(x_{\mathrm{sub}} - a).
+
+   The child function sees only ``output_dimension`` variables.
 
 Value transforms
 ----------------
 
-.. list-table::
-   :header-rows: 1
+Let :math:`u \ge 0` be the shifted component value before the value transform.
 
-   * - Name
-     - Description
-   * - ``none``
-     - No scalar reshaping.
-   * - ``power``
-     - Power-law value reshaping.
-   * - ``oscillatory``
-     - Oscillatory nonlinearity for positive component values, with explicit ``2*pi`` phase reduction for cross-platform numerical stability.
-   * - ``cosine-zero``
-     - Nonmonotone transform preserving zero, with explicit ``2*pi`` phase reduction.
+``none``
+   .. math::
 
-Composition functions
----------------------
+      \phi(u) = u.
 
-.. list-table::
-   :header-rows: 1
+``power``
+   Parameters are ``[alpha, p]``:
 
-   * - Name
-     - Mode
-     - Description
-   * - ``none``
-     - Identity
-     - No composition for exactly one component.
-   * - ``cpm-wsum``
-     - CPM
-     - Common-point weighted sum.
-   * - ``cpm-power-mean``
-     - CPM
-     - Common-point power-mean aggregation.
-   * - ``cpm-level-well``
-     - CPM
-     - Common-point level-well composition with explicit ``2*pi`` phase reduction.
-   * - ``dpm-softmax``
-     - DPM
-     - Deceptive-point softmax composition.
-   * - ``dpm-bgsoftmax``
-     - DPM
-     - Deceptive-point softmax with a smooth background term.
+   .. math::
 
-Name parsing
+      \phi(u) = \alpha u^p.
+
+``oscillatory``
+   Parameters are ``[epsilon, alpha]``:
+
+   .. math::
+
+      \phi(u) = u\left(1 + \epsilon\sin(\alpha u)\right).
+
+``cosine-zero``
+   Parameter is ``[alpha]``:
+
+   .. math::
+
+      \phi(u) = 1 - \cos(\alpha u).
+
+Trigonometric value transforms reduce the phase modulo :math:`2\pi` internally
+for more stable cross-platform numerical behavior.
+
+Composition modes
+-----------------
+
+Let :math:`z_i` be transformed component values.
+
+``none``
+   Single-component identity:
+
+   .. math::
+
+      \psi(z_1) = z_1.
+
+``cpm-wsum``
+   Common-point weighted sum:
+
+   .. math::
+
+      \psi(z) = \sum_i w_i z_i.
+
+``cpm-power-mean``
+   Parameter is ``[p]``:
+
+   .. math::
+
+      \psi(z) = \left(\sum_i w_i z_i^p\right)^{1/p}.
+
+``cpm-level-well``
+   Parameters are ``[epsilon, alpha]``. Let
+   :math:`s = \sum_i w_i z_i`:
+
+   .. math::
+
+      \psi(z) = s\left(1 + \epsilon\sin(\alpha s)\right).
+
+``dpm-softmax``
+   Parameter is ``[sharpness]``. Let :math:`c_i` be full-dimensional DPM
+   centers, :math:`b_i` be DPM biases, and :math:`\gamma` be sharpness:
+
+   .. math::
+
+      q_i(x) = \exp(-\gamma\|x-c_i\|^2 - M),
+      \qquad
+      M = \max_j -\gamma\|x-c_j\|^2.
+
+   Non-global centers are masked near the global center:
+
+   .. math::
+
+      m_0(x)=1,\qquad
+      m_i(x)=1-\exp(-\|x-c_0\|^2),\quad i>0.
+
+   Then
+
+   .. math::
+
+      \psi(x,z) =
+      \frac{\sum_i q_i(x)m_i(x)(z_i+b_i)}
+           {\sum_i q_i(x)m_i(x)}.
+
+``dpm-bgsoftmax``
+   Parameters are ``[sharpness, background_strength, background_sharpness]``.
+   It adds a smooth background term
+
+   .. math::
+
+      \beta(x) =
+      \rho\left(1-\exp(-\eta \min_i\|x-c_i\|)\right)
+
+   and computes
+
+   .. math::
+
+      \psi(x,z) =
+      \frac{\sum_i (q_i(x)m_i(x)+\beta(x))(z_i+b_i)}
+           {\sum_i (q_i(x)m_i(x)+\beta(x))}.
+
+DPM center 0 is the assigned global optimum. Other centers are deceptive
+locations. DPM biases are composition parameters, not component value
+transforms.
+
+Name aliases
 ------------
 
-Spec parsers are permissive: case, spaces, hyphens, and underscores are
-normalized before matching. For example, ``DPM BG Softmax``,
-``dpm-bgsoftmax``, and ``dpmbgsoftmax`` are equivalent inputs. Exported specs
-should use the canonical names.
+Examples of accepted aliases:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Canonical name
+     - Common aliases
+   * - ``none``
+     - ``identity``
+   * - ``rotation``
+     - ``rot``
+   * - ``affine``
+     - ``aff``
+   * - ``block-rotation``
+     - ``blockrotation``, ``blockrot``, ``brot``
+   * - ``cpm-wsum``
+     - ``cpmsum``, ``weighted_sum``
+   * - ``cpm-power-mean``
+     - ``cpmpmean``, ``power_mean``
+   * - ``cpm-level-well``
+     - ``cpmlwell``, ``level_well``
+   * - ``dpm-softmax``
+     - ``dpmsoftmax``, ``dpm``
+   * - ``dpm-bgsoftmax``
+     - ``dpmbgsoftmax``, ``DPM BG Softmax``

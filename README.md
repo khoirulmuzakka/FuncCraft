@@ -8,165 +8,26 @@
 [![Wheel](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml/badge.svg)](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml)
 [![Documentation Status](https://readthedocs.org/projects/funccraft/badge/?version=latest)](https://funccraft.readthedocs.io/)
 
-FuncCraft is a C++17 library, with a Python interface, for scalable generation
-of reproducible continuous optimization benchmark functions. From one suite
-specification it can generate hundreds, thousands, or practically unbounded
-numbers of distinct benchmark instances across dimensions while preserving the
-metadata needed to reproduce each function exactly and still controlling the
-location of the constructed function's known minimum.
+FuncCraft is a C++17 library with a Python interface for generating scalable
+continuous-optimization benchmark suites. A single suite specification can
+generate hundreds, thousands, or very large numbers of distinct benchmark
+functions across dimensions while keeping control over the constructed optimum
+location and optimum value.
 
-The library separates benchmark construction into primitive functions,
-coordinate transforms, value transforms, and composition rules. A generated
-function can be exported as YAML and rebuilt later with the same parameters,
-including transform matrices, selected subspaces, component optimum locations,
-component centers, DPM composition biases, and scale factors.
+FuncCraft is configured with YAML-friendly specs. The main workflow is to edit
+a suite YAML file, load it in C++ or Python, choose a dimension, and evaluate
+the generated benchmark functions in batches.
 
-## Generating Mechanism
+## Install
 
-FuncCraft follows the general composition framework described in the
-documentation. A benchmark is assembled as
+Python:
 
-```text
-f(x) = psi(phi_1(g_1(T_1(x))), ..., phi_m(g_m(T_m(x))))
+```bash
+python -m pip install --upgrade funccraft
+python -m pip install numpy scipy minionpy
 ```
 
-where:
-
-- `g_i` is a primitive benchmark function.
-- `T_i` is a coordinate transform that changes where and how the component is
-  sampled in the search space.
-- `phi_i` is a scalar value transform applied to the component output.
-- `psi` is the composition function that combines all transformed component
-  values.
-
-The runtime `BenchmarkFunction` returns the final shifted/scaled value
-`assigned_fopt + scale_factor * raw_value`, where `raw_value` is the composed
-value above.
-
-For full-dimensional linear coordinate transforms, the convention is:
-
-```text
-T(x) = target_xopt + M * (x - assigned_xopt)
-```
-
-Block rotation applies the same convention after selecting a subspace:
-
-```text
-x_sub = x[selected_indices]
-T(x) = target_xopt_sub + M * (x_sub - assigned_xopt_sub)
-```
-
-Here `assigned_xopt` is the desired minimum location in the transform output
-coordinates: full-dimensional for none/rotation/affine, and subspace-sized for
-block rotation. `target_xopt` is runtime-only and is filled internally by
-`BenchmarkFunction` from the selected base function's native `x_opt` and the
-active benchmark domain. This lets users place a generated optimum at
-`assigned_xopt` without needing to know the primitive domain-scaling details.
-
-The usual suite generator chooses these ingredients from weighted
-choice lists, places the global optimum and component centers deterministically
-from the suite seed, and then materializes a
-`FunctionSpec`. A `FunctionSpec` is the reproducibility record: it is the data
-used to build a `BenchmarkFunction`, and it is also what is exported to YAML.
-For DPM compositions, component 0 is assigned to the constructed global
-optimum and every other component center is sampled from the shrunken search
-domain.
-
-## Implemented Mechanisms
-
-Primitive functions are exposed through `BasicFunctionId`. The current enum
-contains 36 base landscapes, including Sphere, Ellipsoidal, Rosenbrock, Ackley,
-Rastrigin, Griewank, Schwefel, Schaffer variants, Gallagher21, Katsuura, Levy,
-Michalewicz, BentCigar, Discus, HappyCat, HGBat, Step, Quartic, Exponential,
-and StyblinskiTang.
-
-Coordinate transforms:
-
-- `identity` / `none`: direct use of the input coordinates.
-- `rotation` / `rot`: dense orthogonal rotation with a reproducible matrix.
-- `affine` / `aff`: reproducible affine linear transform.
-- `block_rotation` / `blockrotation` / `blockrot` / `brot`: rotation on a
-  selected coordinate subspace.
-
-Value transforms:
-
-- `identity` / `none`: no scalar reshaping.
-- `power`: power-law reshaping with scale.
-- `oscillatory` / `osc`: oscillatory nonlinearity for positive component
-  values.
-- `cosine_zero` / `coszero`: nonmonotone transform preserving zero.
-
-Composition functions:
-
-- `none` / `identity`: no composition for a one-component function.
-- `cpm-wsum` / `cpmsum` / `weighted_sum`: common-point weighted sum.
-- `cpm-power-mean` / `cpmpmean` / `power_mean`: common-point power-mean aggregation.
-- `cpm-level-well` / `cpmlwell` / `level_well`: common-point level-well
-  composition.
-- `dpm-softmax` / `dpmsoftmax` / `dpm`: deceptive multi-point softmax composition.
-- `dpm-bgsoftmax` / `dpmbgsoftmax`: deceptive softmax with a background
-  component.
-
-The default suite choices are in `include/suite_spec.h` and
-`suites/2026_v1.yaml`.
-
-Suite generation can also nest composed functions inside components.
-`max_nested_composition_depth = 0` means composed suite functions use only
-primitive components. Larger values allow nested composed components, and
-`nested_probability` controls how often each component is sampled as a nested
-composition.
-
-## Repository Layout
-
-- `include/`: public C++ headers.
-- `src/`: C++ implementation and Python bindings.
-- `funccraft/`: Python wrapper package.
-- `suites/`: versioned YAML suite collections, named like `2026_v1.yaml`.
-- `tests/`: Python and C++ round-trip and cross-platform value checks.
-- `examples/`: optional examples; Minion-dependent examples are built only when
-  `BUILD_EXAMPLES=ON`. See `examples/main_minimize.cpp` for an end-to-end
-  example that minimizes functions from a generated benchmark suite.
-- `docs/`: Sphinx/Read the Docs-style documentation source and build scripts.
-
-## Public C++ API
-
-Use `#include "funccraft.h"` for normal C++ code. This is the documented
-high-level entry point for `BasicF`, `BenchmarkFunction`, `BenchmarkSuite`,
-`SuiteCollection`, `FunctionSpec`, `SuiteSpec`, `load_function_spec`,
-`load_suite_spec`, and construction/export helpers. Lower-level builder,
-transform, and composition implementation headers are available separately for
-internal or advanced use.
-
-The built-in benchmark collections are versioned by year and version number
-and are defined by YAML files in `suites/`, for example `2026_v1.yaml`.
-For the current collection:
-
-```cpp
-FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
-int n = collection.number_of_functions();
-FuncCraft::SuiteSpec spec = collection.spec();
-FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(10);
-```
-
-## Build Options
-
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `BUILD_LIBRARY` | `ON` | Build the C++ `funccraft` static library. |
-| `BUILD_PYTHON` | `ON` | Build the Python extension module. |
-| `BUILD_EXAMPLES` | `OFF` | Build examples; this enables the Minion FetchContent dependency. |
-| `BUILD_TEST` | `OFF` | Build C++ tests; this does not require Minion. |
-| `FUNCCRAFT_INSTALL` | `OFF` | Generate install/export metadata. |
-
-## Installation
-
-Prerequisites:
-
-- CMake 3.18 or newer.
-- A C++17 compiler.
-- Python 3.9 or newer for the Python package.
-
-Build the C++ library, Python extension, and C++ tests:
+From source:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
@@ -180,139 +41,190 @@ ctest --test-dir build --output-on-failure -C Release
 python tests/test.py
 ```
 
-Build optional examples:
+On Windows, `compile.bat` builds release by default and `compile.bat --debug`
+builds debug. On Linux/macOS, use `./compile.sh` or `./compile.sh --debug`.
 
-```bash
-cmake -S . -B build -DBUILD_EXAMPLES=ON
-cmake --build build --config Release
+## Configure A Suite With YAML
+
+Suite YAML is the easiest way to create and edit benchmark suites:
+
+```yaml
+supported_dimensions: any
+base_functions: [0, 8, 9, 10, 11]
+composition_base_functions: [8, 9, 10, 11]
+
+coordinate_transforms:
+  - kind: rotation
+    probability: 0.5
+  - kind: blockrotation
+    probability: 0.5
+
+value_transforms:
+  - kind: none
+    probability: 0.5
+  - kind: osc
+    probability: 0.5
+
+compositions:
+  - kind: cpmsum
+    probability: 0.5
+  - kind: dpmsoftmax
+    probability: 0.5
+    parameters: [0.005]
+
+min_components: 2
+max_components: 4
+max_nested_composition_depth: 1
+nested_probability: 0.1
+requested_number_of_functions: 500
+master_seed: 1
+lower_bound: -100
+upper_bound: 100
+assigned_fopt: 100.0
+xopt_domain_shrink_factor: 0.8
+suite_label: my-suite
 ```
 
-Build a Python wheel:
+Choice probabilities in each table are fractions and should sum to one. Names
+are parsed permissively: case, spaces, hyphens, and underscores are normalized.
+For example, `DPM BG Softmax`, `dpm-bgsoftmax`, and `dpmbgsoftmax` refer to
+the same composition.
 
-```bash
-python -m pip install --upgrade build
-python -m build --wheel
-python -m pip install dist/funccraft-*.whl
+The repository ships a standard YAML suite at `suites/2026_v1.yaml`. You can
+copy it, edit it, and load your edited file.
+
+## Python Usage
+
+Load an editable suite YAML and evaluate batched points:
+
+```python
+import funccraft as fc
+
+dimension = 10
+suite_spec = fc.load_suite_spec("my_suite.yaml")
+suite = fc.BenchmarkSuite(suite_spec, dimension)
+
+points = [[0.0] * dimension, [1.0] * dimension]
+function_index = 0
+f = suite.function(function_index)
+values = f.evaluate(points)
+
+print(f.spec.label)
+print(f.spec.assigned_xopt)
+print(values)
 ```
 
-On Windows, `compile.bat` is a convenience script for configuring and building
-the project.
+For the packaged 2026 suite, use the collection shortcut:
+
+```python
+import funccraft as fc
+
+dimension = 10
+suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+function_index = 0
+values = suite.evaluate(function_index, [[0.0] * dimension])
+```
+
+All evaluations are batched. Pass a list of points, not a single flat vector.
+
+Minimize one generated function with SciPy:
+
+```python
+import numpy as np
+from scipy.optimize import differential_evolution
+import funccraft as fc
+
+dimension = 10
+suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+function_index = 0
+f = suite.function(function_index)
+domain = f.domain
+bounds = list(zip(domain.lower_bound, domain.upper_bound))
+
+def objective(x):
+    return f.evaluate([np.asarray(x, dtype=float).tolist()])[0]
+
+result = differential_evolution(objective, bounds, seed=1, polish=False)
+print(result.x, result.fun)
+```
+
+Minimize with MinionPy:
+
+```python
+import funccraft as fc
+import minionpy as mpy
+
+dimension = 10
+suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+function_index = 0
+f = suite.function(function_index)
+domain = f.domain
+
+optimizer = mpy.Minimizer(
+    func=f.evaluate,
+    x0=[
+        [0.0] * dimension,
+        [1.0] * dimension,
+        [-0.5] * dimension,
+    ],
+    bounds=list(zip(domain.lower_bound, domain.upper_bound)),
+    algo="ARRDE",
+    maxevals=10000,
+    callback=None,
+    seed=None,
+    options=None,
+)
+result = optimizer.optimize()
+print(result.x, result.fun)
+```
 
 ## C++ Usage
 
-All benchmark evaluations are batched. A function receives a
-`std::vector<std::vector<double>>`, where each inner vector is one point, and
-returns one value per point.
+Use `#include "funccraft.h"` for normal C++ code.
 
-Create one composed benchmark function from a `FunctionSpec`:
+Load an editable suite YAML and evaluate batched points:
 
 ```cpp
 #include "funccraft.h"
 
-#include <random>
+#include <iostream>
 #include <vector>
 
 int main() {
-    using namespace FuncCraft;
+    const int dimension = 10;
+    const int function_index = 0;
 
-    std::mt19937_64 rng(1);
-    std::uniform_real_distribution<double> uniform(-4.0, 4.0);
-    std::vector<double> x_star = {uniform(rng), uniform(rng)};
+    FuncCraft::SuiteSpec spec =
+        FuncCraft::load_suite_spec("my_suite.yaml");
+    FuncCraft::BenchmarkSuite suite(spec, dimension);
 
-    CoordinateTransformSpec sphere_transform;
-    sphere_transform.kind = CoordinateTransformKind::None;
-    sphere_transform.input_dimension = 2;
-    sphere_transform.output_dimension = 2;
-    sphere_transform.assigned_xopt = x_star;
-
-    CoordinateTransformSpec rastrigin_transform;
-    rastrigin_transform.kind = CoordinateTransformKind::Rotation;
-    rastrigin_transform.input_dimension = 2;
-    rastrigin_transform.output_dimension = 2;
-    rastrigin_transform.seed = 17;
-    rastrigin_transform.assigned_xopt = x_star;
-
-    ValueTransformSpec no_value_transform;
-    no_value_transform.kind = ValueTransformKind::None;
-
-    ValueTransformSpec power;
-    power.kind = ValueTransformKind::Power;
-    power.parameters = {1.25, 1.0};
-
-    ComponentSpec sphere;
-    sphere.base_function = BasicFunctionId::Sphere;
-    sphere.coordinate_transform = sphere_transform;
-    sphere.value_transform = no_value_transform;
-
-    ComponentSpec rastrigin;
-    rastrigin.base_function = BasicFunctionId::Rastrigin;
-    rastrigin.coordinate_transform = rastrigin_transform;
-    rastrigin.value_transform = power;
-
-    CompositionSpec composition;
-    composition.kind = CompositionKind::CpmWeightedSum;
-
-    FunctionSpec spec;
-    spec.dimension = 2;
-    spec.domain.dimension = 2;
-    spec.domain.lower_bound = {-5.0, -5.0};
-    spec.domain.upper_bound = {5.0, 5.0};
-    spec.components = {sphere, rastrigin};
-    spec.composition = composition;
-    spec.assigned_xopt = x_star;
-    spec.assigned_fopt = 0.0;
-
-    BenchmarkFunction f(spec);
-    std::vector<double> values = f({x_star, {1.0, 1.0}});
-
-    f.export_spec("function.yaml");
-    BenchmarkFunction same_f = make_benchmark_function("function.yaml");
-}
-```
-
-Create a benchmark suite and evaluate generated functions:
-
-```cpp
-#include "funccraft.h"
-
-#include <vector>
-
-int main() {
-    using namespace FuncCraft;
-
-    SuiteSpec spec = load_suite_spec("suites/2026_v1.yaml");
-    spec.requested_number_of_functions = 500;
-    spec.master_seed = 1;
-
-    BenchmarkSuite suite(spec, 10);
+    const FuncCraft::BenchmarkFunction& f = suite.function(function_index);
     std::vector<std::vector<double>> points = {
-        std::vector<double>(10, 0.0),
-        std::vector<double>(10, 1.0),
+        std::vector<double>(dimension, 0.0),
+        std::vector<double>(dimension, 1.0),
     };
+    std::vector<double> values = f(points);
 
-    for (int i = 0; i < suite.size(); ++i) {
-        const BenchmarkFunction& f = suite.function(i);
-        std::vector<double> values = f(points);
-
-        const FunctionSpec& f_spec = f.spec();
-        const std::vector<double>& x_star = f_spec.assigned_xopt;
-        const double f_star = f_spec.assigned_fopt;
-        const std::string& label = f_spec.label;
-    }
-
-    suite.export_manifest("suite_manifest.yaml");
+    std::cout << f.spec().label << '\n';
+    std::cout << values.front() << '\n';
 }
 ```
 
-`BenchmarkSuite::export_manifest()` is the preferred suite-level export name.
-It writes the normalized suite spec and every generated function spec, which is
-useful for archiving the exact benchmark set used in an experiment.
-`export_spec()` is available as an alias.
+For the packaged 2026 suite:
 
-For a complete optimization run, see `examples/main_minimize.cpp`, which builds
-a benchmark suite and minimizes each generated function with Minion.
+```cpp
+#include "funccraft.h"
 
-Minimize a suite function in C++ with Minion:
+int main() {
+    const int dimension = 10;
+    FuncCraft::SuiteCollection collection =
+        FuncCraft::suite_collection(2026, 1);
+    FuncCraft::BenchmarkSuite suite =
+        collection.benchmark_suite(dimension);
+}
+```
+
+Minimize one generated function with Minion:
 
 ```cpp
 #include "funccraft.h"
@@ -322,12 +234,12 @@ Minimize a suite function in C++ with Minion:
 #include <vector>
 
 int main() {
-    FuncCraft::SuiteSpec spec =
-        FuncCraft::load_suite_spec("suites/2026_v1.yaml");
-    spec.requested_number_of_functions = 40;
+    const int dimension = 10;
+    const int function_index = 0;
 
-    FuncCraft::BenchmarkSuite suite(spec, 10);
-    const FuncCraft::BenchmarkFunction& f = suite.function(0);
+    FuncCraft::BenchmarkSuite suite =
+        FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);
+    const FuncCraft::BenchmarkFunction& f = suite.function(function_index);
     const FuncCraft::Domain& domain = f.domain();
 
     std::vector<std::pair<double, double>> bounds;
@@ -335,7 +247,7 @@ int main() {
         bounds.emplace_back(domain.lower[i], domain.upper[i]);
     }
 
-    std::vector<double> x0(10, 0.0);
+    std::vector<double> x0(dimension, 0.0);
     auto objective = [&f](const std::vector<std::vector<double>>& X, void*) {
         return f(X);
     };
@@ -358,197 +270,51 @@ int main() {
 }
 ```
 
-## Python Usage
+## Function Specs
 
-All benchmark evaluations are batched. Pass a list of points, such as
-`[[0.0] * dimension, [1.0] * dimension]`, rather than one flat point vector.
-
-The Python package exposes the native C++ spec objects, plus small `make_*`
-factory helpers so users do not need to know pybind constructor details. The
-factories return native specs, not a separate Python spec model.
-
-Create one composed benchmark function:
+A `FunctionSpec` describes one benchmark function. You can create it in code
+or write it as YAML. User-authored function specs can omit generated details
+such as rotation matrices and scale factors; FuncCraft fills them when the
+runtime `BenchmarkFunction` is built.
 
 ```python
-import numpy as np
-from funccraft import (
-    BenchmarkFunction,
-    make_benchmark_function,
-    make_component,
-    make_composition,
-    make_coordinate_transform,
-    make_domain,
-    make_function_spec,
-    make_value_transform,
-)
+import funccraft as fc
 
-rng = np.random.default_rng(1)
-x_star = rng.uniform(-4.0, 4.0, size=2).tolist()
-
-spec = make_function_spec(
-    dimension=2,
-    domain=make_domain(2, -5.0, 5.0),
-    components=[
-        make_component(
-            base_function="Sphere",
-            coordinate_transform=make_coordinate_transform(
-                kind="none",
-                input_dimension=2,
-                output_dimension=2,
-                assigned_xopt=x_star,
-            ),
-            value_transform=make_value_transform("none"),
-        ),
-        make_component(
-            base_function="Rastrigin",
-            coordinate_transform=make_coordinate_transform(
-                kind="rotation",
-                input_dimension=2,
-                output_dimension=2,
-                assigned_xopt=x_star,
-                seed=17,
-            ),
-            value_transform=make_value_transform("power", parameters=[1.25, 1.0]),
-        ),
-    ],
-    composition=make_composition("cpm-wsum"),
-    assigned_xopt=x_star,
-    assigned_fopt=0.0,
-)
-
-f = BenchmarkFunction(spec)
-before = f.evaluate([x_star, [1.0, 1.0]])
-
-f.export_spec("function.yaml")
-same_f = make_benchmark_function("function.yaml")
-after = same_f.evaluate([x_star, [1.0, 1.0]])
-assert before == after
+spec = fc.load_function_spec("my_function.yaml")
+f = fc.BenchmarkFunction(spec)
+values = f.evaluate([[0.0, 0.0]])
 ```
 
-Create and use a generated benchmark suite:
+## Exported Manifests
+
+Input YAML is for configuration and editing. Exported function specs and suite
+manifests are materialized records: they include generated matrices, selected
+subspaces, DPM centers and biases, assigned optima, scale factors, labels, and
+metadata.
 
 ```python
-from funccraft import BenchmarkSuite, load_suite_spec
-
-suite_spec = load_suite_spec("suites/2026_v1.yaml")
-suite_spec.requested_number_of_functions = 500
-suite_spec.master_seed = 1
-
-suite = BenchmarkSuite(suite_spec, 10)
-points = [[0.0] * 10, [1.0] * 10]
-
-for i in range(suite.size):
-    f = suite.function(i)
-    values = f.evaluate(points)
-
-    x_star = f.spec.assigned_xopt
-    f_star = f.spec.assigned_fopt
-    label = f.spec.label
-
+f.export_spec("function_materialized.yaml")
 suite.export_manifest("suite_manifest.yaml")
 ```
 
-You can also construct a suite spec directly in Python:
+Archive an exported manifest when you want the exact generated function table
+used in an experiment.
 
-```python
-from funccraft import (
-    BenchmarkSuite,
-    make_composition_choice,
-    make_coordinate_transform_choice,
-    make_suite_spec,
-    make_value_transform_choice,
-)
+## Documentation
 
-suite_spec = make_suite_spec(
-    requested_number_of_functions=500,
-    min_components=2,
-    max_components=4,
-    max_nested_composition_depth=1,
-    nested_probability=0.05,
-    master_seed=1,
-    compositions=[
-        make_composition_choice("dpm-bgsoftmax", 0.5, [0.01, 1.0, 0.01]),
-        make_composition_choice("dpm-softmax", 0.5, [0.01]),
-    ],
-    coordinate_transforms=[
-        make_coordinate_transform_choice("rotation", 0.5),
-        make_coordinate_transform_choice("block-rotation", 0.5),
-    ],
-    value_transforms=[
-        make_value_transform_choice("none", 0.5),
-        make_value_transform_choice("oscillatory", 0.5, [0.1, 1.0]),
-    ],
-)
+Full documentation is available at https://funccraft.readthedocs.io/.
 
-suite = BenchmarkSuite(suite_spec, 10)
-```
+Key pages:
 
-For compact scripts, nested dictionaries with the same current field names are
-accepted anywhere a function or suite spec is expected:
-
-```python
-suite = BenchmarkSuite(
-    {
-        "requested_number_of_functions": 100,
-        "max_components": 4,
-        "compositions": [
-            {"kind": "DPM BG Softmax", "probability": 1.0, "parameters": [0.01, 1.0, 0.01]},
-        ],
-    },
-    10,
-)
-```
-
-Minimize one generated function with SciPy:
-
-```python
-import numpy as np
-from scipy.optimize import minimize
-from funccraft import BenchmarkSuite, load_suite_spec
-
-suite_spec = load_suite_spec("suites/2026_v1.yaml")
-suite_spec.requested_number_of_functions = 40
-
-suite = BenchmarkSuite(suite_spec, 10)
-f = suite.function(0)
-domain = f.domain
-
-bounds = list(zip(domain.lower_bound, domain.upper_bound))
-x0 = np.zeros(domain.dimension)
-
-def objective(x):
-    return f.evaluate([x.tolist()])[0]
-
-result = minimize(objective, x0, method="L-BFGS-B", bounds=bounds)
-print(result.fun, result.x)
-```
-
-For a broader notebook walkthrough, see `examples/Create_functions.ipynb`.
+- `docs/source/yaml_specs.rst`: editable YAML specs.
+- `docs/source/construction.rst`: mathematical construction model.
+- `docs/source/mechanisms.rst`: implemented base functions, transforms, and compositions.
+- `docs/source/funccraft_py/examples.rst`: Python examples.
+- `docs/source/funccraft_cpp/examples.rst`: C++ examples.
 
 ## CI Status
 
-The badges at the top of this README show the pass/fail state for the standard
-CI and wheel workflows: CI builds the C++ library, Python extension, and C++
-test binary on Linux, Windows, and macOS arm, runs C++ and Python round-trip
-tests, generates deterministic benchmark value tables on each platform, and
-compares them with a `1e-7` relative tolerance; the wheel workflow builds
-Python wheels and tests the installed wheel.
-
-## Exported YAML
-
-`BenchmarkFunction::export_spec()` and `BenchmarkFunction.export_spec()` write
-one complete function spec. The exported YAML contains:
-
-- dimension and bounds;
-- component base functions;
-- coordinate transform kind, seed, input/output dimensions, selected indices,
-  `assigned_xopt`, parameters, and generated matrix when applicable;
-- value transform kind and parameters;
-- composition kind, parameters, DPM centers, and DPM biases when applicable;
-- function-level `assigned_xopt` and `assigned_fopt`;
-- materialized `scale_factor`;
-- label and metadata.
-
-`BenchmarkSuite::export_manifest()` and `BenchmarkSuite.export_manifest()` write
-the suite spec plus every generated function spec. This is the right export
-when the exact suite, not just one function, needs to be reproduced.
+The CI workflow builds the C++ library, Python extension, and C++ test binary
+on Linux, Windows, and macOS arm, runs C++ and Python tests, generates
+cross-platform benchmark value tables, and compares them with a `1e-7`
+relative tolerance. The wheel workflow builds and tests Python wheels.

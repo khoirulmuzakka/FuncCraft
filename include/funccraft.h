@@ -6,7 +6,7 @@
  * @brief Public umbrella header for the high-level FuncCraft C++ API.
  *
  * Include this header when you want to construct benchmark functions, generate
- * benchmark suites, load specs from files, and export reproducibility specs.
+ * benchmark suites, load specs from files, and export materialized specs.
  * Low-level runtime builders and transform implementations remain available
  * through their own headers, but are intentionally not included here.
  *
@@ -68,13 +68,17 @@
  * #include "funccraft.h"
  *
  * int main() {
+ *     const int dimension = 10;
+ *     const int function_index = 0;
  *     FuncCraft::SuiteCollection collection =
  *         FuncCraft::suite_collection(2026, 1);
  *
  *     FuncCraft::BenchmarkSuite suite =
- *         collection.benchmark_suite(10);
- *     const FuncCraft::BenchmarkFunction& f = suite.function(0);
- *     std::vector<double> values = f({std::vector<double>(10, 0.0)});
+ *         collection.benchmark_suite(dimension);
+ *     const FuncCraft::BenchmarkFunction& f =
+ *         suite.function(function_index);
+ *     std::vector<double> values =
+ *         f({std::vector<double>(dimension, 0.0)});
  *
  *     f.export_spec("function.yaml");
  *     suite.export_manifest("suite_manifest.yaml");

@@ -215,11 +215,11 @@ class BenchmarkFunction:
         return self._function.evaluate(points)
 
     def export_spec(self, path):
-        """Write the complete function reproducibility spec to a YAML file.
+        """Write the materialized function spec to a YAML file.
 
         Examples
         --------
-        Round-trip a function through YAML::
+        Archive and reload a materialized function::
 
             before = f([[0.25, -0.5]])
             f.export_spec("function.yaml")

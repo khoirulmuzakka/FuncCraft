@@ -194,7 +194,7 @@ def make_coordinate_transform(
         Optional coordinate subset used by block rotation.
     matrix:
         Optional materialized transform matrix. Users normally omit this;
-        exported specs include it for exact reproducibility.
+        exported materialized specs include it.
 
     Examples
     --------
@@ -308,7 +308,7 @@ def make_composition(kind="none", parameters=None, biases=None, centers=None):
         DPM-only component biases used to create deceptive local traps.
     centers:
         DPM-only full-dimensional component centers. Users normally omit this;
-        exported specs include resolved centers for reproducibility.
+        exported materialized specs include resolved centers.
 
     Examples
     --------

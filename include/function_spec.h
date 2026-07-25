@@ -6,7 +6,7 @@
  * @brief Specification types for FuncCraft benchmark functions.
  *
  * Specs describe both what the user wants to build and what was actually
- * materialized for reproducibility:
+ * materialized at runtime:
  * - which primitive components are used;
  * - where component minima are assigned in the generated/search coordinates;
  * - which coordinate/value transforms and composition family are requested;
@@ -156,7 +156,7 @@ struct CompositionSpec {
  * This is the object a user should write by hand, construct from Python, or
  * provide in a concise YAML file. User-authored specs may omit materialized
  * details such as generated matrices, DPM centers, and scale factors; exported
- * specs include them for reproducibility.
+ * materialized specs include them.
  *
  * `assigned_xopt` and `assigned_fopt` control the constructed optimum location
  * and value. `scale_factor = std::nullopt` means the builder should determine

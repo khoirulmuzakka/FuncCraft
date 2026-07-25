@@ -1,31 +1,44 @@
-Welcome to FuncCraft's documentation
-====================================
+FuncCraft documentation
+=======================
 
-FuncCraft is a C++17 library, with a Python interface, for scalable generation
-of reproducible continuous-optimization benchmark functions. A single suite
-specification can generate hundreds, thousands, or practically unbounded
-numbers of distinct benchmark instances across dimensions while preserving the
-metadata needed to reproduce each function exactly.
+FuncCraft is a C++17 library with a Python interface for generating scalable
+continuous-optimization benchmark suites. It is designed around editable YAML
+specifications: write or edit a suite YAML file, load it in C++ or Python,
+choose a dimension, and evaluate the generated benchmark functions in batches.
 
-FuncCraft is designed around controlled benchmark construction: the generated
-function has an assigned global minimizer and assigned optimum value, while the
-surrounding landscape is assembled from primitive benchmark functions,
-coordinate transforms, value transforms, and composition functions.
+A suite specification can generate hundreds, thousands, or very large numbers
+of distinct benchmark functions across dimensions while controlling the
+constructed optimum location and optimum value. The generated landscapes are
+assembled from primitive benchmark functions, coordinate transforms, value
+transforms, and composition rules.
 
-This documentation covers the construction model, installation, C++ API,
-Python API, built-in suite collections, and reproducibility workflow.
+Start with :doc:`funccraft_py/getting_started` if you use Python, or
+:doc:`funccraft_cpp/examples` if you use C++. The YAML reference is in
+:doc:`yaml_specs`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: User guide
 
    installation
+   funccraft_py/getting_started
+   yaml_specs
+   suite_collections
    construction
    mechanisms
-   suite_collections
-   reproducibility
-   funccraft_cpp/index
+   exported_manifests
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Interfaces
+
    funccraft_py/index
+   funccraft_cpp/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Project
+
    testing_ci
    license
 

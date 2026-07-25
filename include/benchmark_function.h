@@ -73,11 +73,11 @@ public:
      */
     const FunctionSpec& spec() const;
     /**
-     * @brief Export the complete reproducibility spec as a YAML node.
+     * @brief Export the materialized function spec as a YAML node.
      */
     YAML::Node export_spec() const;
     /**
-     * @brief Export the complete reproducibility spec to a YAML file.
+     * @brief Export the materialized function spec to a YAML file.
      */
     void export_spec(const std::string& path) const;
 

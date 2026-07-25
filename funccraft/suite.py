@@ -248,8 +248,8 @@ class BenchmarkSuite:
     def export_manifest(self, path):
         """Write the suite spec and all generated function specs to a YAML file.
 
-        The manifest is useful for reproducibility: it records the suite-level
-        spec and every generated function spec.
+        The manifest is a materialized record of the generated suite: it
+        contains the suite-level spec and every generated function spec.
         """
         self._suite.export_manifest(str(path))
 
