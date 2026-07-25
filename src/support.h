@@ -96,6 +96,10 @@ double stable_sin(double phase);
  */
 double stable_cos(double phase);
 /**
+ * @brief Quantize a computed floating-point value for cross-platform robustness.
+ */
+double stable_numeric_value(double value);
+/**
  * @brief Compute 1 - exp(-x) accurately for nonnegative x.
  */
 double stable_one_minus_exp_neg(double x);

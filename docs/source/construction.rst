@@ -155,7 +155,9 @@ raw values, takes the 25th percentile :math:`q`, and uses
    \end{cases}
 
 This keeps typical values comparable while preserving the assigned optimum
-value.
+value. The estimator is deterministic for a fixed materialized function spec:
+the sample points are generated from the function seed, and the raw values are
+computed before the final scale and bias are applied.
 
 For the exact formulas of each transform and composition mode, see
 :doc:`mechanisms`.

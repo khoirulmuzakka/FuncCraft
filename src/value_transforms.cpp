@@ -28,6 +28,22 @@ double clamp_finite_nonnegative(double value) {
     return value;
 }
 
+double stable_positive_power(double value, double exponent) {
+    if (value == 0.0) {
+        return 0.0;
+    }
+    if (exponent == 1.0) {
+        return value;
+    }
+    if (exponent == 2.0) {
+        return stable_numeric_value(value * value);
+    }
+    if (exponent == 0.5) {
+        return stable_numeric_value(std::sqrt(value));
+    }
+    return stable_numeric_value(std::pow(value, exponent));
+}
+
 std::string describe_scalar(double value) {
     if (std::isnan(value)) {
         return "nan";
@@ -69,7 +85,7 @@ PowerValueTransform::PowerValueTransform(double alpha, double p)
 double PowerValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    const double value = alpha_ * std::pow(u, p_);
+    const double value = stable_numeric_value(alpha_ * stable_positive_power(u, p_));
     return clamp_finite_nonnegative(value);
 }
 
@@ -97,7 +113,7 @@ OscillatoryValueTransform::OscillatoryValueTransform(double epsilon, double alph
 double OscillatoryValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    const double value = u * (1.0 + epsilon_ * stable_sin(alpha_ * u));
+    const double value = stable_numeric_value(u * (1.0 + epsilon_ * stable_sin(alpha_ * u)));
     return clamp_finite_nonnegative(value);
 }
 

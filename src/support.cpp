@@ -173,15 +173,26 @@ double reduce_trig_phase(double phase) {
         return phase;
     }
     const double turns = std::nearbyint(phase * kInvTwoPi);
-    return phase - turns * kTwoPi;
+    return stable_numeric_value(phase - turns * kTwoPi);
 }
 
 double stable_sin(double phase) {
-    return std::sin(reduce_trig_phase(phase));
+    return stable_numeric_value(std::sin(reduce_trig_phase(phase)));
 }
 
 double stable_cos(double phase) {
-    return std::cos(reduce_trig_phase(phase));
+    return stable_numeric_value(std::cos(reduce_trig_phase(phase)));
+}
+
+double stable_numeric_value(double value) {
+    if (!std::isfinite(value) || value == 0.0) {
+        return value;
+    }
+    constexpr double scale = 1.0e12;
+    if (std::fabs(value) > std::numeric_limits<double>::max() / scale) {
+        return value;
+    }
+    return std::round(value * scale) / scale;
 }
 
 double stable_one_minus_exp_neg(double x) {
@@ -195,7 +206,7 @@ double stable_one_minus_exp_neg(double x) {
     if (!std::isfinite(x) || x > 745.0) {
         return 1.0;
     }
-    const double value = -std::expm1(-x);
+    const double value = stable_numeric_value(-std::expm1(-stable_numeric_value(x)));
     if (value < 0.0) {
         return 0.0;
     }

@@ -448,17 +448,20 @@ double estimate_lambda(const ComposedFunction& raw_function, const Domain& domai
     }
 
     std::vector<double> values = raw_function(batch);
+    for (double& value : values) {
+        value = detail::stable_numeric_value(value);
+    }
     values.erase(
         std::remove_if(values.begin(), values.end(), [](double value) {
             return !std::isfinite(value);
         }),
         values.end());
 
-    const double q = percentile(std::move(values), 0.25);
+    const double q = detail::stable_numeric_value(percentile(std::move(values), 0.25));
     if (!std::isfinite(q) || q <= kMinRepresentativeScale) {
         return 1.0;
     }
-    return std::min(kTargetScale / q, kMaxLambda);
+    return detail::stable_numeric_value(std::min(kTargetScale / q, kMaxLambda));
 }
 
 double saturating_apply_scale_and_bias(double raw_value, double lambda, double bias) {

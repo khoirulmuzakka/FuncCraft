@@ -36,7 +36,24 @@ double weighted_sum_unchecked(const std::vector<double>& weights, const std::vec
     for (std::size_t i = 0; i < z.size(); ++i) {
         result += weights[i] * z[i];
     }
-    return result;
+    return stable_numeric_value(result);
+}
+
+double stable_positive_power(double value, double exponent) {
+    require(value >= 0.0, "power input must be nonnegative");
+    if (value == 0.0) {
+        return 0.0;
+    }
+    if (exponent == 1.0) {
+        return value;
+    }
+    if (exponent == 2.0) {
+        return stable_numeric_value(value * value);
+    }
+    if (exponent == 0.5) {
+        return stable_numeric_value(std::sqrt(value));
+    }
+    return stable_numeric_value(std::pow(value, exponent));
 }
 
 } // namespace
@@ -110,9 +127,9 @@ double PowerMeanComposition::common_raw_apply(const std::vector<double>& z) cons
     double sum = 0.0;
     for (std::size_t i = 0; i < z.size(); ++i) {
         require(z[i] >= 0.0, "power mean components must be nonnegative");
-        sum += weights_[i] * std::pow(z[i], p_);
+        sum += weights_[i] * stable_positive_power(z[i], p_);
     }
-    return std::pow(sum, 1.0 / p_);
+    return stable_positive_power(stable_numeric_value(sum), 1.0 / p_);
 }
 
 CompositionClass PowerMeanComposition::composition_class() const {
@@ -145,7 +162,7 @@ LevelWellComposition::LevelWellComposition(std::size_t components, double epsilo
 double LevelWellComposition::common_raw_apply(const std::vector<double>& z) const {
     require(weights_.size() == z.size(), "weight/component size mismatch");
     const double s = weighted_sum_unchecked(weights_, z);
-    return s * (1.0 + epsilon_ * stable_sin(alpha_ * s));
+    return stable_numeric_value(s * (1.0 + epsilon_ * stable_sin(alpha_ * s)));
 }
 
 CompositionClass LevelWellComposition::composition_class() const {
@@ -188,14 +205,14 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp((-sharpness_ * squared_distance(x, centers_[i])) - max_logit);
+        double w = stable_numeric_value(std::exp(stable_numeric_value((-sharpness_ * squared_distance(x, centers_[i])) - max_logit)));
         if (i > 0) {
-            w *= selective_mask;
+            w = stable_numeric_value(w * selective_mask);
         }
         numerator += w * (z[i] + (biases_.empty() ? 0.0 : biases_[i]));
         denominator += w;
     }
-    return numerator / denominator;
+    return stable_numeric_value(numerator / denominator);
 }
 
 CompositionClass DeceptiveSoftmaxComposition::composition_class() const {
@@ -249,14 +266,14 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp((-sharpness_ * squared_distance(x, centers_[i])) - max_logit);
+        double w = stable_numeric_value(std::exp(stable_numeric_value((-sharpness_ * squared_distance(x, centers_[i])) - max_logit)));
         if (i > 0) {
-            w *= selective_mask;
+            w = stable_numeric_value(w * selective_mask);
         }
         numerator += (w + background) * (z[i] + (biases_.empty() ? 0.0 : biases_[i]));
         denominator += w + background;
     }
-    return numerator / denominator;
+    return stable_numeric_value(numerator / denominator);
 }
 
 CompositionClass DeceptiveBgSoftmaxComposition::composition_class() const {
