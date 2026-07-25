@@ -129,10 +129,19 @@ values.
 Cross-platform robustness means that generated specifications and sampled
 values should not depend strongly on differences between standard-library
 implementations. FuncCraft therefore uses deterministic integer-based random
-streams, fixed constants for trigonometric phase reduction, shared stable
-``sin``/``cos`` wrappers for oscillatory terms, ``expm1``-based evaluation for
-expressions of the form ``1 - exp(-x)``, fixed lookup tables for generated
-rotation pairs and affine row scales, and quantized generated matrix entries.
+streams, fixed lookup tables for generated rotation pairs and affine row
+scales, and quantized generated matrix entries. Runtime numeric stabilization
+is intentionally narrow: after each component value transform, the resulting
+component value ``z_i(x)`` is passed through ``stable_numeric_value`` before it
+enters ``psi``. Primitive base functions and composition formulas otherwise use
+ordinary ``double`` arithmetic and the platform math library.
+
+``stable_numeric_value`` uses relative binary mantissa rounding. It writes a
+finite nonzero value as ``mantissa * 2^exponent`` with ``frexp``, rounds the
+mantissa to a fixed ``2^-40`` grid, and reconstructs the value with ``ldexp``.
+Because the rounding is relative to the value's magnitude, large and small
+component values keep about the same effective precision.
+
 Exported specs include materialized matrices and generated centers, so loading
 an exported function avoids regenerating those parameters. Some primitives are
 intentionally nonsmooth or highly oscillatory, so exact bitwise equality across

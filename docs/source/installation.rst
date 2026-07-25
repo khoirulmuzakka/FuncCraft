@@ -99,6 +99,37 @@ Build options
      - ``OFF``
      - Install headers, library, CMake package metadata, and suite YAML files.
 
+Use from another C++ project
+----------------------------
+
+For a CMake-based C++ project, the simplest way to consume FuncCraft directly
+from Git is ``FetchContent``:
+
+.. code-block:: cmake
+
+   cmake_minimum_required(VERSION 3.18)
+   project(my_funccraft_app LANGUAGES CXX)
+
+   include(FetchContent)
+
+   set(BUILD_LIBRARY ON CACHE BOOL "" FORCE)
+   set(BUILD_PYTHON OFF CACHE BOOL "" FORCE)
+   set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+   set(BUILD_TEST OFF CACHE BOOL "" FORCE)
+
+   FetchContent_Declare(
+       funccraft
+       GIT_REPOSITORY https://github.com/khoirulmuzakka/FuncCraft.git
+       GIT_TAG main
+   )
+   FetchContent_MakeAvailable(funccraft)
+
+   add_executable(my_app main.cpp)
+   target_link_libraries(my_app PRIVATE funccraft)
+
+For reproducible builds, replace ``GIT_TAG main`` with a released tag or a
+specific commit hash.
+
 Build a wheel
 -------------
 

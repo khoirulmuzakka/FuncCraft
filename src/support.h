@@ -26,9 +26,7 @@ struct SuiteSpec;
 
 namespace detail {
 
-constexpr double kPi = 3.14159265358979323846;
 constexpr double kTwoPi = 6.2831853071795864769252867665590057683943387987502;
-constexpr double kInvTwoPi = 0.15915494309189533576888376337251436203445964574046;
 constexpr std::uint64_t kAssignedXoptSeedRole = 0xA5516EED0D7ULL;
 constexpr std::uint64_t kDpmCenterSeedRole = 0xD9CE17E25ULL;
 
@@ -84,25 +82,9 @@ double uniform01(std::mt19937_64& rng);
  */
 int uniform_int(std::mt19937_64& rng, int lo, int hi);
 /**
- * @brief Reduce a trigonometric phase using FuncCraft's fixed pi constants.
- */
-double reduce_trig_phase(double phase);
-/**
- * @brief Deterministic wrapper around sin with FuncCraft phase reduction.
- */
-double stable_sin(double phase);
-/**
- * @brief Deterministic wrapper around cos with FuncCraft phase reduction.
- */
-double stable_cos(double phase);
-/**
  * @brief Quantize a computed floating-point value for cross-platform robustness.
  */
 double stable_numeric_value(double value);
-/**
- * @brief Compute 1 - exp(-x) accurately for nonnegative x.
- */
-double stable_one_minus_exp_neg(double x);
 /**
  * @brief Draw one standard normal random variate.
  */

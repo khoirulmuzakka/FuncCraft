@@ -28,7 +28,7 @@ double clamp_finite_nonnegative(double value) {
     return value;
 }
 
-double stable_positive_power(double value, double exponent) {
+double positive_power(double value, double exponent) {
     if (value == 0.0) {
         return 0.0;
     }
@@ -36,12 +36,12 @@ double stable_positive_power(double value, double exponent) {
         return value;
     }
     if (exponent == 2.0) {
-        return stable_numeric_value(value * value);
+        return value * value;
     }
     if (exponent == 0.5) {
-        return stable_numeric_value(std::sqrt(value));
+        return std::sqrt(value);
     }
-    return stable_numeric_value(std::pow(value, exponent));
+    return std::pow(value, exponent);
 }
 
 std::string describe_scalar(double value) {
@@ -85,7 +85,7 @@ PowerValueTransform::PowerValueTransform(double alpha, double p)
 double PowerValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    const double value = stable_numeric_value(alpha_ * stable_positive_power(u, p_));
+    const double value = alpha_ * positive_power(u, p_);
     return clamp_finite_nonnegative(value);
 }
 
@@ -113,7 +113,7 @@ OscillatoryValueTransform::OscillatoryValueTransform(double epsilon, double alph
 double OscillatoryValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    const double value = stable_numeric_value(u * (1.0 + epsilon_ * stable_sin(alpha_ * u)));
+    const double value = u * (1.0 + epsilon_ * std::sin(alpha_ * u));
     return clamp_finite_nonnegative(value);
 }
 
@@ -138,7 +138,7 @@ CosineZeroValueTransform::CosineZeroValueTransform(double alpha)
 double CosineZeroValueTransform::raw_apply(double u) const {
     require(u >= -kValueTransformTolerance, "value transform input must be nonnegative");
     u = std::max(0.0, u);
-    return clamp_finite_nonnegative(1.0 - stable_cos(alpha_ * u));
+    return clamp_finite_nonnegative(1.0 - std::cos(alpha_ * u));
 }
 
 ValueTransformClass CosineZeroValueTransform::transform_class() const {

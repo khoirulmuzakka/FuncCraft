@@ -168,22 +168,6 @@ double uniform01(std::mt19937_64& rng) {
     return static_cast<double>(rng() >> 11) * 0x1.0p-53;
 }
 
-double reduce_trig_phase(double phase) {
-    if (!std::isfinite(phase)) {
-        return phase;
-    }
-    const double turns = std::nearbyint(phase * kInvTwoPi);
-    return stable_numeric_value(phase - turns * kTwoPi);
-}
-
-double stable_sin(double phase) {
-    return stable_numeric_value(std::sin(reduce_trig_phase(phase)));
-}
-
-double stable_cos(double phase) {
-    return stable_numeric_value(std::cos(reduce_trig_phase(phase)));
-}
-
 double stable_numeric_value(double value) {
     if (!std::isfinite(value) || value == 0.0) {
         return value;
@@ -192,27 +176,6 @@ double stable_numeric_value(double value) {
     int exponent = 0;
     const double mantissa = std::frexp(value, &exponent);
     return std::ldexp(std::round(mantissa / grid) * grid, exponent);
-}
-
-double stable_one_minus_exp_neg(double x) {
-    if (std::isnan(x)) {
-        return std::numeric_limits<double>::quiet_NaN();
-    }
-    require(x >= 0.0, "exponential argument must be nonnegative");
-    if (x == 0.0) {
-        return 0.0;
-    }
-    if (!std::isfinite(x) || x > 745.0) {
-        return 1.0;
-    }
-    const double value = stable_numeric_value(-std::expm1(-stable_numeric_value(x)));
-    if (value < 0.0) {
-        return 0.0;
-    }
-    if (value > 1.0) {
-        return 1.0;
-    }
-    return value;
 }
 
 std::string normalize_spec_name(const std::string& value) {
@@ -378,7 +341,7 @@ double normal01(std::mt19937_64& rng) {
     }
     const double u2 = uniform01(rng);
     const double r = std::sqrt(-2.0 * std::log(u1));
-    return r * stable_cos(kTwoPi * u2);
+    return r * std::cos(kTwoPi * u2);
 }
 
 Domain centered_scaled_domain(const Domain& domain, double factor) {

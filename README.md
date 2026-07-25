@@ -316,6 +316,7 @@ Key pages:
 
 The CI workflow builds the C++ library, Python extension, and C++ test binary
 on Linux, Windows, and macOS arm, runs C++ and Python tests, generates
-cross-platform benchmark value tables, and requires at least 95% of functions
-to have at least 95% of sampled values agree within `1e-8` relative error. The
-wheel workflow builds and tests Python wheels.
+cross-platform benchmark value tables, requires F1-F35 to have every sampled
+value agree within `1e-8` relative error, and applies a 75% point-agreement /
+75% function-agreement rule to the remaining generated functions. The wheel
+workflow builds and tests Python wheels.
