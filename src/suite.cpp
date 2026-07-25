@@ -466,12 +466,13 @@ const Choice& choose_weighted(const std::vector<Choice>& choices, std::mt19937_6
     return choices.back();
 }
 
+std::vector<int> prefix_stable_nonempty_subspace(int dimension, std::uint64_t seed, std::uint64_t component_index);
+
 CoordinateTransformSpec make_coordinate_transform_spec(
     const CoordinateTransformChoice& choice,
     int dimension,
     const std::vector<double>& assigned_xopt,
     std::uint64_t seed,
-    std::mt19937_64& rng,
     const std::vector<int>* selected_indices) {
     CoordinateTransformSpec spec;
     spec.kind = choice.kind;
@@ -500,12 +501,7 @@ CoordinateTransformSpec make_coordinate_transform_spec(
             spec.assigned_xopt = select_coordinates(assigned_xopt, spec.selected_indices);
             return spec;
         }
-        const int selected_size = uniform_int(rng, 1, dimension);
-        std::set<int> indices;
-        while (static_cast<int>(indices.size()) < selected_size) {
-            indices.insert(uniform_int(rng, 0, dimension - 1));
-        }
-        spec.selected_indices.assign(indices.begin(), indices.end());
+        spec.selected_indices = prefix_stable_nonempty_subspace(dimension, seed, 0);
         spec.output_dimension = static_cast<int>(spec.selected_indices.size());
         spec.assigned_xopt = select_coordinates(assigned_xopt, spec.selected_indices);
         return spec;
@@ -663,30 +659,55 @@ std::vector<int> full_dimension_indices(int dimension) {
     return indices;
 }
 
-std::vector<int> random_nonempty_subspace(int dimension, std::mt19937_64& rng) {
-    require(dimension > 0, "subspace dimension must be positive");
-
-    const int selected_size = dimension == 1 ? 1 : uniform_int(rng, 1, dimension);
-    std::set<int> indices;
-    while (static_cast<int>(indices.size()) < selected_size) {
-        indices.insert(uniform_int(rng, 0, dimension - 1));
-    }
-    return {indices.begin(), indices.end()};
+bool prefix_stable_coin_flip(std::uint64_t seed, std::uint64_t role, std::uint64_t index0, std::uint64_t index1) {
+    std::mt19937_64 rng(indexed_seed(seed, role, index0, index1));
+    return uniform01(rng) < 0.5;
 }
 
-std::vector<std::vector<int>> covering_block_subspaces(int dimension, int count, std::mt19937_64& rng) {
+int prefix_stable_component_index(std::uint64_t seed, std::uint64_t role, int count, int coordinate) {
+    require(count > 0, "component count must be positive");
+    std::mt19937_64 rng(indexed_seed(
+        seed,
+        role,
+        static_cast<std::uint64_t>(coordinate),
+        0));
+    return uniform_int(rng, 0, count - 1);
+}
+
+std::vector<int> prefix_stable_nonempty_subspace(int dimension, std::uint64_t seed, std::uint64_t component_index) {
+    require(dimension > 0, "subspace dimension must be positive");
+
+    std::vector<int> indices;
+    for (int d = 0; d < dimension; ++d) {
+        if (prefix_stable_coin_flip(
+                seed,
+                0xB10C50B5ULL,
+                component_index,
+                static_cast<std::uint64_t>(d))) {
+            indices.push_back(d);
+        }
+    }
+    if (indices.empty()) {
+        indices.push_back(0);
+    }
+    return indices;
+}
+
+std::vector<std::vector<int>> covering_block_subspaces(int dimension, int count, std::uint64_t seed) {
     require(dimension > 0, "subspace dimension must be positive");
     require(count > 0, "subspace count must be positive");
 
     std::vector<std::vector<int>> subspaces(static_cast<std::size_t>(count));
     for (int d = 0; d < dimension; ++d) {
-        const int subspace = uniform_int(rng, 0, count - 1);
+        const int subspace = d < count
+            ? d
+            : prefix_stable_component_index(seed, 0xC0A7E5ULL, count, d);
         subspaces[static_cast<std::size_t>(subspace)].push_back(d);
     }
 
     for (auto& indices : subspaces) {
         if (indices.empty()) {
-            indices = random_nonempty_subspace(dimension, rng);
+            indices.push_back(0);
         }
         std::sort(indices.begin(), indices.end());
         indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
@@ -698,11 +719,11 @@ std::vector<std::vector<int>> covering_block_subspaces(int dimension, int count,
 std::vector<std::vector<int>> block_rotation_subspaces(
     const std::vector<CoordinateTransformChoice>& coord_choices,
     int dimension,
-    std::mt19937_64& rng) {
+    std::uint64_t seed) {
     const bool all_block_rotation = std::all_of(coord_choices.begin(), coord_choices.end(), is_block_rotation_choice);
     const int block_count = static_cast<int>(std::count_if(coord_choices.begin(), coord_choices.end(), is_block_rotation_choice));
     std::vector<std::vector<int>> generated = all_block_rotation
-        ? covering_block_subspaces(dimension, block_count, rng)
+        ? covering_block_subspaces(dimension, block_count, seed)
         : std::vector<std::vector<int>>{};
 
     std::vector<std::vector<int>> per_component(coord_choices.size());
@@ -713,7 +734,7 @@ std::vector<std::vector<int>> block_rotation_subspaces(
         }
         per_component[i] = all_block_rotation
             ? generated[static_cast<std::size_t>(block_index)]
-            : random_nonempty_subspace(dimension, rng);
+            : prefix_stable_nonempty_subspace(dimension, seed, static_cast<std::uint64_t>(i));
         ++block_index;
     }
     return per_component;
@@ -848,7 +869,6 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
     require(dimension_ > 0, "dimension must be positive");
 
     const Domain domain(dimension_, spec_.lower_bound, spec_.upper_bound);
-    std::mt19937_64 rng(mix_seed(blueprint.seed ^ static_cast<std::uint64_t>(dimension_)));
     const auto coord_choices = normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices());
 
     if (!blueprint.composed) {
@@ -878,7 +898,6 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             dimension_,
             x_star,
             blueprint.seed,
-            rng,
             is_block_rotation_choice(blueprint.coordinate_transform_choice) ? &full_subspace : nullptr);
         component.value_transform.kind = ValueTransformKind::None;
         component.seed = blueprint.seed;
@@ -903,11 +922,6 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         const std::vector<double>& x_star,
         std::uint64_t seed) {
         std::mt19937_64 structure_rng(mix_seed(seed ^ static_cast<std::uint64_t>(composition_level + 1) ^ 0xA11CE5EEDULL));
-        std::mt19937_64 geometry_rng(mix_seed(
-            seed
-            ^ static_cast<std::uint64_t>(function_dimension)
-            ^ (static_cast<std::uint64_t>(composition_level + 1) << 32)
-            ^ 0xD1A6A11BADC0FFEEULL));
         const CompositionChoice& comp_choice = choose_weighted(composition_choices, structure_rng);
         const int component_count = uniform_int(structure_rng, spec_.min_components, spec_.max_components);
         FunctionSpec spec = make_suite_function_spec(
@@ -942,7 +956,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             component_coord_choices.begin(),
             component_coord_choices.end(),
             is_block_rotation_choice)
-            ? block_rotation_subspaces(component_coord_choices, function_dimension, geometry_rng)
+            ? block_rotation_subspaces(component_coord_choices, function_dimension, seed)
             : std::vector<std::vector<int>>(static_cast<std::size_t>(component_count));
         if (dpm_mode && is_block_rotation_choice(component_coord_choices.front())) {
             block_subspaces.front() = full_dimension_indices(function_dimension);
@@ -961,7 +975,6 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
                 function_dimension,
                 centers[pos],
                 component_seed,
-                geometry_rng,
                 is_block_rotation_choice(component_coord_choices[pos])
                     ? &block_subspaces[pos]
                     : nullptr);

@@ -11,6 +11,7 @@
 #include <random>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace FuncCraft {
 namespace detail {
@@ -21,14 +22,29 @@ double uniform_signed01(std::mt19937_64& rng) {
     return 2.0 * uniform01(rng) - 1.0;
 }
 
-std::size_t uniform_index(std::mt19937_64& rng, std::size_t upper_exclusive) {
-    require(upper_exclusive > 0, "random index range must not be empty");
-    const auto limit = std::mt19937_64::max() - (std::mt19937_64::max() % upper_exclusive);
-    auto value = rng();
-    while (value >= limit) {
-        value = rng();
+double quantize_generated_parameter(double value) {
+    constexpr double scale = 1.0e14;
+    return std::round(value * scale) / scale;
+}
+
+std::pair<double, double> random_unit_pair(std::mt19937_64& rng) {
+    double u = uniform_signed01(rng);
+    double v = uniform_signed01(rng);
+    double r2 = u * u + v * v;
+    while (r2 == 0.0 || r2 > 1.0) {
+        u = uniform_signed01(rng);
+        v = uniform_signed01(rng);
+        r2 = u * u + v * v;
     }
-    return static_cast<std::size_t>(value % upper_exclusive);
+
+    const double inv_r = 1.0 / std::sqrt(r2);
+    const double c = quantize_generated_parameter(u * inv_r);
+    const double s = quantize_generated_parameter(v * inv_r);
+    const double norm = std::sqrt(c * c + s * s);
+    return {
+        quantize_generated_parameter(c / norm),
+        quantize_generated_parameter(s / norm),
+    };
 }
 
 } // namespace
@@ -126,6 +142,43 @@ std::uint64_t indexed_seed(
 
 double uniform01(std::mt19937_64& rng) {
     return static_cast<double>(rng() >> 11) * 0x1.0p-53;
+}
+
+double reduce_trig_phase(double phase) {
+    if (!std::isfinite(phase)) {
+        return phase;
+    }
+    const double turns = std::nearbyint(phase * kInvTwoPi);
+    return phase - turns * kTwoPi;
+}
+
+double stable_sin(double phase) {
+    return std::sin(reduce_trig_phase(phase));
+}
+
+double stable_cos(double phase) {
+    return std::cos(reduce_trig_phase(phase));
+}
+
+double stable_one_minus_exp_neg(double x) {
+    if (std::isnan(x)) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    require(x >= 0.0, "exponential argument must be nonnegative");
+    if (x == 0.0) {
+        return 0.0;
+    }
+    if (!std::isfinite(x) || x > 745.0) {
+        return 1.0;
+    }
+    const double value = -std::expm1(-x);
+    if (value < 0.0) {
+        return 0.0;
+    }
+    if (value > 1.0) {
+        return 1.0;
+    }
+    return value;
 }
 
 std::string normalize_spec_name(const std::string& value) {
@@ -291,8 +344,7 @@ double normal01(std::mt19937_64& rng) {
     }
     const double u2 = uniform01(rng);
     const double r = std::sqrt(-2.0 * std::log(u1));
-    const double theta = 2.0 * kPi * u2;
-    return r * std::cos(theta);
+    return r * stable_cos(kTwoPi * u2);
 }
 
 Domain centered_scaled_domain(const Domain& domain, double factor) {
@@ -393,9 +445,7 @@ std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, in
     }
 
     for (int plane = 0; plane < dimension - 1; ++plane) {
-        const double theta = uniform_signed01(rng) * kPi;
-        const double c = std::cos(theta);
-        const double s = std::sin(theta);
+        const auto [c, s] = random_unit_pair(rng);
         const auto i = static_cast<std::size_t>(plane);
         const auto j = static_cast<std::size_t>(plane + 1);
 
@@ -412,23 +462,25 @@ std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, in
 }
 
 std::vector<std::vector<double>> random_affine_matrix(std::mt19937_64& rng, int dimension) {
-    auto matrix = random_rotation_matrix(rng, dimension);
+    const std::uint64_t affine_seed = rng();
+    std::mt19937_64 rotation_rng(mix_seed(affine_seed ^ 0xA4411EULL));
+    auto matrix = random_rotation_matrix(rotation_rng, dimension);
     std::vector<double> row_scales(static_cast<std::size_t>(dimension), 1.0);
     for (int row = 0; row < dimension; ++row) {
-        const double exponent = dimension > 1
-            ? static_cast<double>(row) / static_cast<double>(dimension - 1)
-            : 0.0;
-        row_scales[static_cast<std::size_t>(row)] = std::pow(10.0, 2.0 * exponent);
-    }
-    for (std::size_t i = row_scales.size(); i > 1; --i) {
-        const std::size_t j = uniform_index(rng, i);
-        std::swap(row_scales[i - 1], row_scales[j]);
+        std::mt19937_64 scale_rng(indexed_seed(
+            affine_seed,
+            0x5CA1E5ULL,
+            static_cast<std::uint64_t>(row),
+            0));
+        const double exponent = 2.0 * uniform01(scale_rng);
+        row_scales[static_cast<std::size_t>(row)] = quantize_generated_parameter(std::pow(10.0, exponent));
     }
 
     for (int row = 0; row < dimension; ++row) {
         const double scale = row_scales[static_cast<std::size_t>(row)];
         for (int col = 0; col < dimension; ++col) {
-            matrix[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)] *= scale;
+            matrix[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)] =
+                quantize_generated_parameter(matrix[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)] * scale);
         }
     }
     return matrix;

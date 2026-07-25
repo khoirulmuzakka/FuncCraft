@@ -97,6 +97,48 @@ The standard suite collection is also a YAML ``SuiteSpec``. Use
 ``suite_collection(2026, 1)`` when you want the packaged suite, or
 ``load_suite_spec("my_suite.yaml")`` when you want to edit the YAML yourself.
 
+.. _design-constraints:
+
+Design constraints
+------------------
+
+FuncCraft is implemented around two practical constraints: scalable behavior
+under dimension variation and robust numerical behavior across supported
+platforms.
+
+Scalable behavior under dimension variation means that a suite can be
+materialized at different dimensions without resampling the identity of each
+function. For a fixed suite, function index, and seed, the generator keeps the
+structural choices stable: primitive-vs-nested component choices, base
+functions, composition kind, coordinate-transform kind, value-transform kind,
+component seeds, and transform seeds. Generated coordinate data such as
+``assigned_xopt`` and DPM centers are prefix-stable, so a higher-dimensional
+point extends the coordinates already used at lower dimension. Block-rotation
+subspaces are also generated from coordinate-indexed seeds; when all
+components use block rotation, the generated subspaces cover the active
+dimension.
+
+This does not mean that a low-dimensional function is literally the leading
+principal block of the higher-dimensional function. Full rotations and affine
+transforms use an adjacent-plane sweep. The same seed gives a related sequence
+of plane rotations as the dimension grows, but adding a new adjacent plane can
+change coordinates that already existed. The intended guarantee is stable
+function identity and related geometry, not identical embedded function
+values.
+
+Cross-platform robustness means that generated specifications and sampled
+values should not depend strongly on differences between standard-library
+implementations. FuncCraft therefore uses deterministic integer-based random
+streams, fixed constants for trigonometric phase reduction, shared stable
+``sin``/``cos`` wrappers for oscillatory terms, ``expm1``-based evaluation for
+expressions of the form ``1 - exp(-x)``, and quantized generated rotation and
+affine parameters. Exported specs include materialized matrices and generated
+centers, so loading an exported function avoids regenerating those parameters.
+Some primitives are intentionally nonsmooth or highly oscillatory, so exact
+bitwise equality across platforms is not a design target; the CI value
+comparison checks agreement statistically rather than requiring every sampled
+point to match.
+
 Final scaling
 -------------
 

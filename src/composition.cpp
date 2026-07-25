@@ -12,13 +12,6 @@ using namespace detail;
 
 namespace {
 constexpr double kCompositionTolerance = 1.0e-12;
-constexpr double kTwoPi = 6.2831853071795864769252867665590057683943387987502;
-constexpr double kInvTwoPi = 0.15915494309189533576888376337251436203445964574046;
-
-double reduce_trig_phase(double phase) {
-    const double turns = std::nearbyint(phase * kInvTwoPi);
-    return phase - turns * kTwoPi;
-}
 
 void require_nonnegative_weights(const std::vector<double>& weights) {
     for (double weight : weights) {
@@ -152,7 +145,7 @@ LevelWellComposition::LevelWellComposition(std::size_t components, double epsilo
 double LevelWellComposition::common_raw_apply(const std::vector<double>& z) const {
     require(weights_.size() == z.size(), "weight/component size mismatch");
     const double s = weighted_sum_unchecked(weights_, z);
-    return s * (1.0 + epsilon_ * std::sin(reduce_trig_phase(alpha_ * s)));
+    return s * (1.0 + epsilon_ * stable_sin(alpha_ * s));
 }
 
 CompositionClass LevelWellComposition::composition_class() const {
@@ -190,7 +183,7 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
     }
 
     const double optimum_distance_sq = squared_distance(x, centers_.front());
-    const double selective_mask = 1.0 - std::exp(-optimum_distance_sq);
+    const double selective_mask = stable_one_minus_exp_neg(optimum_distance_sq);
 
     double numerator = 0.0;
     double denominator = 0.0;
@@ -249,9 +242,9 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
         max_logit = std::max(max_logit, -sharpness_ * distance_sq);
         min_distance = std::min(min_distance, std::sqrt(distance_sq));
     }
-    const double background = background_strength_ * (1.0 - std::exp(-background_sharpness_ * min_distance));
+    const double background = background_strength_ * stable_one_minus_exp_neg(background_sharpness_ * min_distance);
     const double optimum_distance_sq = squared_distance(x, centers_.front());
-    const double selective_mask = 1.0 - std::exp(-optimum_distance_sq);
+    const double selective_mask = stable_one_minus_exp_neg(optimum_distance_sq);
 
     double numerator = 0.0;
     double denominator = 0.0;

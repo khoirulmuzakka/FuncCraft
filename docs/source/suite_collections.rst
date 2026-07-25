@@ -52,4 +52,5 @@ stable across dimensions: base/composed decision, base-function choices,
 composition kind, coordinate-transform kind, value-transform kind, and the
 relevant seeds. Generated coordinate vectors use prefix-stable generation
 where applicable, so higher-dimensional assigned optima and DPM centers extend
-lower-dimensional ones.
+lower-dimensional ones. The detailed design constraints and limitations are
+described in :ref:`design-constraints`.

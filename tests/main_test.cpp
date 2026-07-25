@@ -483,6 +483,16 @@ void require_prefix_vector(
     }
 }
 
+void require_prefix_int_vector(
+    const std::vector<int>& prefix,
+    const std::vector<int>& full,
+    const std::string& message) {
+    require(prefix.size() <= full.size(), message + ": prefix vector is longer than full vector");
+    for (std::size_t i = 0; i < prefix.size(); ++i) {
+        require(prefix[i] == full[i], message + " at index " + std::to_string(i));
+    }
+}
+
 void require_prefix_generated_geometry(
     const FuncCraft::FunctionSpec& low_dimension,
     const FuncCraft::FunctionSpec& high_dimension,
@@ -504,6 +514,12 @@ void require_prefix_generated_geometry(
             low_component.coordinate_transform.assigned_xopt,
             high_component.coordinate_transform.assigned_xopt,
             component_path + ": coordinate assigned_xopt prefix mismatch");
+        if (!low_component.coordinate_transform.selected_indices.empty()) {
+            require_prefix_int_vector(
+                low_component.coordinate_transform.selected_indices,
+                high_component.coordinate_transform.selected_indices,
+                component_path + ": selected index prefix mismatch");
+        }
         if (low_component.composed_function) {
             require(
                 static_cast<bool>(high_component.composed_function),
@@ -538,23 +554,23 @@ void check_suite_structure_stable_across_dimensions() {
 
 void check_suite_geometry_prefix_stable_across_dimensions() {
     FuncCraft::SuiteSpec suite_spec;
-    suite_spec.coordinate_transforms = {FuncCraft::make_choice(FuncCraft::CoordinateTransformKind::None, 1.0)};
+    suite_spec.coordinate_transforms = {FuncCraft::make_choice(FuncCraft::CoordinateTransformKind::BlockRotation, 1.0)};
     suite_spec.value_transforms = {FuncCraft::make_choice(FuncCraft::ValueTransformKind::None, 1.0)};
     suite_spec.compositions = {FuncCraft::make_choice(FuncCraft::CompositionKind::DpmSoftmax, 1.0, 0.01)};
     suite_spec.requested_number_of_functions = 50;
     suite_spec.min_components = 4;
     suite_spec.max_components = 4;
-    suite_spec.max_nested_composition_depth = 2;
-    suite_spec.nested_probability = 0.5;
+    suite_spec.max_nested_composition_depth = 0;
+    suite_spec.nested_probability = 0.0;
     suite_spec.master_seed = 20260724;
 
-    const FuncCraft::BenchmarkSuite suite_1d(suite_spec, 1);
     const FuncCraft::BenchmarkSuite suite_4d(suite_spec, 4);
-    require(suite_1d.size() == suite_4d.size(), "geometry-prefix suite size mismatch");
-    for (int i = 0; i < suite_1d.size(); ++i) {
+    const FuncCraft::BenchmarkSuite suite_8d(suite_spec, 8);
+    require(suite_4d.size() == suite_8d.size(), "geometry-prefix suite size mismatch");
+    for (int i = 0; i < suite_4d.size(); ++i) {
         require_prefix_generated_geometry(
-            suite_1d.function(i).spec(),
             suite_4d.function(i).spec(),
+            suite_8d.function(i).spec(),
             "function[" + std::to_string(i) + "]");
     }
 }
