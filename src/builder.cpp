@@ -167,7 +167,7 @@ ComposedFunction FunctionBuilder::build() const {
                     invalid = true;
                     break;
                 }
-                component_values[component_index] = transformed_value;
+                component_values[component_index] = detail::stable_numeric_value(transformed_value);
             }
             if (invalid) {
                 values.push_back(penalty);
