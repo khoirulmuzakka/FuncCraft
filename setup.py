@@ -11,14 +11,13 @@ def _remove_stale_package_builds():
 
 
 def _filter_wheel_manifest(files):
-    excluded_prefixes = (
-        "include/",
-        "src/",
-        "examples/",
-        "docs/",
-        "suites/",
-    )
-    return [path for path in files if not path.startswith(excluded_prefixes)]
+    """Keep wheels limited to the importable Python package.
+
+    MANIFEST.in is intentionally broader because source distributions need the
+    C++ sources and CMake files to build from source. Wheels should only contain
+    installed package files produced under funccraft/.
+    """
+    return [path for path in files if path.startswith("funccraft/")]
 
 
 _remove_stale_package_builds()
