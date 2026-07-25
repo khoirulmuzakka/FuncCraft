@@ -188,11 +188,10 @@ double stable_numeric_value(double value) {
     if (!std::isfinite(value) || value == 0.0) {
         return value;
     }
-    constexpr double scale = 1.0e12;
-    if (std::fabs(value) > std::numeric_limits<double>::max() / scale) {
-        return value;
-    }
-    return std::round(value * scale) / scale;
+    constexpr double grid = 0x1.0p-40;
+    int exponent = 0;
+    const double mantissa = std::frexp(value, &exponent);
+    return std::ldexp(std::round(mantissa / grid) * grid, exponent);
 }
 
 double stable_one_minus_exp_neg(double x) {
