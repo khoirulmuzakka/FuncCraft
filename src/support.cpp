@@ -18,33 +18,57 @@ namespace detail {
 
 namespace {
 
-double uniform_signed01(std::mt19937_64& rng) {
-    return 2.0 * uniform01(rng) - 1.0;
-}
-
 double quantize_generated_parameter(double value) {
-    constexpr double scale = 1.0e14;
+    constexpr double scale = 1.0e12;
     return std::round(value * scale) / scale;
 }
 
 std::pair<double, double> random_unit_pair(std::mt19937_64& rng) {
-    double u = uniform_signed01(rng);
-    double v = uniform_signed01(rng);
-    double r2 = u * u + v * v;
-    while (r2 == 0.0 || r2 > 1.0) {
-        u = uniform_signed01(rng);
-        v = uniform_signed01(rng);
-        r2 = u * u + v * v;
-    }
-
-    const double inv_r = 1.0 / std::sqrt(r2);
-    const double c = quantize_generated_parameter(u * inv_r);
-    const double s = quantize_generated_parameter(v * inv_r);
-    const double norm = std::sqrt(c * c + s * s);
-    return {
-        quantize_generated_parameter(c / norm),
-        quantize_generated_parameter(s / norm),
+    static constexpr double kCos[] = {
+        0.99518472667219693, 0.98078528040323043, 0.95694033573220882, 0.92387953251128674,
+        0.88192126434835505, 0.83146961230254524, 0.77301045336273699, 0.70710678118654757,
+        0.63439328416364549, 0.55557023301960229, 0.47139673682599781, 0.38268343236508984,
+        0.29028467725446233, 0.19509032201612833, 0.09801714032956077, 0.0,
+        -0.09801714032956065, -0.19509032201612819, -0.29028467725446216, -0.38268343236508973,
+        -0.47139673682599770, -0.55557023301960218, -0.63439328416364538, -0.70710678118654746,
+        -0.77301045336273699, -0.83146961230254535, -0.88192126434835494, -0.92387953251128674,
+        -0.95694033573220882, -0.98078528040323043, -0.99518472667219682,
     };
+    static constexpr double kSin[] = {
+        0.09801714032956060, 0.19509032201612825, 0.29028467725446233, 0.38268343236508978,
+        0.47139673682599764, 0.55557023301960218, 0.63439328416364549, 0.70710678118654746,
+        0.77301045336273699, 0.83146961230254524, 0.88192126434835494, 0.92387953251128674,
+        0.95694033573220894, 0.98078528040323043, 0.99518472667219693, 1.0,
+        0.99518472667219693, 0.98078528040323043, 0.95694033573220894, 0.92387953251128674,
+        0.88192126434835494, 0.83146961230254535, 0.77301045336273710, 0.70710678118654757,
+        0.63439328416364549, 0.55557023301960218, 0.47139673682599786, 0.38268343236508989,
+        0.29028467725446239, 0.19509032201612861, 0.09801714032956083,
+    };
+    constexpr std::size_t count = sizeof(kCos) / sizeof(kCos[0]);
+    static_assert(count == sizeof(kSin) / sizeof(kSin[0]), "rotation lookup tables must match");
+    const int index = uniform_int(rng, 0, static_cast<int>(count) - 1);
+    const double sine_sign = uniform_int(rng, 0, 1) == 0 ? -1.0 : 1.0;
+    return {
+        kCos[static_cast<std::size_t>(index)],
+        sine_sign * kSin[static_cast<std::size_t>(index)],
+    };
+}
+
+double random_affine_scale(std::mt19937_64& rng) {
+    static constexpr double kScales[] = {
+        1.0000000000000000, 1.1547819846894583, 1.3335214321633240, 1.5399265260594921,
+        1.7782794100389228, 2.0535250264571460, 2.3713737056616550, 2.7384196342643614,
+        3.1622776601683795, 3.6517412725483770, 4.2169650342858221, 4.8696752516586312,
+        5.6234132519034903, 6.4938163157621137, 7.4989420933245581, 8.6596432336006546,
+        10.000000000000000, 11.547819846894581, 13.335214321633240, 15.399265260594921,
+        17.782794100389229, 20.535250264571460, 23.713737056616550, 27.384196342643614,
+        31.622776601683793, 36.517412725483773, 42.169650342858226, 48.696752516586313,
+        56.234132519034908, 64.938163157621137, 74.989420933245581, 86.596432336006540,
+        100.00000000000000,
+    };
+    constexpr std::size_t count = sizeof(kScales) / sizeof(kScales[0]);
+    const int index = uniform_int(rng, 0, static_cast<int>(count) - 1);
+    return kScales[static_cast<std::size_t>(index)];
 }
 
 } // namespace
@@ -453,8 +477,8 @@ std::vector<std::vector<double>> random_rotation_matrix(std::mt19937_64& rng, in
             const auto k = static_cast<std::size_t>(col);
             const double qi = q[i][k];
             const double qj = q[j][k];
-            q[i][k] = c * qi - s * qj;
-            q[j][k] = s * qi + c * qj;
+            q[i][k] = quantize_generated_parameter(c * qi - s * qj);
+            q[j][k] = quantize_generated_parameter(s * qi + c * qj);
         }
     }
 
@@ -472,8 +496,7 @@ std::vector<std::vector<double>> random_affine_matrix(std::mt19937_64& rng, int 
             0x5CA1E5ULL,
             static_cast<std::uint64_t>(row),
             0));
-        const double exponent = 2.0 * uniform01(scale_rng);
-        row_scales[static_cast<std::size_t>(row)] = quantize_generated_parameter(std::pow(10.0, exponent));
+        row_scales[static_cast<std::size_t>(row)] = random_affine_scale(scale_rng);
     }
 
     for (int row = 0; row < dimension; ++row) {

@@ -4,13 +4,16 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -695,24 +698,70 @@ int run_tests() {
     const std::filesystem::path temp = std::filesystem::temp_directory_path() / "funccraft_cpp_test";
     std::filesystem::create_directories(temp);
 
-    check_optima();
-    check_suite_collection();
-    check_identity_transform_assigned_optimum();
-    check_native_domain_scaled_optimum();
-    check_block_rotation_outputs_selected_subspace();
-    check_native_domain_scaled_optimum_high_dimension();
-    check_composed_function_component(temp / "composed_function.yaml");
-    check_composed_component_requires_zero_assigned_fopt();
-    check_suite_yaml_accepts_base_function_names(temp / "suite_names.yaml");
-    check_composition_kind_aliases();
-    check_suite_structure_stable_across_dimensions();
-    check_suite_geometry_prefix_stable_across_dimensions();
-    check_direct_function_geometry_prefix_stable_across_dimensions();
-    check_function_yaml_roundtrip(temp / "function.yaml");
-    check_suite_yaml_roundtrip(temp / "suite.yaml");
+    struct TestCase {
+        std::string name;
+        std::function<void()> run;
+    };
 
-    std::cout << "FuncCraft C++ tests passed\n";
-    return 0;
+    const std::vector<TestCase> tests = {
+        {"Packaged suite optima", check_optima},
+        {"Suite collection API", check_suite_collection},
+        {"Identity transform assigned optimum", check_identity_transform_assigned_optimum},
+        {"Native-domain scaled optimum", check_native_domain_scaled_optimum},
+        {"Block rotation subspace output", check_block_rotation_outputs_selected_subspace},
+        {"Native-domain optimum in high dimension", check_native_domain_scaled_optimum_high_dimension},
+        {"Composed function component", [&] { check_composed_function_component(temp / "composed_function.yaml"); }},
+        {"Reject nonzero nested assigned_fopt", check_composed_component_requires_zero_assigned_fopt},
+        {"Suite YAML accepts base-function names", [&] { check_suite_yaml_accepts_base_function_names(temp / "suite_names.yaml"); }},
+        {"Composition kind aliases", check_composition_kind_aliases},
+        {"Suite structure stable across dimensions", check_suite_structure_stable_across_dimensions},
+        {"Suite geometry prefix-stable across dimensions", check_suite_geometry_prefix_stable_across_dimensions},
+        {"Direct function geometry prefix-stable", check_direct_function_geometry_prefix_stable_across_dimensions},
+        {"Function YAML roundtrip", [&] { check_function_yaml_roundtrip(temp / "function.yaml"); }},
+        {"Suite YAML roundtrip", [&] { check_suite_yaml_roundtrip(temp / "suite.yaml"); }},
+    };
+
+    int passed = 0;
+    int failed = 0;
+
+    std::cout << "FuncCraft C++ Test Suite\n";
+    std::cout << "========================================\n";
+    std::cout << "Temporary files: " << temp.string() << "\n\n";
+
+    for (std::size_t i = 0; i < tests.size(); ++i) {
+        const TestCase& test = tests[i];
+        std::cout << "[" << std::setw(2) << (i + 1) << "/" << tests.size() << "] RUN  " << test.name << '\n';
+        std::ostringstream captured_output;
+        std::streambuf* const original_stdout = std::cout.rdbuf(captured_output.rdbuf());
+        try {
+            test.run();
+            std::cout.rdbuf(original_stdout);
+            ++passed;
+            std::cout << "[" << std::setw(2) << (i + 1) << "/" << tests.size() << "] PASS " << test.name << "\n\n";
+        } catch (const std::exception& e) {
+            std::cout.rdbuf(original_stdout);
+            ++failed;
+            std::cout << "[" << std::setw(2) << (i + 1) << "/" << tests.size() << "] FAIL " << test.name << '\n';
+            std::cout << "      " << e.what() << "\n\n";
+            const std::string captured = captured_output.str();
+            if (!captured.empty()) {
+                std::cout << "      Captured output:\n";
+                std::istringstream lines(captured);
+                std::string line;
+                while (std::getline(lines, line)) {
+                    std::cout << "        " << line << '\n';
+                }
+                std::cout << '\n';
+            }
+        }
+    }
+
+    std::cout << "----------------------------------------\n";
+    std::cout << "Passed: " << passed << " / " << tests.size() << '\n';
+    std::cout << "Failed: " << failed << " / " << tests.size() << '\n';
+    std::cout << "Overall status: " << (failed == 0 ? "PASS" : "FAIL") << '\n';
+
+    return failed == 0 ? 0 : 1;
 }
 
 int generate_values(int argc, char** argv) {

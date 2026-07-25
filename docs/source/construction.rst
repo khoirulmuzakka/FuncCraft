@@ -131,13 +131,13 @@ values should not depend strongly on differences between standard-library
 implementations. FuncCraft therefore uses deterministic integer-based random
 streams, fixed constants for trigonometric phase reduction, shared stable
 ``sin``/``cos`` wrappers for oscillatory terms, ``expm1``-based evaluation for
-expressions of the form ``1 - exp(-x)``, and quantized generated rotation and
-affine parameters. Exported specs include materialized matrices and generated
-centers, so loading an exported function avoids regenerating those parameters.
-Some primitives are intentionally nonsmooth or highly oscillatory, so exact
-bitwise equality across platforms is not a design target; the CI value
-comparison checks agreement statistically rather than requiring every sampled
-point to match.
+expressions of the form ``1 - exp(-x)``, fixed lookup tables for generated
+rotation pairs and affine row scales, and quantized generated matrix entries.
+Exported specs include materialized matrices and generated centers, so loading
+an exported function avoids regenerating those parameters. Some primitives are
+intentionally nonsmooth or highly oscillatory, so exact bitwise equality across
+platforms is not a design target; the CI value comparison checks agreement
+statistically rather than requiring every sampled point to match.
 
 Final scaling
 -------------
