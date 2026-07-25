@@ -24,6 +24,7 @@ Start with :doc:`funccraft_py/getting_started` if you use Python, or
    funccraft_py/getting_started
    yaml_specs
    suite_collections
+   suite_plots
    construction
    mechanisms
    exported_manifests
