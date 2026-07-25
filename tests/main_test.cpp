@@ -47,6 +47,22 @@ void require_close_vector(
     }
 }
 
+void require_exact_vector(
+    const std::vector<double>& actual,
+    const std::vector<double>& expected,
+    const std::string& message) {
+    require(actual.size() == expected.size(), message + ": size mismatch");
+    for (std::size_t i = 0; i < actual.size(); ++i) {
+        if (actual[i] != expected[i]) {
+            std::ostringstream out;
+            out << message << " at index " << i
+                << ": actual=" << std::setprecision(std::numeric_limits<double>::max_digits10) << actual[i]
+                << ", expected=" << expected[i];
+            throw std::runtime_error(out.str());
+        }
+    }
+}
+
 double uniform01(std::mt19937_64& rng) {
     return static_cast<double>(rng() >> 11) * 0x1.0p-53;
 }
@@ -667,6 +683,57 @@ void check_suite_yaml_roundtrip(const std::filesystem::path& path) {
     }
 }
 
+void check_packaged_suite_function_spec_manifest_exact_roundtrip(const std::filesystem::path& path) {
+    constexpr int function_count = 500;
+    FuncCraft::SuiteSpec spec = FuncCraft::suite_collection_spec(2026, 1);
+    spec.requested_number_of_functions = function_count;
+    const FuncCraft::BenchmarkSuite suite(spec, kCrossPlatformDimension);
+    require(suite.size() == function_count, "packaged suite exact roundtrip function count mismatch");
+
+    std::vector<std::vector<std::vector<double>>> points;
+    std::vector<std::vector<double>> before;
+    points.reserve(static_cast<std::size_t>(function_count));
+    before.reserve(static_cast<std::size_t>(function_count));
+    for (int index = 0; index < function_count; ++index) {
+        const FuncCraft::BenchmarkFunction& function = suite.function(index);
+        points.push_back(sample_cross_platform_points(function.domain(), index));
+        before.push_back(function(points.back()));
+    }
+
+    suite.export_manifest(path.string());
+    const YAML::Node manifest = YAML::LoadFile(path.string());
+    require(manifest["functions"] && manifest["functions"].IsSequence(), "suite manifest functions must be a sequence");
+    require(
+        static_cast<int>(manifest["functions"].size()) == function_count,
+        "suite manifest function count mismatch");
+
+    for (int index = 0; index < function_count; ++index) {
+        const YAML::Node entry = manifest["functions"][static_cast<std::size_t>(index)];
+        require(
+            static_cast<bool>(entry["function_spec"]),
+            "suite manifest function entry is missing function_spec");
+
+        const std::filesystem::path function_path = path.parent_path()
+            / ("manifest_function_" + std::to_string(index) + ".yaml");
+        {
+            std::ofstream out(function_path);
+            if (!out) {
+                throw std::runtime_error("failed to open function spec file: " + function_path.string());
+            }
+            YAML::Node function_doc;
+            function_doc["function_spec"] = entry["function_spec"];
+            out << function_doc << '\n';
+        }
+
+        const FuncCraft::BenchmarkFunction imported = FuncCraft::make_benchmark_function(function_path.string());
+        const std::vector<double> after = imported(points[static_cast<std::size_t>(index)]);
+        require_exact_vector(
+            after,
+            before[static_cast<std::size_t>(index)],
+            "packaged suite function-spec exact roundtrip mismatch for function " + std::to_string(index));
+    }
+}
+
 void write_cross_platform_values(const std::string& platform, const std::filesystem::path& output_path) {
     const FuncCraft::BenchmarkSuite suite = make_cross_platform_suite();
     std::ofstream out(output_path);
@@ -719,6 +786,9 @@ int run_tests() {
         {"Direct function geometry prefix-stable", check_direct_function_geometry_prefix_stable_across_dimensions},
         {"Function YAML roundtrip", [&] { check_function_yaml_roundtrip(temp / "function.yaml"); }},
         {"Suite YAML roundtrip", [&] { check_suite_yaml_roundtrip(temp / "suite.yaml"); }},
+        {"Packaged suite manifest exact function-spec roundtrip", [&] {
+            check_packaged_suite_function_spec_manifest_exact_roundtrip(temp / "packaged_suite_manifest.yaml");
+        }},
     };
 
     int passed = 0;

@@ -18,7 +18,7 @@ Build and run the C++ test binary:
    ./bin/funccraft_test.exe
 
 On Linux and macOS, the executable is named ``funccraft_test``. The test
-prints a named report such as ``[ 1/15] RUN ...`` and ``[ 1/15] PASS ...``,
+prints a named report such as ``[ 1/16] RUN ...`` and ``[ 1/16] PASS ...``,
 then ends with the number of passed and failed checks. A successful run ends
 with ``Overall status: PASS``.
 
@@ -73,6 +73,15 @@ The C++ test binary prints a named report. The checks cover these groups:
   exported function specs, and exported suite manifests. Roundtrip checks
   evaluate the function before and after export/import and require matching
   values.
+
+- ``Packaged suite manifest exact function-spec roundtrip``: builds the
+  packaged ``2026_v1`` suite at dimension 10 with 500 functions. For each
+  function, it evaluates 1000 deterministic random points, exports the suite
+  manifest, extracts each exported ``function_spec``, constructs a standalone
+  ``BenchmarkFunction`` from that spec, and evaluates the same points again.
+  This test requires exact ``double`` equality, so it verifies that exported
+  materialized function specs contain all information needed to reproduce the
+  already-built function.
 
 - ``Suite structure stable across dimensions``: builds the same suite spec at
   dimensions 2 and 5. For every generated

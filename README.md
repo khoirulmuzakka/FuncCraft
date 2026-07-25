@@ -10,9 +10,9 @@
 
 FuncCraft is a C++17 library with a Python interface for generating scalable
 continuous-optimization benchmark suites. A single suite specification can
-generate hundreds, thousands, or very large numbers of distinct benchmark
-functions across dimensions while keeping control over the constructed optimum
-location and optimum value.
+generate hundreds, thousands, or practically unlimited numbers of distinct
+benchmark functions across dimensions while keeping control over the
+constructed optimum location and optimum value.
 
 FuncCraft is configured with YAML-friendly specs. The main workflow is to edit
 a suite YAML file, load it in C++ or Python, choose a dimension, and evaluate
