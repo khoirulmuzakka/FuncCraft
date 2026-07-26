@@ -5,15 +5,13 @@
 # FuncCraft
 
 [![CI](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/ci.yml/badge.svg)](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/ci.yml)
-[![Wheel](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml/badge.svg)](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml)
 [![Documentation Status](https://readthedocs.org/projects/funccraft/badge/?version=latest)](https://funccraft.readthedocs.io/)
 [![PyPI version](https://img.shields.io/pypi/v/funccraft.svg)](https://pypi.org/project/funccraft/)
 [![PyPI Python Version](https://img.shields.io/pypi/pyversions/funccraft.svg)](https://pypi.org/project/funccraft/)
 [![PyPI pip downloads](https://img.shields.io/pypi/dm/funccraft.svg)](https://pypi.org/project/funccraft/)
-[![PyPI License](https://img.shields.io/pypi/l/funccraft.svg)](https://pypi.org/project/funccraft/)
 
 FuncCraft is a C++17 library with a Python interface for generating scalable
-continuous-optimization benchmark suites. A single suite specification can
+black-box optimization benchmark suites. A single suite specification can
 generate hundreds, thousands, or practically unlimited numbers of distinct
 benchmark functions across dimensions while keeping control over the
 constructed optimum location and optimum value.

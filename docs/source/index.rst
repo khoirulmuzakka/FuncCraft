@@ -2,7 +2,7 @@ FuncCraft documentation
 =======================
 
 FuncCraft is a C++17 library with a Python interface for generating scalable
-continuous-optimization benchmark suites. It is designed around editable YAML
+black-box optimization benchmark suites. It is designed around editable YAML
 specifications: write or edit a suite YAML file, load it in C++ or Python,
 choose a dimension, and evaluate the generated benchmark functions in batches.
 
@@ -23,7 +23,7 @@ starts. The YAML reference is in :doc:`yaml_specs`.
    funccraft_py/getting_started
    yaml_specs
    suite_collections
-   suite_plots
+   plots
    construction
    mechanisms
    exported_manifests

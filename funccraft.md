@@ -5,7 +5,7 @@
 [![Documentation Status](https://readthedocs.org/projects/funccraft/badge/?version=latest)](https://funccraft.readthedocs.io/)
 
 FuncCraft is a Python package backed by a C++17 benchmark-function generator
-for continuous optimization research. It is designed for scalable benchmark
+for black-box optimization research. It is designed for scalable benchmark
 suite generation across dimensions: one editable suite specification can
 generate hundreds, thousands, or practically unlimited numbers of distinct
 benchmark functions while controlling the constructed optimum location and
