@@ -28,6 +28,14 @@ if((BUILD_EXAMPLES OR BUILD_PYTHON OR BUILD_TEST OR FUNCCRAFT_INSTALL) AND NOT B
     message(FATAL_ERROR "BUILD_LIBRARY must be ON when BUILD_EXAMPLES, BUILD_PYTHON, BUILD_TEST, or FUNCCRAFT_INSTALL is ON.")
 endif()
 
+function(funccraft_apply_reproducible_fp target_name)
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE /fp:precise)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+        target_compile_options(${target_name} PRIVATE -ffp-contract=off)
+    endif()
+endfunction()
+
 if(PROJECT_IS_TOP_LEVEL AND NOT (DEFINED SKBUILD AND SKBUILD))
     set(FUNCCRAFT_OUTPUT_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bin")
     set(FUNCCRAFT_OUTPUT_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
@@ -65,6 +73,7 @@ list(REMOVE_ITEM FUNCCRAFT_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/binding
 
 if(BUILD_LIBRARY)
     add_library(funccraft STATIC ${FUNCCRAFT_SOURCE_FILES})
+    funccraft_apply_reproducible_fp(funccraft)
 
     target_include_directories(funccraft PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

@@ -703,7 +703,9 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
     domain_ = input_domain;
     component_types_ = summarize_component_types(spec_.components);
 
-    scale_factor_ = spec_.scale_factor.value_or(estimate_lambda(raw_function, domain_, spec_.seed));
+    scale_factor_ = spec_.scale_factor.has_value()
+        ? *spec_.scale_factor
+        : detail::stable_numeric_value(estimate_lambda(raw_function, domain_, spec_.seed));
     assigned_fopt_ = spec_.assigned_fopt;
     spec_.scale_factor = scale_factor_;
     spec_.assigned_fopt = assigned_fopt_;
