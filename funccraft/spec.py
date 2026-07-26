@@ -563,7 +563,10 @@ def _enum(enum_type, value, aliases=None):
     if isinstance(value, enum_type):
         return value
     if isinstance(value, int):
-        return enum_type(value)
+        for item in enum_type.__members__.values():
+            if item.value == value:
+                return item
+        raise ValueError(f"unknown {enum_type.__name__}: {value!r}")
     normalized = _normalize_name(value)
     aliases = aliases or {}
     if normalized in aliases:

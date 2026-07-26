@@ -553,10 +553,15 @@ BasicFunctionId yaml_basic_function_id(const YAML::Node& node) {
             }
         }
         try {
-            return static_cast<BasicFunctionId>(node.as<int>());
+            const auto parsed = static_cast<BasicFunctionId>(node.as<int>());
+            for (BasicFunctionId id : list_basic_functions()) {
+                if (id == parsed) {
+                    return id;
+                }
+            }
         } catch (const YAML::Exception&) {
-            throw std::invalid_argument("unknown base_function: " + name);
         }
+        throw std::invalid_argument("unknown base_function: " + name);
     }
     throw std::invalid_argument("base_function must be a string or integer");
 }

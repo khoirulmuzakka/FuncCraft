@@ -151,9 +151,23 @@ def check_composition_kinds():
         raise AssertionError("suite composition choice did not generate DPM bg softmax functions")
 
 
+def check_basic_function_ids_start_at_one():
+    values = [item.value for item in BasicFunctionId.__members__.values()]
+    expected = list(range(1, len(values) + 1))
+    if values != expected:
+        raise AssertionError(f"basic function ids are not contiguous from 1: {values!r}")
+    try:
+        make_suite_spec(base_functions=[0])
+    except ValueError:
+        return
+    raise AssertionError("base function id 0 was accepted")
+
+
 def main():
     dimension = 3
     default_suite_path = Path(__file__).resolve().parents[1] / "suites" / "2026_v1.yaml"
+
+    check_basic_function_ids_start_at_one()
 
     suite_year = 2026
     suite_version = 1

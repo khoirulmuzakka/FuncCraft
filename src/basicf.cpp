@@ -185,14 +185,6 @@ double ackley_eval(const double* x, int dimension) {
            + 20.0 + std::exp(1.0);
 }
 
-double separable_rastrigin_eval(const double* x, int dimension) {
-    double sum = 10.0 * static_cast<double>(dimension);
-    for (int i = 0; i < dimension; ++i) {
-        sum += sqr(x[i]) - 10.0 * std::cos(2.0 * kPi * x[i]);
-    }
-    return sum;
-}
-
 double bueche_rastrigin_eval(const double* x, int dimension) {
     double sum = 10.0 * static_cast<double>(dimension);
     for (int i = 0; i < dimension; ++i) {
@@ -540,14 +532,6 @@ double hcf_eval(const double* x, int dimension) {
     return sum_abs * std::exp(sum_abs / static_cast<double>(dimension));
 }
 
-double grie_rosen_eval(const double* x, int dimension) {
-    double sum = 1.0;
-    for (int i = 0; i < dimension - 1; ++i) {
-        sum += 100.0 * sqr(x[i + 1] - sqr(x[i])) + sqr(1.0 - x[i]);
-    }
-    return sum;
-}
-
 double schaffer_f6_eval(const double* x, int dimension) {
     if (dimension <= 1) {
         return 0.0;
@@ -606,8 +590,6 @@ std::vector<double> x_opt_for(BasicFunctionId id, int dimension) {
     case BasicFunctionId::Rosenbrock:
     case BasicFunctionId::GriewankRosenbrock:
         return std::vector<double>(static_cast<std::size_t>(dimension), 0.0);
-    case BasicFunctionId::GrieRosen:
-        return std::vector<double>(static_cast<std::size_t>(dimension), 1.0);
     case BasicFunctionId::DixonPrice: {
         std::vector<double> x(static_cast<std::size_t>(dimension), 0.0);
         if (dimension > 0) {
@@ -647,8 +629,6 @@ double f_opt_for(BasicFunctionId id, int dimension) {
         return -1.0;
     case BasicFunctionId::Michalewicz:
         return michalewicz_eval(michalewicz_reference_minimizer(dimension).data(), dimension);
-    case BasicFunctionId::GrieRosen:
-        return 1.0;
     case BasicFunctionId::StyblinskiTang:
         return -39.16616570377142 * static_cast<double>(dimension);
     default:
@@ -701,7 +681,6 @@ bool basic_is_multimodal(BasicFunctionId id) {
     case BasicFunctionId::LunacekBiRastrigin:
     case BasicFunctionId::Levy:
     case BasicFunctionId::Michalewicz:
-    case BasicFunctionId::GrieRosen:
     case BasicFunctionId::SchafferF6:
     case BasicFunctionId::StyblinskiTang:
         return true;
@@ -770,8 +749,6 @@ std::string properties_for(BasicFunctionId id) {
         return "Basic function, HGBat, multimodal, non-separable, flat ridge structure.";
     case BasicFunctionId::HCF:
         return "Basic function, HCF, unimodal, separable, exponential growth with L1 norm.";
-    case BasicFunctionId::GrieRosen:
-        return "Basic function, Griewank-Rosenbrock, multimodal, non-separable, Rosenbrock-style coupling.";
     case BasicFunctionId::SchafferF6:
         return "Basic function, Schaffer F6, multimodal, non-separable, pairwise radial coupling.";
     case BasicFunctionId::Step:
@@ -908,8 +885,6 @@ double BasicF::evaluate_impl(const double* x) const {
         return hgbat_eval(x, dimension);
     case BasicFunctionId::HCF:
         return hcf_eval(x, dimension);
-    case BasicFunctionId::GrieRosen:
-        return grie_rosen_eval(x, dimension);
     case BasicFunctionId::SchafferF6:
         return schaffer_f6_eval(x, dimension);
     case BasicFunctionId::Step:
@@ -1013,8 +988,6 @@ std::string to_string(BasicFunctionId id) {
         return "HGBat";
     case BasicFunctionId::HCF:
         return "HCF";
-    case BasicFunctionId::GrieRosen:
-        return "GrieRosen";
     case BasicFunctionId::SchafferF6:
         return "SchafferF6";
     case BasicFunctionId::Step:
@@ -1072,7 +1045,6 @@ std::vector<BasicFunctionId> list_basic_functions() {
         BasicFunctionId::HappyCat,
         BasicFunctionId::HGBat,
         BasicFunctionId::HCF,
-        BasicFunctionId::GrieRosen,
         BasicFunctionId::SchafferF6,
         BasicFunctionId::Step,
         BasicFunctionId::Quartic,

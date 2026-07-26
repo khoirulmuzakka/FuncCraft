@@ -23,8 +23,8 @@ python -m pip install numpy scipy minionpy
 Suite YAML is the easiest way to configure FuncCraft:
 
 ```yaml
-base_functions: [0, 8, 9, 10, 11]
-composition_base_functions: [8, 9, 10, 11]
+base_functions: [1, 9, 10, 11, 12]
+composition_base_functions: [9, 10, 11, 12]
 coordinate_transforms:
   - kind: rotation
     probability: 0.5

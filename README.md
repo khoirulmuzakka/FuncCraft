@@ -7,6 +7,10 @@
 [![CI](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/ci.yml/badge.svg)](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/ci.yml)
 [![Wheel](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml/badge.svg)](https://github.com/khoirulmuzakka/FuncCraft/actions/workflows/wheel.yaml)
 [![Documentation Status](https://readthedocs.org/projects/funccraft/badge/?version=latest)](https://funccraft.readthedocs.io/)
+[![PyPI version](https://img.shields.io/pypi/v/funccraft.svg)](https://pypi.org/project/funccraft/)
+[![PyPI Python Version](https://img.shields.io/pypi/pyversions/funccraft.svg)](https://pypi.org/project/funccraft/)
+[![PyPI pip downloads](https://img.shields.io/pypi/dm/funccraft.svg)](https://pypi.org/project/funccraft/)
+[![PyPI License](https://img.shields.io/pypi/l/funccraft.svg)](https://pypi.org/project/funccraft/)
 
 FuncCraft is a C++17 library with a Python interface for generating scalable
 continuous-optimization benchmark suites. A single suite specification can
@@ -50,8 +54,8 @@ Suite YAML is the easiest way to create and edit benchmark suites:
 
 ```yaml
 supported_dimensions: any
-base_functions: [0, 8, 9, 10, 11]
-composition_base_functions: [8, 9, 10, 11]
+base_functions: [1, 9, 10, 11, 12]
+composition_base_functions: [9, 10, 11, 12]
 
 coordinate_transforms:
   - kind: rotation

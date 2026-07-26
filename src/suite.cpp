@@ -135,10 +135,15 @@ BasicFunctionId parse_basic_function_yaml_item(const YAML::Node& node, const std
         }
     }
     try {
-        return static_cast<BasicFunctionId>(std::stoi(text));
+        const auto parsed = static_cast<BasicFunctionId>(std::stoi(text));
+        for (BasicFunctionId id : list_basic_functions()) {
+            if (id == parsed) {
+                return id;
+            }
+        }
     } catch (const std::exception&) {
-        throw std::invalid_argument("unknown base function in " + field + ": " + text);
     }
+    throw std::invalid_argument("unknown base function in " + field + ": " + text);
 }
 
 std::vector<BasicFunctionId> yaml_basic_function_list(const YAML::Node& node, const std::string& field) {

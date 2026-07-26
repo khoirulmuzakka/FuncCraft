@@ -102,7 +102,6 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("HappyCat", FuncCraft::BasicFunctionId::HappyCat)
         .value("HGBat", FuncCraft::BasicFunctionId::HGBat)
         .value("HCF", FuncCraft::BasicFunctionId::HCF)
-        .value("GrieRosen", FuncCraft::BasicFunctionId::GrieRosen)
         .value("SchafferF6", FuncCraft::BasicFunctionId::SchafferF6)
         .value("Step", FuncCraft::BasicFunctionId::Step)
         .value("Quartic", FuncCraft::BasicFunctionId::Quartic)

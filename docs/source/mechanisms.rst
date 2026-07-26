@@ -18,99 +18,96 @@ names can both be used in YAML.
    * - ID
      - Name
      - Notes
-   * - 0
+   * - 1
      - Sphere
      - Unimodal, smooth, separable.
-   * - 1
+   * - 2
      - Ellipsoidal
      - Unimodal, high-conditioned.
-   * - 2
+   * - 3
      - SumDifferentPowers
      - Unimodal, variable powers.
-   * - 3
+   * - 4
      - BuecheRastrigin
      - Multimodal Rastrigin-family landscape.
-   * - 4
+   * - 5
      - LinearSlope
      - Unimodal sloped landscape.
-   * - 5
+   * - 6
      - AttractiveSector
      - Unimodal, asymmetric sector structure.
-   * - 6
+   * - 7
      - StepEllipsoidal
      - Unimodal stepped high-conditioned landscape.
-   * - 7
+   * - 8
      - StepRastrigin
      - Multimodal stepped Rastrigin-family landscape.
-   * - 8
+   * - 9
      - Rosenbrock
      - Unimodal valley, nonseparable.
-   * - 9
+   * - 10
      - Ackley
      - Multimodal.
-   * - 10
+   * - 11
      - Rastrigin
      - Multimodal, separable in primitive coordinates.
-   * - 11
+   * - 12
      - Griewank
      - Multimodal.
-   * - 12
+   * - 13
      - Schwefel
      - Multimodal.
-   * - 13
+   * - 14
      - SharpRidge
      - Unimodal ridge.
-   * - 14
+   * - 15
      - Weierstrass
      - Multimodal, rugged.
-   * - 15
+   * - 16
      - SchafferF7
      - Multimodal.
-   * - 16
+   * - 17
      - SchafferF7Cond1000
      - Multimodal, conditioned Schaffer variant.
-   * - 17
+   * - 18
      - GriewankRosenbrock
      - Multimodal hybrid.
-   * - 18
+   * - 19
      - Gallagher21
      - Multimodal peaks.
-   * - 19
+   * - 20
      - Katsuura
      - Multimodal.
-   * - 20
+   * - 21
      - LunacekBiRastrigin
      - Multimodal double-funnel Rastrigin-family landscape.
-   * - 21
+   * - 22
      - Zakharov
      - Unimodal.
-   * - 22
+   * - 23
      - Levy
      - Multimodal.
-   * - 23
+   * - 24
      - Michalewicz
      - Multimodal.
-   * - 24
+   * - 25
      - DixonPrice
      - Unimodal.
-   * - 25
+   * - 26
      - BentCigar
      - Unimodal, high-conditioned.
-   * - 26
+   * - 27
      - Discus
      - Unimodal, high-conditioned.
-   * - 27
+   * - 28
      - HappyCat
      - Multimodal/nonconvex BBOB-style function.
-   * - 28
+   * - 29
      - HGBat
      - Unimodal/nonconvex BBOB-style function.
-   * - 29
+   * - 30
      - HCF
      - Unimodal composition-style primitive.
-   * - 30
-     - GrieRosen
-     - Multimodal Griewank-Rosenbrock variant.
    * - 31
      - SchafferF6
      - Multimodal.

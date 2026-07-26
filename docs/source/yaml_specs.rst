@@ -23,8 +23,8 @@ Save a file such as ``my_suite.yaml``:
 .. code-block:: yaml
 
    supported_dimensions: any
-   base_functions: [0, 8, 9, 10, 11]
-   composition_base_functions: [8, 9, 10, 11]
+   base_functions: [1, 9, 10, 11, 12]
+   composition_base_functions: [9, 10, 11, 12]
 
    coordinate_transforms:
      - kind: rotation

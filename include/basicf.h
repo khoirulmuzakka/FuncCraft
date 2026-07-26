@@ -21,7 +21,7 @@ struct Domain;
 
 enum class BasicFunctionId {
     /// Sphere function.
-    Sphere,
+    Sphere = 1,
     /// Ellipsoidal function.
     Ellipsoidal,
     /// Sum of different powers.
@@ -80,8 +80,6 @@ enum class BasicFunctionId {
     HGBat,
     /// HCF function.
     HCF,
-    /// Griewank-Rosenbrock function.
-    GrieRosen,
     /// Schaffer F6 function.
     SchafferF6,
     /// Step function.
