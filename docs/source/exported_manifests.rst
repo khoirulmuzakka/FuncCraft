@@ -19,7 +19,9 @@ Python:
    import funccraft as fc
 
    function_index = 0
-   f = fc.suite_collection(2026, 1).benchmark_suite(2).function(function_index)
+   year = 2026
+   version = 1
+   f = fc.suite_collection(year, version).benchmark_suite(2).function(function_index)
    f.export_spec("function_materialized.yaml")
 
    same = fc.BenchmarkFunction("function_materialized.yaml")

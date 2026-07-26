@@ -16,7 +16,7 @@ Check the installation:
 
 .. code-block:: shell
 
-   python -c "import funccraft as fc; print(fc.suite_collection(2026, 1).name)"
+   python -c "import funccraft as fc; print(fc.suite_collection(year=2026, version=1).name)"
 
 Optional optimization examples use SciPy or MinionPy:
 

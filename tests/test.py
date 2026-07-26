@@ -5,6 +5,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 try:
     from funccraft import (
         BasicFunctionId,
@@ -25,7 +27,6 @@ try:
         suite_collection_number_of_functions,
     )
 except ModuleNotFoundError:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from funccraft import (
         BasicFunctionId,
         BenchmarkFunction,
@@ -56,7 +57,7 @@ def assert_close_sequence(actual, expected, *, tolerance=1.0e-9):
 
 def candidate_points(function):
     dimension = function.dimension
-    x_star = list(function.spec.assigned_xopt)
+    x_star = function.get_xopt()
     zero = [0.0] * dimension
     pattern = [0.25 if i % 2 == 0 else -0.75 for i in range(dimension)]
     return [x_star, zero, pattern]
@@ -65,9 +66,9 @@ def candidate_points(function):
 def check_optima(suite, *, tolerance=20.0):
     for index in range(len(suite)):
         function = suite.function(index)
-        x_star = list(function.spec.assigned_xopt)
+        x_star = function.get_xopt()
         value = function.evaluate([x_star])[0]
-        expected = function.spec.assigned_fopt
+        expected = function.get_fopt()
         if not math.isclose(value, expected, rel_tol=tolerance, abs_tol=tolerance):
             raise AssertionError(
                 f"optimum mismatch for function {index}: {value!r} != {expected!r}"
@@ -154,8 +155,10 @@ def main():
     dimension = 3
     default_suite_path = Path(__file__).resolve().parents[1] / "suites" / "2026_v1.yaml"
 
-    collection = suite_collection(2026, 1)
-    if collection.number_of_functions != suite_collection_number_of_functions(2026, 1):
+    suite_year = 2026
+    suite_version = 1
+    collection = suite_collection(suite_year, suite_version)
+    if collection.number_of_functions != suite_collection_number_of_functions(suite_year, suite_version):
         raise AssertionError("suite collection function count mismatch")
     collection_suite = collection.benchmark_suite(2)
     value = collection_suite.function(0).evaluate([collection_suite.function(0).spec.assigned_xopt])[0]

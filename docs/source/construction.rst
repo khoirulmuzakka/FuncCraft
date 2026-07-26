@@ -94,8 +94,9 @@ and probabilities. The suite generator samples from those choices, creates
 objects for a requested dimension.
 
 The standard suite collection is also a YAML ``SuiteSpec``. Use
-``suite_collection(2026, 1)`` when you want the packaged suite, or
-``load_suite_spec("my_suite.yaml")`` when you want to edit the YAML yourself.
+``suite_collection(year=2026, version=1)`` when you want the packaged suite,
+or ``load_suite_spec("my_suite.yaml")`` when you want to edit the YAML
+yourself.
 
 .. _design-constraints:
 

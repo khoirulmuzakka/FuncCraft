@@ -25,11 +25,15 @@ The suite itself is available through:
 
    import funccraft as fc
 
-   suite = fc.suite_collection(2026, 1).benchmark_suite(2)
+   year = 2026
+   version = 1
+   suite = fc.suite_collection(year, version).benchmark_suite(2)
 
 and in C++:
 
 .. code-block:: cpp
 
+   const int year = 2026;
+   const int version = 1;
    FuncCraft::BenchmarkSuite suite =
-       FuncCraft::suite_collection(2026, 1).benchmark_suite(2);
+       FuncCraft::suite_collection(year, version).benchmark_suite(2);

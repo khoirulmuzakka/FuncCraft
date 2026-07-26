@@ -91,7 +91,9 @@ int main(int argc, char* argv[]) {
 
     try {
         const RunConfig config = parse_cli(argc, argv);
-        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
+        const int year = 2026;
+        const int version = 1;
+        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(year, version);
         const FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(config.dimension);
         if (config.high < config.low) {
             throw std::invalid_argument("high must be greater than or equal to low");
@@ -166,7 +168,7 @@ int main(int argc, char* argv[]) {
                     static_cast<int>(config.seed),
                     settings);
                 const minion::MinionResult result = optimizer.optimize();
-                const double error = std::abs(result.fun - spec.assigned_fopt);
+                const double error = std::abs(result.fun - function.get_fopt());
                 const bool ok = std::isfinite(result.fun);
                 failed += ok ? 0 : 1;
 

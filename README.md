@@ -110,7 +110,8 @@ f = suite.function(function_index)
 values = f.evaluate(points)
 
 print(f.spec.label)
-print(f.spec.assigned_xopt)
+print(f.get_xopt())
+print(f.get_fopt())
 print(values)
 ```
 
@@ -120,7 +121,9 @@ For the packaged 2026 suite, use the collection shortcut:
 import funccraft as fc
 
 dimension = 10
-suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+year = 2026
+version = 1
+suite = fc.suite_collection(year, version).benchmark_suite(dimension)
 function_index = 0
 values = suite.evaluate(function_index, [[0.0] * dimension])
 ```
@@ -135,7 +138,9 @@ from scipy.optimize import differential_evolution
 import funccraft as fc
 
 dimension = 10
-suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+year = 2026
+version = 1
+suite = fc.suite_collection(year, version).benchmark_suite(dimension)
 function_index = 0
 f = suite.function(function_index)
 domain = f.domain
@@ -155,7 +160,9 @@ import funccraft as fc
 import minionpy as mpy
 
 dimension = 10
-suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+year = 2026
+version = 1
+suite = fc.suite_collection(year, version).benchmark_suite(dimension)
 function_index = 0
 f = suite.function(function_index)
 domain = f.domain
@@ -217,8 +224,10 @@ For the packaged 2026 suite:
 
 int main() {
     const int dimension = 10;
+    const int year = 2026;
+    const int version = 1;
     FuncCraft::SuiteCollection collection =
-        FuncCraft::suite_collection(2026, 1);
+        FuncCraft::suite_collection(year, version);
     FuncCraft::BenchmarkSuite suite =
         collection.benchmark_suite(dimension);
 }
@@ -236,9 +245,11 @@ Minimize one generated function with Minion:
 int main() {
     const int dimension = 10;
     const int function_index = 0;
+    const int year = 2026;
+    const int version = 1;
 
     FuncCraft::BenchmarkSuite suite =
-        FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);
+        FuncCraft::suite_collection(year, version).benchmark_suite(dimension);
     const FuncCraft::BenchmarkFunction& f = suite.function(function_index);
     const FuncCraft::Domain& domain = f.domain();
 

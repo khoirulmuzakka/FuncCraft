@@ -12,9 +12,8 @@ controlling the constructed optimum location and optimum value. The generated
 landscapes are assembled from primitive benchmark functions, coordinate
 transforms, value transforms, and composition rules.
 
-Start with :doc:`funccraft_py/getting_started` if you use Python, or
-:doc:`funccraft_cpp/examples` if you use C++. The YAML reference is in
-:doc:`yaml_specs`.
+Start with :doc:`funccraft_py/getting_started` for Python and C++ quick
+starts. The YAML reference is in :doc:`yaml_specs`.
 
 .. toctree::
    :maxdepth: 2

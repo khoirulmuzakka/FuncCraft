@@ -630,8 +630,8 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             auto child = std::make_shared<BenchmarkFunction>(*component_spec.composed_function);
             component_spec.composed_function = std::make_shared<FunctionSpec>(child->spec());
             child_domain = child->domain();
-            child_xopt = child->spec().assigned_xopt;
-            child_fopt = child->assigned_fopt();
+            child_xopt = child->get_xopt();
+            child_fopt = child->get_fopt();
             detail::require(
                 std::abs(child_fopt) <= 1.0e-12,
                 "materialized composed component assigned_fopt must be zero");
@@ -732,8 +732,12 @@ double BenchmarkFunction::scale_factor() const {
     return scale_factor_;
 }
 
-double BenchmarkFunction::assigned_fopt() const {
+double BenchmarkFunction::get_fopt() const {
     return assigned_fopt_;
+}
+
+const std::vector<double>& BenchmarkFunction::get_xopt() const {
+    return spec_.assigned_xopt;
 }
 
 const std::string& BenchmarkFunction::component_types() const {

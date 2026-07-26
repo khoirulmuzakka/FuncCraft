@@ -255,7 +255,8 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_property_readonly("domain", &FuncCraft::BenchmarkFunction::domain, py::return_value_policy::reference_internal)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkFunction::dimension)
         .def_property_readonly("scale_factor", &FuncCraft::BenchmarkFunction::scale_factor)
-        .def_property_readonly("assigned_fopt", &FuncCraft::BenchmarkFunction::assigned_fopt)
+        .def("get_fopt", &FuncCraft::BenchmarkFunction::get_fopt)
+        .def("get_xopt", &FuncCraft::BenchmarkFunction::get_xopt, py::return_value_policy::reference_internal)
         .def_property_readonly("component_types", &FuncCraft::BenchmarkFunction::component_types)
         .def_property_readonly("spec", &FuncCraft::BenchmarkFunction::spec, py::return_value_policy::reference_internal)
         .def("export_spec", [](const FuncCraft::BenchmarkFunction& self, const std::string& path) {

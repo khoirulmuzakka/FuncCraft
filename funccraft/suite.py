@@ -13,7 +13,9 @@ suite definition shipped with the package::
 
     from funccraft import suite_collection
 
-    collection = suite_collection(2026, 1)
+    year = 2026
+    version = 1
+    collection = suite_collection(year, version)
     print(collection.name, collection.number_of_functions)
 
     suite = collection.benchmark_suite(dimension=10)
@@ -119,7 +121,9 @@ def suite_collection(year, version):
     --------
     Build a standard suite at any supported dimension::
 
-        collection = suite_collection(2026, 1)
+        year = 2026
+        version = 1
+        collection = suite_collection(year, version)
         suite_2d = collection.benchmark_suite(2)
         suite_20d = collection.benchmark_suite(20)
     """
@@ -225,7 +229,7 @@ class BenchmarkSuite:
 
             f = suite.function(42)
             print(f.spec.label)
-            print(f.spec.assigned_xopt)
+            print(f.get_xopt())
         """
         return BenchmarkFunction(self._suite.function(index))
 
@@ -280,7 +284,9 @@ class SuiteCollection:
     --------
     Create the standard 2026 v1 suite at two dimensions::
 
-        collection = SuiteCollection(2026, 1)
+        year = 2026
+        version = 1
+        collection = SuiteCollection(year, version)
         print(collection.name)
         print(collection.number_of_functions)
 

@@ -127,7 +127,8 @@ class BenchmarkFunction:
         })
 
         print(f.dimension)
-        print(f.assigned_fopt)
+        print(f.get_fopt())
+        print(f.get_xopt())
         print(f([[1.0, -1.0], [0.0, 0.0]]))
     """
 
@@ -166,10 +167,13 @@ class BenchmarkFunction:
         """Alias for :attr:`scale_factor`."""
         return self.scale_factor
 
-    @property
-    def assigned_fopt(self):
+    def get_fopt(self):
         """Return the assigned optimum value."""
-        return self._function.assigned_fopt
+        return self._function.get_fopt()
+
+    def get_xopt(self):
+        """Return the assigned optimum location."""
+        return list(self._function.get_xopt())
 
     @property
     def component_types(self):
@@ -235,6 +239,7 @@ class BenchmarkFunction:
             f"dimension={self.dimension}, "
             f"label='{self.spec.label}', "
             f"component_types='{self.component_types}', "
+            f"fopt={self.get_fopt()}, "
             f"scale_factor={self.scale_factor})"
         )
 

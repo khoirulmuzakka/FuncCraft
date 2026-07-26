@@ -22,6 +22,8 @@ Load a suite YAML
    values = f.evaluate(points)
 
    print(f.spec.label)
+   print(f.get_xopt())
+   print(f.get_fopt())
    print(f.component_types)
    print(values)
 
@@ -33,7 +35,9 @@ Use a packaged suite collection
    import funccraft as fc
 
    dimension = 10
-   suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+   year = 2026
+   version = 1
+   suite = fc.suite_collection(year, version).benchmark_suite(dimension)
    function_index = 0
    values = suite.evaluate(function_index, [[0.0] * dimension])
 
@@ -112,7 +116,9 @@ batched interface:
 
    dimension = 10
    function_index = 0
-   suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+   year = 2026
+   version = 1
+   suite = fc.suite_collection(year, version).benchmark_suite(dimension)
    f = suite.function(function_index)
    domain = f.domain
    bounds = list(zip(domain.lower_bound, domain.upper_bound))
@@ -137,7 +143,9 @@ initial guesses as a list of lists:
 
    dimension = 10
    function_index = 0
-   suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+   year = 2026
+   version = 1
+   suite = fc.suite_collection(year, version).benchmark_suite(dimension)
    f = suite.function(function_index)
    domain = f.domain
 

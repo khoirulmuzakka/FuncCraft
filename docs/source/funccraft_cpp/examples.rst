@@ -32,6 +32,7 @@ Load a suite YAML
        std::vector<double> values = f(points);
 
        std::cout << f.spec().label << '\n';
+       std::cout << f.get_fopt() << '\n';
        std::cout << values.front() << '\n';
    }
 
@@ -44,8 +45,10 @@ Use a packaged suite collection
 
    int main() {
        const int dimension = 10;
+       const int year = 2026;
+       const int version = 1;
        FuncCraft::SuiteCollection collection =
-           FuncCraft::suite_collection(2026, 1);
+           FuncCraft::suite_collection(year, version);
        FuncCraft::BenchmarkSuite suite =
            collection.benchmark_suite(dimension);
    }
@@ -132,9 +135,11 @@ dependency. ``examples/main_minimize.cpp`` contains a fuller program.
    int main() {
        const int dimension = 10;
        const int function_index = 0;
+       const int year = 2026;
+       const int version = 1;
 
        FuncCraft::BenchmarkSuite suite =
-           FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);
+           FuncCraft::suite_collection(year, version).benchmark_suite(dimension);
        const FuncCraft::BenchmarkFunction& f =
            suite.function(function_index);
        const FuncCraft::Domain& domain = f.domain();

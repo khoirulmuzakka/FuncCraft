@@ -58,7 +58,11 @@ public:
     /**
      * @brief Return the assigned optimum value applied after scaling.
      */
-    double assigned_fopt() const;
+    double get_fopt() const;
+    /**
+     * @brief Return the assigned optimum location.
+     */
+    const std::vector<double>& get_xopt() const;
     /**
      * @brief Return a compact summary of immediate component source types.
      *

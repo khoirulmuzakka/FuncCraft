@@ -74,7 +74,9 @@ import funccraft as fc
 
 dimension = 10
 function_index = 0
-suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+year = 2026
+version = 1
+suite = fc.suite_collection(year, version).benchmark_suite(dimension)
 values = suite.evaluate(function_index, [[0.0] * dimension])
 ```
 
@@ -91,7 +93,9 @@ import funccraft as fc
 
 dimension = 10
 function_index = 0
-suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+year = 2026
+version = 1
+suite = fc.suite_collection(year, version).benchmark_suite(dimension)
 f = suite.function(function_index)
 domain = f.domain
 bounds = list(zip(domain.lower_bound, domain.upper_bound))
@@ -111,7 +115,9 @@ import minionpy as mpy
 
 dimension = 10
 function_index = 0
-suite = fc.suite_collection(2026, 1).benchmark_suite(dimension)
+year = 2026
+version = 1
+suite = fc.suite_collection(year, version).benchmark_suite(dimension)
 f = suite.function(function_index)
 domain = f.domain
 

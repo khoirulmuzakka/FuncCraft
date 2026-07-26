@@ -13,7 +13,9 @@ Use the built-in suite collection::
 
     import funccraft as fc
 
-    collection = fc.suite_collection(2026, 1)
+    year = 2026
+    version = 1
+    collection = fc.suite_collection(year, version)
     suite = collection.benchmark_suite(dimension=10)
     values = suite.evaluate(0, [[0.0] * 10])
 

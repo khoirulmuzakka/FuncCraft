@@ -74,21 +74,23 @@ std::vector<std::vector<double>> candidate_points(const FuncCraft::BenchmarkFunc
         pattern[static_cast<std::size_t>(i)] = (i % 2 == 0) ? 0.25 : -0.75;
     }
     return {
-        function.spec().assigned_xopt,
+        function.get_xopt(),
         std::vector<double>(static_cast<std::size_t>(dimension), 0.0),
         pattern,
     };
 }
 
 void check_optima() {
-    const FuncCraft::BenchmarkSuite suite = FuncCraft::suite_collection(2026, 1).benchmark_suite(2);
+    constexpr int suite_year = 2026;
+    constexpr int suite_version = 1;
+    const FuncCraft::BenchmarkSuite suite = FuncCraft::suite_collection(suite_year, suite_version).benchmark_suite(2);
 
     for (int i = 0; i < 36; ++i) {
         const FuncCraft::BenchmarkFunction& function = suite.function(i);
-        const double value = function({function.spec().assigned_xopt}).front();
+        const double value = function({function.get_xopt()}).front();
         require_close(
             value,
-            function.spec().assigned_fopt,
+            function.get_fopt(),
             20.0,
             "optimum mismatch for function " + std::to_string(i));
     }
@@ -98,11 +100,13 @@ void check_suite_collection() {
     const std::vector<FuncCraft::SuiteCollectionId> collections = FuncCraft::list_suite_collections();
     require(!collections.empty(), "suite collection registry is empty");
 
-    const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
-    require(collection.year() == 2026, "suite collection year mismatch");
-    require(collection.version() == 1, "suite collection version mismatch");
+    constexpr int suite_year = 2026;
+    constexpr int suite_version = 1;
+    const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(suite_year, suite_version);
+    require(collection.year() == suite_year, "suite collection year mismatch");
+    require(collection.version() == suite_version, "suite collection version mismatch");
     require(
-        FuncCraft::suite_collection_number_of_functions(2026, 1) == collection.number_of_functions(),
+        FuncCraft::suite_collection_number_of_functions(suite_year, suite_version) == collection.number_of_functions(),
         "suite collection free function count mismatch");
 
     FuncCraft::SuiteSpec spec = collection.spec();
@@ -353,7 +357,9 @@ FuncCraft::BenchmarkSuite make_roundtrip_suite() {
 }
 
 FuncCraft::BenchmarkSuite make_cross_platform_suite() {
-    return FuncCraft::suite_collection(2026, 1).benchmark_suite(kCrossPlatformDimension);
+    constexpr int suite_year = 2026;
+    constexpr int suite_version = 1;
+    return FuncCraft::suite_collection(suite_year, suite_version).benchmark_suite(kCrossPlatformDimension);
 }
 
 FuncCraft::FunctionSpec make_alias_function_spec(FuncCraft::CompositionKind composition_kind) {
@@ -685,7 +691,9 @@ void check_suite_yaml_roundtrip(const std::filesystem::path& path) {
 
 void check_packaged_suite_function_spec_manifest_exact_roundtrip(const std::filesystem::path& path) {
     constexpr int function_count = 500;
-    FuncCraft::SuiteSpec spec = FuncCraft::suite_collection_spec(2026, 1);
+    constexpr int suite_year = 2026;
+    constexpr int suite_version = 1;
+    FuncCraft::SuiteSpec spec = FuncCraft::suite_collection_spec(suite_year, suite_version);
     spec.requested_number_of_functions = function_count;
     const FuncCraft::BenchmarkSuite suite(spec, kCrossPlatformDimension);
     require(suite.size() == function_count, "packaged suite exact roundtrip function count mismatch");

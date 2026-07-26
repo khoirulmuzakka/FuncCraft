@@ -70,8 +70,10 @@
  * int main() {
  *     const int dimension = 10;
  *     const int function_index = 0;
+ *     const int year = 2026;
+ *     const int version = 1;
  *     FuncCraft::SuiteCollection collection =
- *         FuncCraft::suite_collection(2026, 1);
+ *         FuncCraft::suite_collection(year, version);
  *
  *     FuncCraft::BenchmarkSuite suite =
  *         collection.benchmark_suite(dimension);

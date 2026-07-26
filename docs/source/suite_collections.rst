@@ -11,7 +11,9 @@ The current packaged collection is ``2026_v1``:
 
    import funccraft as fc
 
-   collection = fc.suite_collection(2026, 1)
+   year = 2026
+   version = 1
+   collection = fc.suite_collection(year, version)
    print(collection.name)
    print(collection.number_of_functions)
 
@@ -24,8 +26,10 @@ C++:
    #include "funccraft.h"
 
    int main() {
+       const int year = 2026;
+       const int version = 1;
        FuncCraft::SuiteCollection collection =
-           FuncCraft::suite_collection(2026, 1);
+           FuncCraft::suite_collection(year, version);
 
        int n = collection.number_of_functions();
        FuncCraft::BenchmarkSuite suite =

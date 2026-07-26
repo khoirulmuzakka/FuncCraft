@@ -74,7 +74,9 @@ std::string truncate_with_ellipsis(const std::string& text, std::size_t max_len)
 int main(int argc, char* argv[]) {
     try {
         const CheckConfig config = parse_cli(argc, argv);
-        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
+        const int year = 2026;
+        const int version = 1;
+        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(year, version);
         const FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(config.dimension);
 
         int failures = 0;
@@ -109,11 +111,11 @@ int main(int argc, char* argv[]) {
             const auto function = suite.function(i);
             const auto& spec = function.spec();
             const auto fields = split_class_label(spec.label);
-            const double max_x_star = spec.assigned_xopt.empty()
+            const double max_x_star = function.get_xopt().empty()
                 ? 0.0
-                : *std::max_element(spec.assigned_xopt.begin(), spec.assigned_xopt.end());
-            const double value = function(std::vector<std::vector<double>>{spec.assigned_xopt}).front();
-            const double error = std::fabs(value - spec.assigned_fopt);
+                : *std::max_element(function.get_xopt().begin(), function.get_xopt().end());
+            const double value = function(std::vector<std::vector<double>>{function.get_xopt()}).front();
+            const double error = std::fabs(value - function.get_fopt());
             const bool ok = std::isfinite(value) && error <= config.tolerance;
 
             max_abs_error = std::max(max_abs_error, error);

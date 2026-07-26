@@ -47,7 +47,7 @@ void write_manifest(
         const auto& spec = function.spec();
         out << i << ' '
             << spec.label << ' '
-            << std::scientific << std::setprecision(16) << spec.assigned_fopt
+            << std::scientific << std::setprecision(16) << function.get_fopt()
             << '\n';
     }
 }
@@ -62,7 +62,9 @@ int main(int argc, char* argv[]) {
         const Config config = parse_cli(argc, argv);
         std::filesystem::create_directories(config.out_dir);
 
-        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(2026, 1);
+        const int year = 2026;
+        const int version = 1;
+        const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(year, version);
         const FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(config.dimension);
         const std::filesystem::path manifest_path =
             std::filesystem::path(config.out_dir) / "suite_manifest.txt";
