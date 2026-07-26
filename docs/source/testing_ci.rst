@@ -136,7 +136,7 @@ This is intended to catch platform-sensitive changes in floating-point
 behavior while allowing small numerical drift from library/compiler
 differences.
 
-In CI, the first 35 functions are treated as the primitive-function prefix and
+In CI, the first 34 functions are treated as the primitive-function prefix and
 must have every sampled value agree within ``1e-8`` relative error. For the
 remaining generated functions, the comparison succeeds when at least 75% of
 functions have at least 75% of sampled values agree within ``1e-8`` relative
