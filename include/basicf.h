@@ -72,8 +72,6 @@ enum class BasicFunctionId {
     DixonPrice,
     /// Bent cigar function.
     BentCigar,
-    /// Discus function.
-    Discus,
     /// HappyCat function.
     HappyCat,
     /// HGBat function.

@@ -96,6 +96,23 @@ void check_optima() {
     }
 }
 
+void check_basic_function_registry_ids() {
+    const std::vector<FuncCraft::BasicFunctionId> ids = FuncCraft::list_basic_functions();
+    require(!ids.empty(), "basic function registry is empty");
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        const int expected = static_cast<int>(i + 1);
+        const int actual = static_cast<int>(ids[i]);
+        require(
+            actual == expected,
+            "basic function registry id mismatch at index " + std::to_string(i)
+                + ": actual=" + std::to_string(actual)
+                + ", expected=" + std::to_string(expected));
+    }
+    require(ids[0] == FuncCraft::BasicFunctionId::Sphere, "basic function id 1 must be Sphere");
+    require(ids[1] == FuncCraft::BasicFunctionId::Ellipsoidal, "basic function id 2 must be Ellipsoidal");
+    require(ids[2] == FuncCraft::BasicFunctionId::SumDifferentPowers, "basic function id 3 must be SumDifferentPowers");
+}
+
 void check_suite_collection() {
     const std::vector<FuncCraft::SuiteCollectionId> collections = FuncCraft::list_suite_collections();
     require(!collections.empty(), "suite collection registry is empty");
@@ -779,6 +796,7 @@ int run_tests() {
     };
 
     const std::vector<TestCase> tests = {
+        {"Basic function registry ids", check_basic_function_registry_ids},
         {"Packaged suite optima", check_optima},
         {"Suite collection API", check_suite_collection},
         {"Identity transform assigned optimum", check_identity_transform_assigned_optimum},

@@ -136,14 +136,6 @@ double bent_cigar_eval(const double* x, int dimension) {
     return sum;
 }
 
-double discus_eval(const double* x, int dimension) {
-    double sum = 1.0e6 * sqr(x[0]);
-    for (int i = 1; i < dimension; ++i) {
-        sum += sqr(x[i]);
-    }
-    return sum;
-}
-
 double rosenbrock_original_eval(const double* x, int dimension) {
     if (dimension <= 1) {
         return 0.0;
@@ -741,8 +733,6 @@ std::string properties_for(BasicFunctionId id) {
         return "Basic function, Dixon-Price, unimodal, non-separable, curved valley.";
     case BasicFunctionId::BentCigar:
         return "Basic function, Bent Cigar, unimodal, separable, extreme ill-conditioning.";
-    case BasicFunctionId::Discus:
-        return "Basic function, Discus, unimodal, separable, extreme axis scaling.";
     case BasicFunctionId::HappyCat:
         return "Basic function, HappyCat, multimodal, non-separable, flat ridge structure.";
     case BasicFunctionId::HGBat:
@@ -877,8 +867,6 @@ double BasicF::evaluate_impl(const double* x) const {
         return dixon_price_eval(x, dimension);
     case BasicFunctionId::BentCigar:
         return bent_cigar_eval(x, dimension);
-    case BasicFunctionId::Discus:
-        return discus_eval(x, dimension);
     case BasicFunctionId::HappyCat:
         return happy_cat_eval(x, dimension);
     case BasicFunctionId::HGBat:
@@ -980,8 +968,6 @@ std::string to_string(BasicFunctionId id) {
         return "DixonPrice";
     case BasicFunctionId::BentCigar:
         return "BentCigar";
-    case BasicFunctionId::Discus:
-        return "Discus";
     case BasicFunctionId::HappyCat:
         return "HappyCat";
     case BasicFunctionId::HGBat:
@@ -1013,11 +999,11 @@ bool is_unimodal(BasicFunctionId id) {
 
 std::vector<BasicFunctionId> list_basic_functions() {
     // Registry order intentionally excludes near-duplicate landscapes such as
-    // BentCigar, Discus, SchafferF7Cond10, and Gallagher101.
+    // BentCigar, SchafferF7Cond10, and Gallagher101.
     return {
         BasicFunctionId::Sphere,
-        BasicFunctionId::SumDifferentPowers,
         BasicFunctionId::Ellipsoidal,
+        BasicFunctionId::SumDifferentPowers,
         BasicFunctionId::BuecheRastrigin,
         BasicFunctionId::LinearSlope,
         BasicFunctionId::AttractiveSector,
@@ -1041,7 +1027,6 @@ std::vector<BasicFunctionId> list_basic_functions() {
         BasicFunctionId::Michalewicz,
         BasicFunctionId::DixonPrice,
         BasicFunctionId::BentCigar,
-        BasicFunctionId::Discus,
         BasicFunctionId::HappyCat,
         BasicFunctionId::HGBat,
         BasicFunctionId::HCF,

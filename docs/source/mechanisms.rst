@@ -97,30 +97,27 @@ names can both be used in YAML.
      - BentCigar
      - Unimodal, high-conditioned.
    * - 27
-     - Discus
-     - Unimodal, high-conditioned.
-   * - 28
      - HappyCat
      - Multimodal/nonconvex BBOB-style function.
-   * - 29
+   * - 28
      - HGBat
      - Unimodal/nonconvex BBOB-style function.
-   * - 30
+   * - 29
      - HCF
      - Unimodal composition-style primitive.
-   * - 31
+   * - 30
      - SchafferF6
      - Multimodal.
-   * - 32
+   * - 31
      - Step
      - Unimodal stepped function.
-   * - 33
+   * - 32
      - Quartic
      - Unimodal quartic function.
-   * - 34
+   * - 33
      - Exponential
      - Unimodal exponential landscape.
-   * - 35
+   * - 34
      - StyblinskiTang
      - Multimodal.
 

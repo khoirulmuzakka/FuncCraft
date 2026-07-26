@@ -98,7 +98,6 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("Michalewicz", FuncCraft::BasicFunctionId::Michalewicz)
         .value("DixonPrice", FuncCraft::BasicFunctionId::DixonPrice)
         .value("BentCigar", FuncCraft::BasicFunctionId::BentCigar)
-        .value("Discus", FuncCraft::BasicFunctionId::Discus)
         .value("HappyCat", FuncCraft::BasicFunctionId::HappyCat)
         .value("HGBat", FuncCraft::BasicFunctionId::HGBat)
         .value("HCF", FuncCraft::BasicFunctionId::HCF)
