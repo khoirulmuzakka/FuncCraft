@@ -7,6 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+OPTIMUM_FUNCTION_COUNT = 500
+
 try:
     from funccraft import (
         BasicFunctionId,
@@ -86,7 +88,8 @@ def check_function_yaml_roundtrip(function, path):
 
 
 def check_suite_yaml_roundtrip(suite, path):
-    indices = [0, 36, len(suite) - 1]
+    first_composed = len(BasicFunctionId.__members__)
+    indices = [0, first_composed + 2, len(suite) - 1]
     before = {
         index: suite.function(index).evaluate(candidate_points(suite.function(index)))
         for index in indices
@@ -180,7 +183,7 @@ def main():
         raise AssertionError("suite collection generated a nonfinite value")
 
     optimum_suite_spec = load_suite_spec(str(default_suite_path))
-    optimum_suite_spec.requested_number_of_functions = 36
+    optimum_suite_spec.requested_number_of_functions = OPTIMUM_FUNCTION_COUNT
     optimum_suite = BenchmarkSuite(optimum_suite_spec, 2)
     check_optima(optimum_suite)
     check_composition_kinds()
@@ -194,7 +197,10 @@ def main():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
-        check_function_yaml_roundtrip(roundtrip_suite.function(36), tmpdir / "function.yaml")
+        check_function_yaml_roundtrip(
+            roundtrip_suite.function(len(BasicFunctionId.__members__) + 2),
+            tmpdir / "function.yaml",
+        )
         check_suite_yaml_roundtrip(roundtrip_suite, tmpdir / "suite.yaml")
 
 

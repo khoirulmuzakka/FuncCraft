@@ -150,7 +150,7 @@ f(x) = assigned_fopt + scale_factor * psi(x, z_1(x), ..., z_m(x))
 
 Implemented mechanism families include:
 
-- 36 primitive base functions, including Sphere, Rosenbrock, Ackley,
+- 34 primitive base functions, including Sphere, Rosenbrock, Ackley,
   Rastrigin, Griewank, Schwefel, Katsuura, Levy, BentCigar, HappyCat,
   HGBat, and StyblinskiTang.
 - coordinate transforms: `none`, `rotation`, `affine`, `block-rotation`.

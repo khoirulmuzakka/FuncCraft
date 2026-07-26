@@ -998,8 +998,8 @@ bool is_unimodal(BasicFunctionId id) {
 }
 
 std::vector<BasicFunctionId> list_basic_functions() {
-    // Registry order intentionally excludes near-duplicate landscapes such as
-    // BentCigar, SchafferF7Cond10, and Gallagher101.
+    // Registry order intentionally excludes removed near-duplicate landscapes
+    // such as Discus, SchafferF7Cond10, and Gallagher101.
     return {
         BasicFunctionId::Sphere,
         BasicFunctionId::Ellipsoidal,

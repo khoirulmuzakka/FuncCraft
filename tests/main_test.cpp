@@ -80,12 +80,17 @@ std::vector<std::vector<double>> candidate_points(const FuncCraft::BenchmarkFunc
     };
 }
 
+int first_composed_function_index() {
+    return static_cast<int>(FuncCraft::list_basic_functions().size());
+}
+
 void check_optima() {
     constexpr int suite_year = 2026;
     constexpr int suite_version = 1;
-    const FuncCraft::BenchmarkSuite suite = FuncCraft::suite_collection(suite_year, suite_version).benchmark_suite(2);
+    const FuncCraft::BenchmarkSuite suite = FuncCraft::suite_collection(suite_year, suite_version).benchmark_suite(10);
 
-    for (int i = 0; i < 36; ++i) {
+    const int checked_count = std::min(kCrossPlatformFunctionCount, suite.size());
+    for (int i = 0; i < checked_count; ++i) {
         const FuncCraft::BenchmarkFunction& function = suite.function(i);
         const double value = function({function.get_xopt()}).front();
         require_close(
@@ -675,7 +680,7 @@ std::vector<std::vector<double>> sample_cross_platform_points(const FuncCraft::D
 
 void check_function_yaml_roundtrip(const std::filesystem::path& path) {
     const FuncCraft::BenchmarkSuite suite = make_roundtrip_suite();
-    const FuncCraft::BenchmarkFunction& function = suite.function(36);
+    const FuncCraft::BenchmarkFunction& function = suite.function(first_composed_function_index() + 2);
     const std::vector<std::vector<double>> points = candidate_points(function);
     const std::vector<double> before = function(points);
 
@@ -686,7 +691,7 @@ void check_function_yaml_roundtrip(const std::filesystem::path& path) {
 
 void check_suite_yaml_roundtrip(const std::filesystem::path& path) {
     const FuncCraft::BenchmarkSuite suite = make_roundtrip_suite();
-    const std::vector<int> indices = {0, 36, suite.size() - 1};
+    const std::vector<int> indices = {0, first_composed_function_index() + 2, suite.size() - 1};
     std::vector<std::vector<double>> before;
     before.reserve(indices.size());
     for (int index : indices) {
