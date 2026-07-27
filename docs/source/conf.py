@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 project = "FuncCraft"
 copyright = "2026, Khoirul Faiq Muzakka"
 author = "Khoirul Faiq Muzakka"
-release = "0.1.2"
+release = "0.2.1"
 
 extensions = [
     "sphinx.ext.autodoc",
