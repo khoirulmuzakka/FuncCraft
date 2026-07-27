@@ -23,33 +23,63 @@ Save a file such as ``my_suite.yaml``:
 .. code-block:: yaml
 
    supported_dimensions: any
-   base_functions: [1, 9, 10, 11, 12]
-   composition_base_functions: [9, 10, 11, 12]
+   base_functions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+   composition_base_functions: [4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27]
 
    coordinate_transforms:
+     - kind: none
+       probability: 0.0
+       parameters: []
      - kind: rotation
-       probability: 0.5
+       probability: 0.34
+       parameters: []
+     - kind: affine
+       probability: 0.33
+       parameters: []
      - kind: blockrotation
-       probability: 0.5
+       probability: 0.33
+       parameters: []
 
    value_transforms:
      - kind: none
        probability: 0.5
+       parameters: []
+     - kind: power
+       probability: 0.25
+       parameters: []
      - kind: osc
-       probability: 0.5
+       probability: 0.25
+       parameters: []
+     - kind: cosine-zero
+       probability: 0.0
+       parameters: []
 
    compositions:
      - kind: cpmsum
-       probability: 0.5
+       probability: 0.1
+       parameters: []
+     - kind: cpmpmean
+       probability: 0.1
+       parameters: [3.0]
+     - kind: cpmpmean
+       probability: 0.1
+       parameters: [0.1]
+     - kind: cpmlwell
+       probability: 0.2
+       parameters: []
      - kind: dpmsoftmax
-       probability: 0.5
+       probability: 0.25
        parameters: [0.005]
+     - kind: dpmbgsoftmax
+       probability: 0.25
+       parameters: [0.005, 1.0, 0.01]
 
    min_components: 2
-   max_components: 4
+   max_components: 5
    max_nested_composition_depth: 1
    nested_probability: 0.1
    requested_number_of_functions: 500
+   max_number_of_functions: 0
    master_seed: 1
    lower_bound: -100
    upper_bound: 100
@@ -88,16 +118,18 @@ Suite fields
 
 ``base_functions``
    Primitive functions that are included as mandatory single-function
-   benchmarks in the generated suite. Values may be numeric IDs or names.
+   benchmarks in the generated suite. Values may be numeric IDs or names. See
+   :doc:`primitive_base_functions` for the full ID table.
 
 ``composition_base_functions``
    Primitive pool used inside composed functions and nested composed
-   components.
+   components. See :doc:`primitive_base_functions` for the full ID table.
 
 ``coordinate_transforms``, ``value_transforms``, ``compositions``
    Choice tables. Each entry has ``kind``, ``probability``, and optional
    ``parameters``. Probabilities in each table are fractions and should sum to
-   one.
+   one. The example above lists all currently implemented options; set an
+   option's probability to ``0`` to keep it visible but disable it.
 
 ``min_components`` and ``max_components``
    Range for the number of components in composed functions.

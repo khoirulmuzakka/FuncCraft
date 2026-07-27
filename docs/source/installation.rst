@@ -37,7 +37,42 @@ Requirements:
 - ``pybind11`` for Python builds
 - ``yaml-cpp`` or network access so CMake can fetch ``yaml-cpp``
 
-From the repository root:
+To build and install the Python package from a local checkout, run this from
+the repository root:
+
+.. code-block:: shell
+
+   python -m pip install .
+
+This builds a wheel locally, compiles the native extension, and installs the
+result into the active Python environment.
+
+To keep the wheel artifact instead of only installing it:
+
+.. code-block:: shell
+
+   python -m pip install --upgrade build
+   python -m build --wheel
+
+The wheel is written to ``dist/`` and can be installed with:
+
+.. code-block:: shell
+
+   python -m pip install dist/funccraft-*.whl
+
+For editable Python development:
+
+.. code-block:: shell
+
+   python -m pip install -e .
+
+Native C++ build
+----------------
+
+To build the native C++ library and tests directly with CMake, run this from
+the repository root.
+
+On Windows:
 
 .. code-block:: shell
 
@@ -99,8 +134,8 @@ Build options
      - ``OFF``
      - Install headers, library, CMake package metadata, and suite YAML files.
 
-Use from another C++ project
-----------------------------
+Use in another C++ project
+--------------------------
 
 For a CMake-based C++ project, the simplest way to consume FuncCraft directly
 from Git is ``FetchContent``:
@@ -129,15 +164,6 @@ from Git is ``FetchContent``:
 
 For reproducible builds, replace ``GIT_TAG master`` with a released tag or a
 specific commit hash.
-
-Build a wheel
--------------
-
-.. code-block:: shell
-
-   python -m pip install --upgrade build
-   python -m build --wheel
-   python -m pip install dist/funccraft-*.whl
 
 Build the documentation
 -----------------------
