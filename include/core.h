@@ -52,8 +52,8 @@ enum class CoordinateTransformClass {
     Rotation,
     /// Affine transform.
     Affine,
-    /// Block rotation transform on a selected subspace.
-    BlockRotation,
+    /// Subspace rotation transform on a selected subspace.
+    SubspaceRotation,
     /// Mixed coordinate transforms across components.
     Mixed,
 };
@@ -65,7 +65,7 @@ enum class CoordinateTransformKind {
     None,
     Rotation,
     Affine,
-    BlockRotation,
+    SubspaceRotation,
 };
 
 /**

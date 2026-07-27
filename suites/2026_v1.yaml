@@ -52,7 +52,7 @@ coordinate_transforms:
   - kind: affine
     probability: 0.33
     parameters: []
-  - kind: blockrotation
+  - kind: subspace-rotation
     probability: 0.33
     parameters: []
 value_transforms:

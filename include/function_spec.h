@@ -37,7 +37,7 @@ inline constexpr const char* None = "none";
 
 inline constexpr const char* CoordinateRotation = "rotation";
 inline constexpr const char* CoordinateAffine = "affine";
-inline constexpr const char* CoordinateBlockRotation = "block-rotation";
+inline constexpr const char* CoordinateSubspaceRotation = "subspace-rotation";
 
 inline constexpr const char* ValuePower = "power";
 inline constexpr const char* ValueOscillatory = "oscillatory";
@@ -65,11 +65,11 @@ struct DomainSpec {
  * `input_dimension` is the parent/search dimension. `output_dimension` is the
  * dimension seen by the component function after the transform. `assigned_xopt`
  * is output-dimensional: for full transforms this is the full generated/search
- * coordinate, while for block rotation it is the selected subspace coordinate.
+ * coordinate, while for subspace rotation it is the selected subspace coordinate.
  * The corresponding transform target is computed internally from the selected
  * base function and benchmark domain.
  *
- * `selected_indices` is only meaningful for block rotation. If it is empty,
+ * `selected_indices` is only meaningful for subspace rotation. If it is empty,
  * suite generation may choose the subspace. `matrix` is empty until the
  * concrete linear transform is generated or loaded.
  */
@@ -141,7 +141,7 @@ struct ComponentSpec {
  *
  * DPM families use `centers` as full-dimensional softmax centers. Empty means
  * the builder should resolve centers internally. This is separate from
- * block-rotation component `assigned_xopt`, which may be subspace-dimensional.
+ * subspace-rotation component `assigned_xopt`, which may be subspace-dimensional.
  */
 struct CompositionSpec {
     CompositionKind kind = CompositionKind::None;

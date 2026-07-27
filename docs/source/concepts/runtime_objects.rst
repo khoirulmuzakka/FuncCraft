@@ -242,7 +242,7 @@ The packaged suite is defined by this YAML file:
      - kind: affine
        probability: 0.33
        parameters: []
-     - kind: blockrotation
+     - kind: subspace-rotation
        probability: 0.33
        parameters: []
    value_transforms:
@@ -309,7 +309,7 @@ What the suite contains
 ``coordinate_transforms``
    ``none`` is listed but disabled. Generated composed functions use
    ``rotation`` with probability ``0.34``, ``affine`` with probability
-   ``0.33``, and ``blockrotation`` with probability ``0.33``.
+   ``0.33``, and ``subspace-rotation`` with probability ``0.33``.
 
 ``value_transforms``
    Component values use ``none`` with probability ``0.5``, ``power`` with

@@ -41,7 +41,7 @@ optimum. The transform maps parent coordinates into child coordinates.
 
       T(x) = t + A(x-a).
 
-``block-rotation``
+``subspace-rotation``
    Subspace transform. If ``selected_indices`` defines projection :math:`P`,
    then :math:`x_{\mathrm{sub}} = Px` and
 
@@ -181,8 +181,8 @@ Examples of accepted aliases:
      - ``rot``
    * - ``affine``
      - ``aff``
-   * - ``block-rotation``
-     - ``blockrotation``, ``blockrot``, ``brot``
+   * - ``subspace-rotation``
+     - none
    * - ``cpm-wsum``
      - ``cpmsum``, ``weighted_sum``
    * - ``cpm-power-mean``

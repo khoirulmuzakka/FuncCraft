@@ -75,7 +75,7 @@ def _make_coordinate_transform(
 
     ``assigned_xopt`` is the desired optimum location in the transform output
     coordinates. For full transforms this is the full generated/search point;
-    for block rotation this is the selected subspace point. The transform
+    for subspace rotation this is the selected subspace point. The transform
     target is determined internally from the selected base function and domain
     scaling.
 
@@ -83,10 +83,10 @@ def _make_coordinate_transform(
     ----------
     kind:
         One of ``"none"``, ``"rotation"``, ``"affine"``, or
-        ``"block-rotation"``. Enum names ``"None"``, ``"Rotation"``,
-        ``"Affine"``, and ``"BlockRotation"`` are also accepted. Names are
-        normalized, so ``"Block Rotation"``, ``"block_rotation"``, and
-        ``"block-rotation"`` are equivalent.
+        ``"subspace-rotation"``. Enum names ``"None"``, ``"Rotation"``,
+        ``"Affine"``, and ``"SubspaceRotation"`` are also accepted. Names are
+        normalized, so ``"Subspace Rotation"``, ``"subspace_rotation"``, and
+        ``"subspace-rotation"`` are equivalent.
     input_dimension:
         Ambient/search dimension. Leave as ``0`` to let FuncCraft infer it
         from the parent function dimension.
@@ -98,7 +98,7 @@ def _make_coordinate_transform(
         FuncCraft uses the function-level assigned optimum or a generated
         center, depending on the suite construction mode.
     selected_indices:
-        Optional coordinate subset used by block rotation.
+        Optional coordinate subset used by subspace rotation.
     parameters:
         Optional transform-specific parameters. Current built-in transforms do
         not require user parameters.
@@ -118,10 +118,10 @@ def _make_coordinate_transform(
             seed=123,
         )
 
-    Block rotation on selected coordinates::
+    Subspace rotation on selected coordinates::
 
         transform = make_coordinate_transform(
-            "block-rotation",
+            "subspace-rotation",
             selected_indices=[0, 2, 4],
             seed=123,
         )
@@ -367,7 +367,7 @@ def _make_coordinate_transform_choice(kind, probability=1.0, parameters=None):
     should sum to one.
 
     Available ``kind`` values are ``"none"``, ``"rotation"``, ``"affine"``,
-    and ``"block-rotation"``. Set ``probability=0.0`` to keep an option visible
+    and ``"subspace-rotation"``. Set ``probability=0.0`` to keep an option visible
     but disabled.
     """
     spec = CoordinateTransformChoice()
@@ -460,7 +460,7 @@ def _make_suite_spec(
       generated composed functions. Nested composed functions are also allowed
       as base components up to ``max_nested_composition_depth``.
     - ``coordinate_transforms``: choices for ``"none"``, ``"rotation"``,
-      ``"affine"``, and ``"block-rotation"``.
+      ``"affine"``, and ``"subspace-rotation"``.
     - ``value_transforms``: choices for ``"none"``, ``"power"``,
       ``"oscillatory"``, and ``"cosine-zero"``.
     - ``compositions``: choices for ``"cpm-wsum"``, ``"cpm-power-mean"``,
@@ -515,7 +515,7 @@ def _make_suite_spec(
                 make_coordinate_transform_choice("none", 0.0),
                 make_coordinate_transform_choice("rotation", 0.34),
                 make_coordinate_transform_choice("affine", 0.33),
-                make_coordinate_transform_choice("block-rotation", 0.33),
+                make_coordinate_transform_choice("subspace-rotation", 0.33),
             ],
             value_transforms=[
                 make_value_transform_choice("none", 0.5),
@@ -626,9 +626,6 @@ _COORDINATE_ALIASES = {
     "identity": _NO_COORDINATE_TRANSFORM,
     "rot": CoordinateTransformKind.Rotation,
     "aff": CoordinateTransformKind.Affine,
-    "blockrot": CoordinateTransformKind.BlockRotation,
-    "blockrotation": CoordinateTransformKind.BlockRotation,
-    "brot": CoordinateTransformKind.BlockRotation,
 }
 
 _VALUE_ALIASES = {

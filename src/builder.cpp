@@ -13,13 +13,13 @@ using namespace detail;
 namespace {
 
 Domain transform_output_domain(const Domain& domain, const CoordinateTransform& transform) {
-    const auto* block = dynamic_cast<const BlockRotationTransform*>(&transform);
-    if (block != nullptr) {
-        const auto& indices = block->selected_indices();
+    const auto* subspace = dynamic_cast<const SubspaceRotationTransform*>(&transform);
+    if (subspace != nullptr) {
+        const auto& indices = subspace->selected_indices();
         Domain subdomain(static_cast<int>(indices.size()));
         for (std::size_t i = 0; i < indices.size(); ++i) {
             const int idx = indices[i];
-            require(idx >= 0 && idx < domain.dimension(), "block rotation selected index out of range");
+            require(idx >= 0 && idx < domain.dimension(), "subspace rotation selected index out of range");
             subdomain.lower[i] = domain.lower[static_cast<std::size_t>(idx)];
             subdomain.upper[i] = domain.upper[static_cast<std::size_t>(idx)];
         }

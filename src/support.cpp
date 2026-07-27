@@ -201,8 +201,8 @@ CoordinateTransformKind parse_coordinate_transform_kind(const std::string& kind)
     if (normalized == "affine" || normalized == "aff") {
         return CoordinateTransformKind::Affine;
     }
-    if (normalized == "blockrotation" || normalized == "blockrot" || normalized == "brot") {
-        return CoordinateTransformKind::BlockRotation;
+    if (normalized == "subspacerotation") {
+        return CoordinateTransformKind::SubspaceRotation;
     }
     throw std::invalid_argument("unknown coordinate transform kind: " + kind);
 }
@@ -270,8 +270,8 @@ std::string to_spec_name(CoordinateTransformKind kind) {
         return spec_name::CoordinateRotation;
     case CoordinateTransformKind::Affine:
         return spec_name::CoordinateAffine;
-    case CoordinateTransformKind::BlockRotation:
-        return spec_name::CoordinateBlockRotation;
+    case CoordinateTransformKind::SubspaceRotation:
+        return spec_name::CoordinateSubspaceRotation;
     }
     throw std::logic_error("unhandled coordinate transform kind");
 }

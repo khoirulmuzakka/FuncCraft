@@ -112,7 +112,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("None", FuncCraft::CoordinateTransformKind::None)
         .value("Rotation", FuncCraft::CoordinateTransformKind::Rotation)
         .value("Affine", FuncCraft::CoordinateTransformKind::Affine)
-        .value("BlockRotation", FuncCraft::CoordinateTransformKind::BlockRotation)
+        .value("SubspaceRotation", FuncCraft::CoordinateTransformKind::SubspaceRotation)
         .export_values();
 
     py::enum_<FuncCraft::ValueTransformKind>(m, "ValueTransformKind")

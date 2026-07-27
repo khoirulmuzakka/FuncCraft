@@ -123,22 +123,22 @@ private:
 };
 
 /**
- * @brief Selects coordinates from the full vector and rotates only that block.
+ * @brief Selects coordinates from the full vector and rotates only that subspace.
  *
  * `selected_indices` uses 0-based indices into the full input vector. The
  * transform maps a full `D`-dimensional input into an `m`-dimensional selected
  * subspace, where `m = selected_indices.size()`. `assigned_xopt`,
  * `target_xopt`, and `matrix` are all subspace-sized.
  */
-class BlockRotationTransform final : public CoordinateTransform {
+class SubspaceRotationTransform final : public CoordinateTransform {
 public:
-    BlockRotationTransform(
+    SubspaceRotationTransform(
         int dimension,
         std::vector<int> selected_indices,
         std::vector<double> assigned_xopt,
         std::vector<double> target_xopt,
         std::uint64_t seed);
-    BlockRotationTransform(
+    SubspaceRotationTransform(
         int dimension,
         std::vector<int> selected_indices,
         std::vector<double> assigned_xopt,

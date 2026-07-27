@@ -192,8 +192,8 @@ void check_native_domain_scaled_optimum() {
     require_close(value, spec.assigned_fopt, 1.0e-12, "native-domain scaled optimum mismatch");
 }
 
-void check_block_rotation_outputs_selected_subspace() {
-    FuncCraft::BlockRotationTransform transform(
+void check_subspace_rotation_outputs_selected_subspace() {
+    FuncCraft::SubspaceRotationTransform transform(
         4,
         {0, 3},
         {1.0, 4.0},
@@ -203,12 +203,12 @@ void check_block_rotation_outputs_selected_subspace() {
 
     std::vector<double> out;
     transform.apply({1.0, 2.0, 3.0, 4.0}, out);
-    require_close_vector(out, std::vector<double>{10.0, 40.0}, 0.0, "block rotation selected optimum mismatch");
+    require_close_vector(out, std::vector<double>{10.0, 40.0}, 0.0, "subspace rotation selected optimum mismatch");
 
     transform.apply({2.0, -200.0, 300.0, 6.0}, out);
-    require_close_vector(out, std::vector<double>{11.0, 42.0}, 0.0, "block rotation selected subspace output mismatch");
-    require(transform.input_dimension() == 4, "block rotation input dimension mismatch");
-    require(transform.output_dimension() == 2, "block rotation output dimension mismatch");
+    require_close_vector(out, std::vector<double>{11.0, 42.0}, 0.0, "subspace rotation selected subspace output mismatch");
+    require(transform.input_dimension() == 4, "subspace rotation input dimension mismatch");
+    require(transform.output_dimension() == 2, "subspace rotation output dimension mismatch");
 }
 
 void check_native_domain_scaled_optimum_high_dimension() {
@@ -219,7 +219,7 @@ void check_native_domain_scaled_optimum_high_dimension() {
         for (FuncCraft::CoordinateTransformKind kind : {
                  FuncCraft::CoordinateTransformKind::None,
                  FuncCraft::CoordinateTransformKind::Rotation,
-                 FuncCraft::CoordinateTransformKind::BlockRotation,
+                 FuncCraft::CoordinateTransformKind::SubspaceRotation,
              }) {
             FuncCraft::FunctionSpec spec;
             spec.dimension = dimension;
@@ -236,7 +236,7 @@ void check_native_domain_scaled_optimum_high_dimension() {
             component.coordinate_transform.input_dimension = dimension;
             component.coordinate_transform.output_dimension = dimension;
             component.coordinate_transform.assigned_xopt = spec.assigned_xopt;
-            if (kind == FuncCraft::CoordinateTransformKind::BlockRotation) {
+            if (kind == FuncCraft::CoordinateTransformKind::SubspaceRotation) {
                 component.coordinate_transform.selected_indices.resize(static_cast<std::size_t>(dimension));
                 for (int i = 0; i < dimension; ++i) {
                     component.coordinate_transform.selected_indices[static_cast<std::size_t>(i)] = i;
@@ -604,7 +604,7 @@ void check_suite_structure_stable_across_dimensions() {
 
 void check_suite_geometry_prefix_stable_across_dimensions() {
     FuncCraft::SuiteSpec suite_spec;
-    suite_spec.coordinate_transforms = {FuncCraft::make_choice(FuncCraft::CoordinateTransformKind::BlockRotation, 1.0)};
+    suite_spec.coordinate_transforms = {FuncCraft::make_choice(FuncCraft::CoordinateTransformKind::SubspaceRotation, 1.0)};
     suite_spec.value_transforms = {FuncCraft::make_choice(FuncCraft::ValueTransformKind::None, 1.0)};
     suite_spec.compositions = {FuncCraft::make_choice(FuncCraft::CompositionKind::DpmSoftmax, 1.0, 0.01)};
     suite_spec.requested_number_of_functions = 50;
@@ -809,7 +809,7 @@ int run_tests() {
         {"Suite collection API", check_suite_collection},
         {"Identity transform assigned optimum", check_identity_transform_assigned_optimum},
         {"Native-domain scaled optimum", check_native_domain_scaled_optimum},
-        {"Block rotation subspace output", check_block_rotation_outputs_selected_subspace},
+        {"Subspace rotation subspace output", check_subspace_rotation_outputs_selected_subspace},
         {"Native-domain optimum in high dimension", check_native_domain_scaled_optimum_high_dimension},
         {"Composed function component", [&] { check_composed_function_component(temp / "composed_function.yaml"); }},
         {"Reject nonzero nested assigned_fopt", check_composed_component_requires_zero_assigned_fopt},

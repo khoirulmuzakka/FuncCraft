@@ -58,8 +58,7 @@ class BenchmarkFunction:
         generation.
     ``coordinate_transform``
         Component transform dictionary. Available ``kind`` values are
-        ``none``, ``rotation``, ``affine``, and ``blockrotation`` (aliases such
-        as ``block-rotation`` are accepted). Common fields are
+        ``none``, ``rotation``, ``affine``, and ``subspace-rotation``. Common fields are
         ``input_dimension``, ``output_dimension``, ``assigned_xopt``,
         ``seed``, ``parameters``, ``matrix``, ``offset``, and
         ``selected_indices``. Generated/exported YAML records may also contain
@@ -214,7 +213,7 @@ class BenchmarkSuite:
     ``coordinate_transforms``
         Choice table with entries containing ``kind``, ``probability``, and
         optional ``parameters``. Available kinds are ``none``, ``rotation``,
-        ``affine``, and ``blockrotation``/``block-rotation``.
+        ``affine``, and ``subspace-rotation``.
     ``value_transforms``
         Choice table with entries containing ``kind``, ``probability``, and
         optional ``parameters``. Available kinds are ``none``, ``power``,

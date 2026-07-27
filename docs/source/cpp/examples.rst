@@ -353,7 +353,7 @@ to keep an option visible but disabled.
            make_choice(CoordinateTransformKind::None, 0.0),
            make_choice(CoordinateTransformKind::Rotation, 0.5),
            make_choice(CoordinateTransformKind::Affine, 0.0),
-           make_choice(CoordinateTransformKind::BlockRotation, 0.5),
+           make_choice(CoordinateTransformKind::SubspaceRotation, 0.5),
        };
        spec.value_transforms = {
            make_choice(ValueTransformKind::None, 0.5),
@@ -470,7 +470,7 @@ Put this in ``my_suite.yaml``:
      - kind: affine
        probability: 0.0
        parameters: []
-     - kind: blockrotation
+     - kind: subspace-rotation
        probability: 0.5
        parameters: []
    value_transforms:

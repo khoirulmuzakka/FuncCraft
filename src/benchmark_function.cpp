@@ -99,14 +99,14 @@ std::shared_ptr<CoordinateTransform> make_coordinate_transform(
     const CoordinateTransformKind kind = spec.kind;
     detail::require(spec.input_dimension > 0, "coordinate transform input_dimension must be positive");
     detail::require(spec.output_dimension > 0, "coordinate transform output_dimension must be positive");
-    if (kind != CoordinateTransformKind::BlockRotation) {
+    if (kind != CoordinateTransformKind::SubspaceRotation) {
         detail::require(
             spec.input_dimension == spec.output_dimension,
             "full coordinate transforms require input_dimension == output_dimension");
     } else {
         detail::require(
             static_cast<int>(spec.selected_indices.size()) == spec.output_dimension,
-            "block rotation output_dimension must match selected_indices size");
+            "subspace rotation output_dimension must match selected_indices size");
     }
     const int output_dimension = spec.output_dimension;
     detail::require(output_dimension > 0, "coordinate transform output dimension must be positive");
@@ -129,10 +129,10 @@ std::shared_ptr<CoordinateTransform> make_coordinate_transform(
         }
         return std::make_shared<AffineTransform>(spec.input_dimension, spec.assigned_xopt, target_xopt, seed);
     }
-    if (kind == CoordinateTransformKind::BlockRotation) {
-        detail::require(!spec.selected_indices.empty(), "block rotation transform needs selected indices");
+    if (kind == CoordinateTransformKind::SubspaceRotation) {
+        detail::require(!spec.selected_indices.empty(), "subspace rotation transform needs selected indices");
         if (!spec.matrix.empty()) {
-            return std::make_shared<BlockRotationTransform>(
+            return std::make_shared<SubspaceRotationTransform>(
                 spec.input_dimension,
                 spec.selected_indices,
                 spec.assigned_xopt,
@@ -140,7 +140,7 @@ std::shared_ptr<CoordinateTransform> make_coordinate_transform(
                 seed,
                 spec.matrix);
         }
-        return std::make_shared<BlockRotationTransform>(
+        return std::make_shared<SubspaceRotationTransform>(
             spec.input_dimension,
             spec.selected_indices,
             spec.assigned_xopt,
@@ -195,11 +195,11 @@ CoordinateTransformSpec materialized_coordinate_transform_spec(
         spec.matrix = affine->matrix();
         return spec;
     }
-    if (spec.kind == CoordinateTransformKind::BlockRotation) {
-        const auto* block = dynamic_cast<const BlockRotationTransform*>(&transform);
-        detail::require(block != nullptr, "block rotation transform materialization mismatch");
-        spec.selected_indices = block->selected_indices();
-        spec.matrix = block->matrix();
+    if (spec.kind == CoordinateTransformKind::SubspaceRotation) {
+        const auto* subspace_rotation = dynamic_cast<const SubspaceRotationTransform*>(&transform);
+        detail::require(subspace_rotation != nullptr, "subspace rotation transform materialization mismatch");
+        spec.selected_indices = subspace_rotation->selected_indices();
+        spec.matrix = subspace_rotation->matrix();
         return spec;
     }
     throw std::logic_error("unhandled coordinate transform kind");
@@ -530,14 +530,14 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             transform.input_dimension = resolved_spec.dimension;
         }
         detail::require(transform.input_dimension == resolved_spec.dimension, "coordinate transform input_dimension must match function dimension");
-        if (transform.kind == CoordinateTransformKind::BlockRotation) {
-            detail::require(!transform.selected_indices.empty(), "block rotation selected indices must not be empty");
+        if (transform.kind == CoordinateTransformKind::SubspaceRotation) {
+            detail::require(!transform.selected_indices.empty(), "subspace rotation selected indices must not be empty");
             if (transform.output_dimension == 0) {
                 transform.output_dimension = static_cast<int>(transform.selected_indices.size());
             }
             detail::require(
                 transform.output_dimension == static_cast<int>(transform.selected_indices.size()),
-                "block rotation output_dimension must match selected_indices size");
+                "subspace rotation output_dimension must match selected_indices size");
         } else {
             if (transform.output_dimension == 0) {
                 transform.output_dimension = transform.input_dimension;
@@ -552,11 +552,11 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             "coordinate transform assigned_xopt prefix is longer than the transform output dimension");
         require_finite_vector(transform.assigned_xopt, "coordinate transform assigned_xopt");
 
-        std::vector<double> assigned_base = transform.kind == CoordinateTransformKind::BlockRotation
+        std::vector<double> assigned_base = transform.kind == CoordinateTransformKind::SubspaceRotation
             ? select_coordinates(
                 dpm_mode ? resolved_spec.composition.centers[component_index] : resolved_spec.assigned_xopt,
                 transform.selected_indices,
-                "block rotation assigned_xopt")
+                "subspace rotation assigned_xopt")
             : (dpm_mode ? resolved_spec.composition.centers[component_index] : resolved_spec.assigned_xopt);
 
         if (dpm_mode && component_index == 0) {
@@ -568,19 +568,19 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
                 assigned_base,
                 "DPM component assigned_xopt");
             require_finite_vector(transform.assigned_xopt, "coordinate transform assigned_xopt");
-            if (transform.kind == CoordinateTransformKind::BlockRotation) {
+            if (transform.kind == CoordinateTransformKind::SubspaceRotation) {
                 assign_selected_coordinates(
                     resolved_spec.composition.centers[component_index],
                     transform.selected_indices,
                     transform.assigned_xopt,
-                    "DPM block component center");
+                    "DPM subspace-rotation component center");
             } else {
                 resolved_spec.composition.centers[component_index] = transform.assigned_xopt;
             }
         } else if (transform.assigned_xopt.empty()) {
             transform.assigned_xopt = assigned_base;
         } else if (static_cast<int>(transform.assigned_xopt.size()) < assigned_dimension) {
-            const Domain assignment_domain = transform.kind == CoordinateTransformKind::BlockRotation
+            const Domain assignment_domain = transform.kind == CoordinateTransformKind::SubspaceRotation
                 ? selected_domain(input_domain, transform.selected_indices)
                 : input_domain;
             transform.assigned_xopt = detail::complete_prefix_stable_point(
@@ -647,7 +647,7 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             };
         }
 
-        const Domain transform_domain = component_spec.coordinate_transform.kind == CoordinateTransformKind::BlockRotation
+        const Domain transform_domain = component_spec.coordinate_transform.kind == CoordinateTransformKind::SubspaceRotation
             ? selected_domain(input_domain, component_spec.coordinate_transform.selected_indices)
             : input_domain;
         const std::vector<double> target_xopt = detail::map_point_between_domains(

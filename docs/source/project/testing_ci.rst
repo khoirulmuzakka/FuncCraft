@@ -79,8 +79,8 @@ The C++ binary prints a named report with 17 checks and finishes with
    transforms, and mapping between benchmark domains and primitive native
    domains. The high-dimensional check covers dimensions 1 and 100.
 
-``Block rotation subspace output``
-   Checks the low-level block-rotation transform directly, including selected
+``Subspace rotation subspace output``
+   Checks the low-level subspace-rotation transform directly, including selected
    subspace output and input/output dimensions.
 
 ``Composed function component`` and ``Reject nonzero nested assigned_fopt``
@@ -100,9 +100,9 @@ The C++ binary prints a named report with 17 checks and finishes with
    structure.
 
 ``Suite geometry prefix-stable across dimensions``
-   Builds a non-nested block-rotation DPM suite at dimensions 4 and 8. It
+   Builds a non-nested subspace-rotation DPM suite at dimensions 4 and 8. It
    checks prefix-stability of ``assigned_xopt``, DPM centers, component
-   transform ``assigned_xopt`` values, and block ``selected_indices``.
+   transform ``assigned_xopt`` values, and subspace-rotation ``selected_indices``.
 
 ``Direct function geometry prefix-stable``
    Constructs direct DPM ``FunctionSpec`` objects at dimensions 1 and 4 with

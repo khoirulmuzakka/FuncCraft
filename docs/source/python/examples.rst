@@ -208,7 +208,7 @@ This section creates a custom ``BenchmarkSuite`` from an inline Python dictionar
            {'kind': 'none', 'probability': 0.0, 'parameters': []},
            {'kind': 'rotation', 'probability': 0.5, 'parameters': []},
            {'kind': 'affine', 'probability': 0.0, 'parameters': []},
-           {'kind': 'blockrotation', 'probability': 0.5, 'parameters': []},
+           {'kind': 'subspace-rotation', 'probability': 0.5, 'parameters': []},
        ],
        'value_transforms': [
            {'kind': 'none', 'probability': 0.5, 'parameters': []},

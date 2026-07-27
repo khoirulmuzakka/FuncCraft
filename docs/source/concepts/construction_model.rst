@@ -53,7 +53,7 @@ A component is either primitive or nested:
 Each component owns one coordinate transform and one value transform. The
 coordinate transform has an ``input_dimension`` equal to the parent/search
 dimension and an ``output_dimension`` equal to the component input dimension.
-Block rotation can therefore make a component live on a selected subspace.
+Subspace rotation can therefore make a component live on a selected subspace.
 
 Nested composed components must have ``assigned_fopt = 0``. Component values
 are expected to be zero at their assigned optimum; the final nonzero optimum
@@ -68,7 +68,7 @@ location. The target optimum of the primitive or nested child is determined
 internally by FuncCraft, including domain scaling for primitive base functions.
 
 For full-dimensional transforms, ``assigned_xopt`` has length equal to the
-ambient dimension. For block rotation, ``assigned_xopt`` has length equal to
+ambient dimension. For subspace rotation, ``assigned_xopt`` has length equal to
 the selected subspace size.
 
 CPM and DPM compositions
@@ -113,13 +113,13 @@ structural choices stable: primitive-vs-nested component choices, base
 functions, composition kind, coordinate-transform kind, value-transform kind,
 component seeds, and transform seeds. Generated coordinate data such as
 ``assigned_xopt`` and DPM centers are prefix-stable, so a higher-dimensional
-point extends the coordinates already used at lower dimension. Block-rotation
+point extends the coordinates already used at lower dimension. Subspace-rotation
 subspaces are also generated from coordinate-indexed seeds; when all
-components use block rotation, the generated subspaces cover the active
+components use subspace rotation, the generated subspaces cover the active
 dimension.
 
 This does not mean that a low-dimensional function is literally the leading
-principal block of the higher-dimensional function. Full rotations and affine
+coordinate slice of the higher-dimensional function. Full rotations and affine
 transforms use an adjacent-plane sweep. The same seed gives a related sequence
 of plane rotations as the dimension grows, but adding a new adjacent plane can
 change coordinates that already existed. The intended guarantee is stable

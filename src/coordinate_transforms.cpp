@@ -29,9 +29,9 @@ void require_finite_vector(const std::vector<double>& values, const std::string&
 void require_unique_selected_indices(const std::vector<int>& selected_indices, int dimension) {
     std::vector<bool> seen(static_cast<std::size_t>(dimension), false);
     for (int idx : selected_indices) {
-        require(idx >= 0 && idx < dimension, "block rotation selected index out of range");
+        require(idx >= 0 && idx < dimension, "subspace rotation selected index out of range");
         auto pos = static_cast<std::size_t>(idx);
-        require(!seen[pos], "block rotation selected indices must be unique");
+        require(!seen[pos], "subspace rotation selected indices must be unique");
         seen[pos] = true;
     }
 }
@@ -208,7 +208,7 @@ const std::vector<std::vector<double>>& AffineTransform::matrix() const {
     return matrix_;
 }
 
-BlockRotationTransform::BlockRotationTransform(
+SubspaceRotationTransform::SubspaceRotationTransform(
     int dimension,
     std::vector<int> selected_indices,
     std::vector<double> assigned_xopt,
@@ -221,15 +221,15 @@ BlockRotationTransform::BlockRotationTransform(
           std::move(target_xopt),
           seed),
       selected_indices_(std::move(selected_indices)) {
-    require(!selected_indices_.empty(), "block rotation transform needs at least one selected index");
+    require(!selected_indices_.empty(), "subspace rotation transform needs at least one selected index");
     require_unique_selected_indices(selected_indices_, input_dimension_);
-    require_dimension(assigned_xopt_, output_dimension_, "block rotation assigned_xopt");
-    require_dimension(target_xopt_, output_dimension_, "block rotation target_xopt");
+    require_dimension(assigned_xopt_, output_dimension_, "subspace rotation assigned_xopt");
+    require_dimension(target_xopt_, output_dimension_, "subspace rotation target_xopt");
     std::mt19937_64 rng(mix_seed(seed_));
     matrix_ = random_rotation_matrix(rng, output_dimension_);
 }
 
-BlockRotationTransform::BlockRotationTransform(
+SubspaceRotationTransform::SubspaceRotationTransform(
     int dimension,
     std::vector<int> selected_indices,
     std::vector<double> assigned_xopt,
@@ -244,15 +244,15 @@ BlockRotationTransform::BlockRotationTransform(
           seed),
       selected_indices_(std::move(selected_indices)),
       matrix_(std::move(matrix)) {
-    require(!selected_indices_.empty(), "block rotation transform needs at least one selected index");
+    require(!selected_indices_.empty(), "subspace rotation transform needs at least one selected index");
     require_unique_selected_indices(selected_indices_, input_dimension_);
-    require_dimension(assigned_xopt_, output_dimension_, "block rotation assigned_xopt");
-    require_dimension(target_xopt_, output_dimension_, "block rotation target_xopt");
-    require_matrix_shape(matrix_, output_dimension_, output_dimension_, "block rotation transform matrix");
+    require_dimension(assigned_xopt_, output_dimension_, "subspace rotation assigned_xopt");
+    require_dimension(target_xopt_, output_dimension_, "subspace rotation target_xopt");
+    require_matrix_shape(matrix_, output_dimension_, output_dimension_, "subspace rotation transform matrix");
 }
 
-void BlockRotationTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
-    require_dimension(x, input_dimension(), "block rotation transform input");
+void SubspaceRotationTransform::apply(const std::vector<double>& x, std::vector<double>& out) const {
+    require_dimension(x, input_dimension(), "subspace rotation transform input");
     out.assign(selected_indices_.size(), 0.0);
 
     for (std::size_t r = 0; r < selected_indices_.size(); ++r) {
@@ -264,23 +264,23 @@ void BlockRotationTransform::apply(const std::vector<double>& x, std::vector<dou
     }
 }
 
-int BlockRotationTransform::input_dimension() const {
+int SubspaceRotationTransform::input_dimension() const {
     return input_dimension_;
 }
 
-int BlockRotationTransform::output_dimension() const {
+int SubspaceRotationTransform::output_dimension() const {
     return output_dimension_;
 }
 
-CoordinateTransformClass BlockRotationTransform::transform_class() const {
-    return CoordinateTransformClass::BlockRotation;
+CoordinateTransformClass SubspaceRotationTransform::transform_class() const {
+    return CoordinateTransformClass::SubspaceRotation;
 }
 
-const std::vector<int>& BlockRotationTransform::selected_indices() const {
+const std::vector<int>& SubspaceRotationTransform::selected_indices() const {
     return selected_indices_;
 }
 
-const std::vector<std::vector<double>>& BlockRotationTransform::matrix() const {
+const std::vector<std::vector<double>>& SubspaceRotationTransform::matrix() const {
     return matrix_;
 }
 

@@ -499,13 +499,13 @@ CoordinateTransformSpec make_coordinate_transform_spec(
     if (choice.kind == CoordinateTransformKind::Affine) {
         return spec;
     }
-    if (choice.kind == CoordinateTransformKind::BlockRotation) {
+    if (choice.kind == CoordinateTransformKind::SubspaceRotation) {
         if (selected_indices != nullptr) {
-            require(!selected_indices->empty(), "block rotation selected indices must not be empty");
+            require(!selected_indices->empty(), "subspace rotation selected indices must not be empty");
             spec.selected_indices = *selected_indices;
             spec.output_dimension = static_cast<int>(spec.selected_indices.size());
             for (int idx : spec.selected_indices) {
-                require(idx >= 0 && idx < dimension, "block rotation selected index out of range");
+                require(idx >= 0 && idx < dimension, "subspace rotation selected index out of range");
             }
             spec.assigned_xopt = select_coordinates(assigned_xopt, spec.selected_indices);
             return spec;
@@ -651,8 +651,8 @@ std::vector<BasicFunctionId> sample_base_functions(
     return selected;
 }
 
-bool is_block_rotation_choice(const CoordinateTransformChoice& choice) {
-    return choice.kind == CoordinateTransformKind::BlockRotation;
+bool is_subspace_rotation_choice(const CoordinateTransformChoice& choice) {
+    return choice.kind == CoordinateTransformKind::SubspaceRotation;
 }
 
 bool is_deceptive_composition_choice(const CompositionChoice& choice) {
@@ -702,7 +702,7 @@ std::vector<int> prefix_stable_nonempty_subspace(int dimension, std::uint64_t se
     return indices;
 }
 
-std::vector<std::vector<int>> covering_block_subspaces(int dimension, int count, std::uint64_t seed) {
+std::vector<std::vector<int>> covering_subspaces(int dimension, int count, std::uint64_t seed) {
     require(dimension > 0, "subspace dimension must be positive");
     require(count > 0, "subspace count must be positive");
 
@@ -725,26 +725,26 @@ std::vector<std::vector<int>> covering_block_subspaces(int dimension, int count,
     return subspaces;
 }
 
-std::vector<std::vector<int>> block_rotation_subspaces(
+std::vector<std::vector<int>> subspace_rotation_subspaces(
     const std::vector<CoordinateTransformChoice>& coord_choices,
     int dimension,
     std::uint64_t seed) {
-    const bool all_block_rotation = std::all_of(coord_choices.begin(), coord_choices.end(), is_block_rotation_choice);
-    const int block_count = static_cast<int>(std::count_if(coord_choices.begin(), coord_choices.end(), is_block_rotation_choice));
-    std::vector<std::vector<int>> generated = all_block_rotation
-        ? covering_block_subspaces(dimension, block_count, seed)
+    const bool all_subspace_rotation = std::all_of(coord_choices.begin(), coord_choices.end(), is_subspace_rotation_choice);
+    const int subspace_rotation_count = static_cast<int>(std::count_if(coord_choices.begin(), coord_choices.end(), is_subspace_rotation_choice));
+    std::vector<std::vector<int>> generated = all_subspace_rotation
+        ? covering_subspaces(dimension, subspace_rotation_count, seed)
         : std::vector<std::vector<int>>{};
 
     std::vector<std::vector<int>> per_component(coord_choices.size());
-    int block_index = 0;
+    int subspace_rotation_index = 0;
     for (std::size_t i = 0; i < coord_choices.size(); ++i) {
-        if (!is_block_rotation_choice(coord_choices[i])) {
+        if (!is_subspace_rotation_choice(coord_choices[i])) {
             continue;
         }
-        per_component[i] = all_block_rotation
-            ? generated[static_cast<std::size_t>(block_index)]
+        per_component[i] = all_subspace_rotation
+            ? generated[static_cast<std::size_t>(subspace_rotation_index)]
             : prefix_stable_nonempty_subspace(dimension, seed, static_cast<std::uint64_t>(i));
-        ++block_index;
+        ++subspace_rotation_index;
     }
     return per_component;
 }
@@ -920,7 +920,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             "base");
         function_spec.composition.kind = CompositionKind::None;
 
-        const std::vector<int> full_subspace = is_block_rotation_choice(blueprint.coordinate_transform_choice)
+        const std::vector<int> full_subspace = is_subspace_rotation_choice(blueprint.coordinate_transform_choice)
             ? full_dimension_indices(dimension_)
             : std::vector<int>{};
         ComponentSpec component;
@@ -930,7 +930,7 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             dimension_,
             x_star,
             blueprint.seed,
-            is_block_rotation_choice(blueprint.coordinate_transform_choice) ? &full_subspace : nullptr);
+            is_subspace_rotation_choice(blueprint.coordinate_transform_choice) ? &full_subspace : nullptr);
         component.value_transform.kind = ValueTransformKind::None;
         component.seed = blueprint.seed;
         function_spec.components.push_back(std::move(component));
@@ -984,14 +984,14 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
         for (int i = 0; i < component_count; ++i) {
             component_coord_choices.push_back(choose_weighted(coord_choices, structure_rng));
         }
-        std::vector<std::vector<int>> block_subspaces = std::any_of(
+        std::vector<std::vector<int>> subspace_rotation_indices = std::any_of(
             component_coord_choices.begin(),
             component_coord_choices.end(),
-            is_block_rotation_choice)
-            ? block_rotation_subspaces(component_coord_choices, function_dimension, seed)
+            is_subspace_rotation_choice)
+            ? subspace_rotation_subspaces(component_coord_choices, function_dimension, seed)
             : std::vector<std::vector<int>>(static_cast<std::size_t>(component_count));
-        if (dpm_mode && is_block_rotation_choice(component_coord_choices.front())) {
-            block_subspaces.front() = full_dimension_indices(function_dimension);
+        if (dpm_mode && is_subspace_rotation_choice(component_coord_choices.front())) {
+            subspace_rotation_indices.front() = full_dimension_indices(function_dimension);
         }
 
         for (int i = 0; i < component_count; ++i) {
@@ -1007,22 +1007,22 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
                 function_dimension,
                 centers[pos],
                 component_seed,
-                is_block_rotation_choice(component_coord_choices[pos])
-                    ? &block_subspaces[pos]
+                is_subspace_rotation_choice(component_coord_choices[pos])
+                    ? &subspace_rotation_indices[pos]
                     : nullptr);
             component.value_transform = make_value_transform_spec(choose_weighted(value_choices, structure_rng));
             component.seed = component_seed;
             if (use_composed_component) {
                 const int child_nested_depth = sample_nested_depth_for_component(remaining_nested_depth, structure_rng);
-                const bool block_component = is_block_rotation_choice(component_coord_choices[pos]);
-                const int child_dimension = block_component
-                    ? static_cast<int>(block_subspaces[pos].size())
+                const bool subspace_component = is_subspace_rotation_choice(component_coord_choices[pos]);
+                const int child_dimension = subspace_component
+                    ? static_cast<int>(subspace_rotation_indices[pos].size())
                     : function_dimension;
-                const Domain child_domain = block_component
-                    ? selected_domain(function_domain, block_subspaces[pos])
+                const Domain child_domain = subspace_component
+                    ? selected_domain(function_domain, subspace_rotation_indices[pos])
                     : function_domain;
-                const std::vector<double> child_x_star = block_component
-                    ? select_coordinates(centers[pos], block_subspaces[pos])
+                const std::vector<double> child_x_star = subspace_component
+                    ? select_coordinates(centers[pos], subspace_rotation_indices[pos])
                     : centers[pos];
                 component.composed_function = std::make_shared<FunctionSpec>(
                     make_composed_spec(

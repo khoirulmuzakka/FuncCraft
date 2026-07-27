@@ -54,7 +54,7 @@ Implemented mechanism families include:
 - 34 primitive base functions, including Sphere, Rosenbrock, Ackley,
   Rastrigin, Griewank, Schwefel, Katsuura, Levy, BentCigar, HappyCat,
   HGBat, and StyblinskiTang.
-- coordinate transforms: `none`, `rotation`, `affine`, `block-rotation`.
+- coordinate transforms: `none`, `rotation`, `affine`, `subspace-rotation`.
 - value transforms: `none`, `power`, `oscillatory`, `cosine-zero`.
 - compositions: `none`, `cpm-wsum`, `cpm-power-mean`, `cpm-level-well`,
   `dpm-softmax`, `dpm-bgsoftmax`.
@@ -117,7 +117,7 @@ suite_config = {
         {"kind": "none", "probability": 0.0, "parameters": []},
         {"kind": "rotation", "probability": 0.34, "parameters": []},
         {"kind": "affine", "probability": 0.33, "parameters": []},
-        {"kind": "blockrotation", "probability": 0.33, "parameters": []},
+        {"kind": "subspace-rotation", "probability": 0.33, "parameters": []},
     ],
     "value_transforms": [
         {"kind": "none", "probability": 0.5, "parameters": []},
@@ -201,7 +201,7 @@ coordinate_transforms:
   - kind: affine
     probability: 0.33
     parameters: []
-  - kind: blockrotation
+  - kind: subspace-rotation
     probability: 0.33
     parameters: []
 value_transforms:

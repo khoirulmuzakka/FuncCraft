@@ -75,8 +75,8 @@ std::string to_string(CoordinateTransformClass cls) {
         return "ROT";
     case CoordinateTransformClass::Affine:
         return "AFF";
-    case CoordinateTransformClass::BlockRotation:
-        return "BROT";
+    case CoordinateTransformClass::SubspaceRotation:
+        return "SROT";
     case CoordinateTransformClass::Mixed:
         return "MIXED";
     default:

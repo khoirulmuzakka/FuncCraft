@@ -79,7 +79,7 @@ inline std::vector<CoordinateTransformChoice> all_coordinate_transform_choices()
         make_choice(CoordinateTransformKind::None, 0.0),
         make_choice(CoordinateTransformKind::Rotation, 0.5),
         make_choice(CoordinateTransformKind::Affine, 0.0),
-        make_choice(CoordinateTransformKind::BlockRotation, 0.5),
+        make_choice(CoordinateTransformKind::SubspaceRotation, 0.5),
     };
 }
 
