@@ -13,7 +13,7 @@ in generated FuncCraft suites.
 .. raw:: html
 
    <iframe
-     src="_static/base_functions.pdf"
+     src="../_static/base_functions.pdf"
      width="100%"
      height="760px"
      style="border: 1px solid #d0d7de; border-radius: 4px;">
@@ -21,7 +21,7 @@ in generated FuncCraft suites.
    </iframe>
 
 If the PDF does not render in your browser, download it directly:
-:download:`base_functions.pdf <figs/base_functions.pdf>`.
+:download:`base_functions.pdf <../figs/base_functions.pdf>`.
 
 Suite Plots
 -----------
@@ -33,7 +33,7 @@ structure remains visible across functions with different value ranges.
 .. raw:: html
 
    <iframe
-     src="_static/2D_plot_log.pdf"
+     src="../_static/2D_plot_log.pdf"
      width="100%"
      height="760px"
      style="border: 1px solid #d0d7de; border-radius: 4px;">
@@ -41,7 +41,7 @@ structure remains visible across functions with different value ranges.
    </iframe>
 
 If the PDF does not render in your browser, download it directly:
-:download:`2D_plot_log.pdf <figs/2D_plot_log.pdf>`.
+:download:`2D_plot_log.pdf <../figs/2D_plot_log.pdf>`.
 
 The suite itself is available through:
 

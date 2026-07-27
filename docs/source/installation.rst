@@ -120,14 +120,14 @@ from Git is ``FetchContent``:
    FetchContent_Declare(
        funccraft
        GIT_REPOSITORY https://github.com/khoirulmuzakka/FuncCraft.git
-       GIT_TAG main
+       GIT_TAG master
    )
    FetchContent_MakeAvailable(funccraft)
 
    add_executable(my_app main.cpp)
    target_link_libraries(my_app PRIVATE funccraft)
 
-For reproducible builds, replace ``GIT_TAG main`` with a released tag or a
+For reproducible builds, replace ``GIT_TAG master`` with a released tag or a
 specific commit hash.
 
 Build a wheel

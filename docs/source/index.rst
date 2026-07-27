@@ -12,35 +12,57 @@ controlling the constructed optimum location and optimum value. The generated
 landscapes are assembled from primitive benchmark functions, coordinate
 transforms, value transforms, and composition rules.
 
-Start with :doc:`funccraft_py/getting_started` for Python and C++ quick
-starts. The YAML reference is in :doc:`yaml_specs`.
+Start with :doc:`installation` and :doc:`getting_started`. The two central
+runtime objects are :doc:`concepts/benchmark_function` and
+:doc:`concepts/benchmark_suite`.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Start here
+
+   installation
+   getting_started
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Core concepts
+
+   concepts/overview
+   concepts/benchmark_function
+   concepts/benchmark_suite
+   concepts/specs_vs_runtime
 
 .. toctree::
    :maxdepth: 2
    :caption: User guide
 
-   installation
-   funccraft_py/getting_started
-   yaml_specs
-   suite_collections
-   plots
-   construction
-   mechanisms
-   exported_manifests
+   user_guide/packaged_suites
+   user_guide/yaml_specs
+   user_guide/construction_model
+   user_guide/mechanisms
+   user_guide/exporting
+   user_guide/plotting
 
 .. toctree::
    :maxdepth: 2
-   :caption: Interfaces
+   :caption: Examples
 
-   funccraft_py/index
-   funccraft_cpp/index
+   examples/python
+   examples/cpp
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API reference
+
+   api/python
+   api/cpp
 
 .. toctree::
    :maxdepth: 1
    :caption: Project
 
-   testing_ci
-   license
+   project/testing_ci
+   project/license
 
 Indices and tables
 ==================
