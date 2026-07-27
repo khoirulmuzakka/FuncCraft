@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
 
         const int function_count = std::min(config.max_functions, suite.size());
         for (int i = 1; i <= function_count; ++i) {
-            const auto function = suite.function(i);
+            const auto& function = suite.function(i);
             const auto& spec = function.spec();
             const auto fields = split_class_label(spec.label);
             const double max_x_star = function.get_xopt().empty()

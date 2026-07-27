@@ -138,6 +138,7 @@ ComposedFunction FunctionBuilder::build() const {
         std::vector<double> component_values(components->size(), 0.0);
         std::vector<double> transformed(static_cast<std::size_t>(dimension), 0.0);
         std::vector<double> child_input;
+        std::vector<std::vector<double>> child_batch(1);
         for (const auto& x : X) {
             require_dimension(x, dimension, "benchmark function input");
             bool invalid = false;
@@ -149,7 +150,8 @@ ComposedFunction FunctionBuilder::build() const {
                 } else {
                     detail::map_point_between_domains(transformed, component.domain, component.child_domain, child_input);
                 }
-                const std::vector<double> child_values = component.evaluate({child_input});
+                child_batch.front() = child_input;
+                const std::vector<double> child_values = component.evaluate(child_batch);
                 if (child_values.size() != 1 || !std::isfinite(child_values.front())) {
                     invalid = true;
                     break;

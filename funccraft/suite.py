@@ -275,7 +275,12 @@ class BenchmarkSuite:
 
     @property
     def theoretical_max_number_of_functions(self):
-        """Return the combinatorial upper bound implied by the spec."""
+        """Return the top-level combinatorial capacity implied by the spec.
+
+        Nested composed components are not recursively expanded in this count,
+        so when nesting is enabled the value is a lower bound on the full
+        recursive combinatorial capacity.
+        """
         return self._suite.theoretical_max_number_of_functions
 
     def function(self, index):

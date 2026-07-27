@@ -16,7 +16,7 @@
 #include "suite_spec.h"
 
 #include <cstdint>
-#include <optional>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,6 +42,11 @@ public:
      * @brief Construct a benchmark suite by loading its spec from a file.
      */
     BenchmarkSuite(const std::string& spec_path, int dimension);
+    BenchmarkSuite(const BenchmarkSuite& other);
+    BenchmarkSuite& operator=(const BenchmarkSuite& other);
+    BenchmarkSuite(BenchmarkSuite&&) noexcept = default;
+    BenchmarkSuite& operator=(BenchmarkSuite&&) noexcept = default;
+    ~BenchmarkSuite() = default;
 
     /**
      * @brief Return the number of generated functions.
@@ -51,10 +56,12 @@ public:
      */
     int size() const;
     /**
-     * @brief Return the theoretical upper bound implied by the suite spec.
+     * @brief Return the top-level combinatorial capacity implied by the suite spec.
      *
      * This is a combinatorial bound computed from the available base functions,
-     * transform families, and composition families.
+     * transform families, and composition families. Nested composed components
+     * are not recursively expanded in this count, so when nesting is enabled it
+     * is a lower bound on the full recursive combinatorial capacity.
      */
     std::uint64_t theoretical_max_number_of_functions() const;
     /**
@@ -104,6 +111,7 @@ private:
     };
 
     BenchmarkFunction build_function(const FunctionBlueprint& blueprint) const;
+    YAML::Node export_function_spec(int index) const;
     bool supports_dimension(int dimension) const;
 
     SuiteSpec spec_;
@@ -111,7 +119,7 @@ private:
     std::uint64_t theoretical_max_number_of_functions_ = 0;
     std::vector<FunctionBlueprint> blueprints_;
     std::vector<int> supported_dimensions_;
-    mutable std::vector<std::optional<BenchmarkFunction>> function_cache_;
+    mutable std::vector<std::unique_ptr<BenchmarkFunction>> function_cache_;
 };
 
 /**

@@ -856,9 +856,9 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
 
     function_cache_.resize(blueprints_.size());
     std::cout << "BenchmarkSuite generated. Contains " << size()
-              << " benchmark functions out of "
+              << " benchmark functions out of at least "
               << std::scientific << static_cast<long double>(theoretical_max_number_of_functions_)
-              << std::defaultfloat << " possible functions at dimension "
+              << std::defaultfloat << " possible top-level function structures at dimension "
               << dimension_ << ".\n";
 }
 
@@ -869,6 +869,28 @@ BenchmarkSuite::BenchmarkSuite(const std::string& spec_path, int dimension)
               << " (dimension: " << dimension_
               << ", requested_functions: " << spec_.requested_number_of_functions
               << ")\n";
+}
+
+BenchmarkSuite::BenchmarkSuite(const BenchmarkSuite& other)
+    : spec_(other.spec_),
+      dimension_(other.dimension_),
+      theoretical_max_number_of_functions_(other.theoretical_max_number_of_functions_),
+      blueprints_(other.blueprints_),
+      supported_dimensions_(other.supported_dimensions_),
+      function_cache_(other.blueprints_.size()) {}
+
+BenchmarkSuite& BenchmarkSuite::operator=(const BenchmarkSuite& other) {
+    if (this == &other) {
+        return *this;
+    }
+    spec_ = other.spec_;
+    dimension_ = other.dimension_;
+    theoretical_max_number_of_functions_ = other.theoretical_max_number_of_functions_;
+    blueprints_ = other.blueprints_;
+    supported_dimensions_ = other.supported_dimensions_;
+    function_cache_.clear();
+    function_cache_.resize(blueprints_.size());
+    return *this;
 }
 
 bool BenchmarkSuite::supports_dimension(int dimension) const {
@@ -1048,10 +1070,19 @@ int BenchmarkSuite::dimension() const {
 const BenchmarkFunction& BenchmarkSuite::function(int index) const {
     require(index >= 1 && index <= size(), "benchmark function index out of range; function indices start at 1");
     const std::size_t pos = static_cast<std::size_t>(index - 1);
-    if (!function_cache_[pos].has_value()) {
-        function_cache_[pos].emplace(build_function(blueprints_[pos]));
+    if (!function_cache_[pos]) {
+        function_cache_[pos] = std::make_unique<BenchmarkFunction>(build_function(blueprints_[pos]));
     }
     return *function_cache_[pos];
+}
+
+YAML::Node BenchmarkSuite::export_function_spec(int index) const {
+    require(index >= 1 && index <= size(), "benchmark function index out of range; function indices start at 1");
+    const std::size_t pos = static_cast<std::size_t>(index - 1);
+    if (function_cache_[pos]) {
+        return function_cache_[pos]->export_spec();
+    }
+    return build_function(blueprints_[pos]).export_spec();
 }
 
 std::vector<double> BenchmarkSuite::operator()(int index, const std::vector<std::vector<double>>& X) const {
@@ -1073,7 +1104,7 @@ YAML::Node BenchmarkSuite::export_manifest() const {
 
     YAML::Node functions(YAML::NodeType::Sequence);
     for (int i = 1; i <= size(); ++i) {
-        YAML::Node entry = function(i).export_spec();
+        YAML::Node entry = export_function_spec(i);
         entry["index"] = i;
         functions.push_back(entry);
     }
