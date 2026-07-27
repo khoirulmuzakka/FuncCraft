@@ -29,15 +29,12 @@ mechanisms without assuming either interface.
    :maxdepth: 2
    :caption: Shared Concepts
 
-   concepts/overview
    concepts/construction_model
    concepts/mechanisms
-   concepts/benchmark_function
-   concepts/benchmark_suite
-   concepts/suite_2026_v1
+   concepts/runtime_objects
    concepts/primitive_base_functions
-   
-   
+
+
 .. toctree::
    :maxdepth: 2
    :caption: Examples and API

@@ -212,6 +212,23 @@ suite.export_manifest("suite_manifest.yaml")
 Exported YAML records include generated matrices, selected subspaces, DPM centers and
 biases, assigned optima, scale factors, labels, and metadata.
 
+Warning: the packaged `2026_v1` suite contains 1,000,000 functions. Exporting
+the full shipped suite manifest will write every generated function record and
+is usually a mistake. To export a smaller reproducible subset, copy the
+collection configuration dictionary, reduce `requested_number_of_functions`,
+build the smaller suite, and export that suite:
+
+```python
+import funccraft as fc
+
+collection = fc.SuiteCollection(year=2026, version=1)
+config = collection.config
+config["requested_number_of_functions"] = 500
+
+suite = fc.BenchmarkSuite(config, dimension=2)
+suite.export_manifest("suite_2026_v1_first_500.yaml")
+```
+
 ## Links
 
 - Documentation: https://funccraft.readthedocs.io/

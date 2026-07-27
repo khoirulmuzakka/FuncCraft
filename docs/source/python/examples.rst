@@ -96,7 +96,7 @@ A ``BenchmarkFunction`` evaluates batches: pass a list of points and receive one
        'assigned_xopt': nested_xopt,
        'assigned_fopt': 0.0,
        'seed': 11,
-       'label': 'nested-rosenbrock-rastrigin',
+       'label': 'nested-rosenbrock-schwefel',
    }
    
    function_config = {
@@ -220,7 +220,7 @@ This section creates a custom ``BenchmarkSuite`` from an inline Python dictionar
            {'kind': 'cpmsum', 'probability': 0.1, 'parameters': []},
            {'kind': 'cpmpmean', 'probability': 0.1, 'parameters': [3.0]},
            {'kind': 'cpmpmean', 'probability': 0.1, 'parameters': [0.1]},
-           {'kind': 'cpmlwell', 'probability': 0.2, 'parameters': []},
+           {'kind': 'cpmlwell', 'probability': 0.2, 'parameters': [0.1, 1.0]},
            {'kind': 'dpmsoftmax', 'probability': 0.25, 'parameters': [0.01]},
            {'kind': 'dpmbgsoftmax', 'probability': 0.25, 'parameters': [0.01, 1.0, 0.01]},
        ],
@@ -274,6 +274,23 @@ FuncCraft ships the versioned ``2026_v1`` benchmark suite. Load it through ``Sui
    function = shipped_suite.function(1)
    print('F1 label:', function.label)
    print('F1 component_types:', function.component_types)
+
+.. warning::
+
+   The packaged ``2026_v1`` suite contains 1,000,000 functions. Do not export
+   the full shipped suite manifest unless you intentionally want a very large
+   file containing every generated function record. To export a smaller
+   reproducible subset, copy the collection configuration dictionary, lower
+   ``requested_number_of_functions``, build a smaller ``BenchmarkSuite``, and
+   export that suite.
+
+   .. code-block:: python
+
+      subset_config = collection.config
+      subset_config['requested_number_of_functions'] = 500
+
+      subset_suite = BenchmarkSuite(subset_config, dimension=2)
+      subset_suite.export_manifest('suite_2026_v1_first_500.yaml')
 
 Plot functions 1 through 500 from the shipped suite at dimension 2 as 3D surfaces and save the pages to a PDF.
 

@@ -7,6 +7,7 @@ from types import SimpleNamespace as _SimpleNamespace
 from . import _funccraft
 from ._private import function_spec as _function_config
 from ._private import suite_spec as _suite_config
+from ._private import _spec_to_dict as _config_dict
 
 BasicF = _funccraft.BasicF
 BasicFunctionId = _funccraft.BasicFunctionId
@@ -292,6 +293,16 @@ class BenchmarkSuite:
         """Return the top-level combinatorial capacity implied by the YAML."""
         return self._suite.theoretical_max_number_of_functions
 
+    @property
+    def config(self):
+        """Return this suite recipe as a plain configuration dictionary.
+
+        The returned dictionary can be edited and passed to
+        :class:`BenchmarkSuite` to build a related suite. For example, reduce
+        ``requested_number_of_functions`` before exporting a smaller manifest.
+        """
+        return _config_dict(self._native_record)
+
     def function(self, index):
         """Materialize one generated function by one-based index.
 
@@ -374,6 +385,16 @@ class SuiteCollection:
     def number_of_functions(self):
         """Number of functions defined by the collection YAML."""
         return self._collection.number_of_functions
+
+    @property
+    def config(self):
+        """Return the packaged suite recipe as a plain configuration dictionary.
+
+        The returned dictionary is independent of the collection object. Edit
+        it and pass it to :class:`BenchmarkSuite` when you want a smaller or
+        otherwise modified suite recipe.
+        """
+        return _config_dict(self._collection.spec())
 
     def benchmark_suite(self, dimension):
         """Build a runtime :class:`BenchmarkSuite` at ``dimension``.

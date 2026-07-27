@@ -517,7 +517,7 @@ Put this in ``my_suite.yaml``:
    xopt_domain_shrink_factor: 0.8
    suite_label: cpp-suite
 
-Then load it at an explicit dimension and evaluate F1:
+Then load it at an explicit dimension and inspect the first five functions:
 
 .. code-block:: cpp
 
@@ -575,6 +575,28 @@ dimension you want.
        std::cout << "F1 component_types: "
                  << f1.component_types() << '\n';
    }
+
+.. warning::
+
+   The packaged ``2026_v1`` suite contains 1,000,000 functions. Do not export
+   the full shipped suite manifest unless you intentionally want a very large
+   file containing every generated function record. To export a smaller
+   reproducible subset, copy the collection ``SuiteSpec``, lower
+   ``requested_number_of_functions``, build a smaller ``BenchmarkSuite``, and
+   export that suite.
+
+   .. code-block:: cpp
+
+      #include "funccraft.h"
+
+      int main() {
+          FuncCraft::SuiteSpec spec =
+              FuncCraft::suite_collection_spec(2026, 1);
+          spec.requested_number_of_functions = 500;
+
+          FuncCraft::BenchmarkSuite suite(spec, 2);
+          suite.export_manifest("suite_2026_v1_first_500.yaml");
+      }
 
 Plot functions 1 through 500
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
