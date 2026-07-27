@@ -45,8 +45,8 @@ RunConfig parse_cli(int argc, char* argv[]) {
     if (argc > arg_index + 1) config.max_evals = static_cast<std::size_t>(std::strtoull(argv[arg_index + 1], nullptr, 10));
     if (argc > arg_index + 2) config.population_size = std::max(0, std::atoi(argv[arg_index + 2]));
     if (argc > arg_index + 3) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 3], nullptr, 10));
-    if (argc > arg_index + 4) config.low = std::max(1, std::atoi(argv[arg_index + 4]));
-    if (argc > arg_index + 5) config.high = std::max(1, std::atoi(argv[arg_index + 5]));
+    if (argc > arg_index + 4) config.low = std::atoi(argv[arg_index + 4]);
+    if (argc > arg_index + 5) config.high = std::atoi(argv[arg_index + 5]);
     return config;
 }
 
@@ -95,6 +95,9 @@ int main(int argc, char* argv[]) {
         const int version = 1;
         const FuncCraft::SuiteCollection collection = FuncCraft::suite_collection(year, version);
         const FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(config.dimension);
+        if (config.low < 1 || config.high < 1) {
+            throw std::invalid_argument("function indices are one-based; low and high must be at least 1");
+        }
         if (config.high < config.low) {
             throw std::invalid_argument("high must be greater than or equal to low");
         }
