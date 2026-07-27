@@ -1,10 +1,13 @@
 #include "funccraft.h"
 #include <algorithm>
 #include <array>
+#include <cerrno>
+#include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -15,24 +18,50 @@ struct CheckConfig {
     double tolerance = 1.0e-8;
 };
 
-bool is_integer_arg(const char* text) {
+int parse_int_arg(const char* text, const std::string& name) {
     if (text == nullptr || *text == '\0') {
-        return false;
+        throw std::invalid_argument(name + " must be an integer");
     }
     char* end = nullptr;
-    std::strtol(text, &end, 10);
-    return end != nullptr && *end == '\0';
+    errno = 0;
+    const long value = std::strtol(text, &end, 10);
+    if (errno != 0 || end == text || end == nullptr || *end != '\0') {
+        throw std::invalid_argument(name + " must be an integer");
+    }
+    if (value < INT_MIN || value > INT_MAX) {
+        throw std::out_of_range(name + " is outside the int range");
+    }
+    return static_cast<int>(value);
+}
+
+double parse_double_arg(const char* text, const std::string& name) {
+    if (text == nullptr || *text == '\0') {
+        throw std::invalid_argument(name + " must be a number");
+    }
+    char* end = nullptr;
+    errno = 0;
+    const double value = std::strtod(text, &end);
+    if (errno != 0 || end == text || end == nullptr || *end != '\0' || !std::isfinite(value)) {
+        throw std::invalid_argument(name + " must be a finite number");
+    }
+    return value;
 }
 
 CheckConfig parse_cli(int argc, char* argv[]) {
     CheckConfig config;
     int arg_index = 1;
-    if (argc > 1 && !is_integer_arg(argv[1])) {
-        ++arg_index;
+    if (argc > arg_index) config.dimension = parse_int_arg(argv[arg_index], "dimension");
+    if (argc > arg_index + 1) config.max_functions = parse_int_arg(argv[arg_index + 1], "max_functions");
+    if (argc > arg_index + 2) config.tolerance = parse_double_arg(argv[arg_index + 2], "tolerance");
+    if (config.dimension < 1) {
+        throw std::invalid_argument("dimension must be at least 1");
     }
-    if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
-    if (argc > arg_index + 1) config.max_functions = std::max(1, std::atoi(argv[arg_index + 1]));
-    if (argc > arg_index + 2) config.tolerance = std::atof(argv[arg_index + 2]);
+    if (config.max_functions < 1) {
+        throw std::invalid_argument("max_functions must be at least 1");
+    }
+    if (config.tolerance < 0.0) {
+        throw std::invalid_argument("tolerance must be non-negative");
+    }
     return config;
 }
 

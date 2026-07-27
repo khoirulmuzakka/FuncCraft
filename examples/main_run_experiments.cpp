@@ -1,10 +1,13 @@
 #include "funccraft.h"
 #include <algorithm>
+#include <cerrno>
+#include <climits>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -20,8 +23,25 @@ bool is_integer_arg(const char* text) {
         return false;
     }
     char* end = nullptr;
+    errno = 0;
     std::strtol(text, &end, 10);
-    return end != nullptr && *end == '\0';
+    return errno == 0 && end != nullptr && *end == '\0';
+}
+
+int parse_int_arg(const char* text, const std::string& name) {
+    if (text == nullptr || *text == '\0') {
+        throw std::invalid_argument(name + " must be an integer");
+    }
+    char* end = nullptr;
+    errno = 0;
+    const long value = std::strtol(text, &end, 10);
+    if (errno != 0 || end == text || end == nullptr || *end != '\0') {
+        throw std::invalid_argument(name + " must be an integer");
+    }
+    if (value < INT_MIN || value > INT_MAX) {
+        throw std::out_of_range(name + " is outside the int range");
+    }
+    return static_cast<int>(value);
 }
 
 Config parse_cli(int argc, char* argv[]) {
@@ -31,8 +51,14 @@ Config parse_cli(int argc, char* argv[]) {
         config.out_dir = argv[1];
         arg_index = 2;
     }
-    if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
-    if (argc > arg_index + 1) config.max_functions = std::max(1, std::atoi(argv[arg_index + 1]));
+    if (argc > arg_index) config.dimension = parse_int_arg(argv[arg_index], "dimension");
+    if (argc > arg_index + 1) config.max_functions = parse_int_arg(argv[arg_index + 1], "max_functions");
+    if (config.dimension < 1) {
+        throw std::invalid_argument("dimension must be at least 1");
+    }
+    if (config.max_functions < 1) {
+        throw std::invalid_argument("max_functions must be at least 1");
+    }
     return config;
 }
 

@@ -201,10 +201,9 @@ std::vector<double> yaml_double_list(const YAML::Node& node, const std::string& 
 template <typename Choice, typename ParseKind>
 Choice choice_from_yaml(const YAML::Node& node, ParseKind parse_kind) {
     require(node && node.IsMap(), "choice entry must be a YAML mapping");
+    require(static_cast<bool>(node["kind"]), "choice entry must define kind");
     Choice choice;
-    if (node["kind"]) {
-        choice.kind = parse_kind(node["kind"].as<std::string>());
-    }
+    choice.kind = parse_kind(node["kind"].as<std::string>());
     if (node["probability"]) {
         choice.probability = node["probability"].as<double>();
     }
@@ -450,6 +449,14 @@ double total_probability(const std::vector<Choice>& choices) {
         sum += choice.probability;
     }
     return sum;
+}
+
+template <typename Choice>
+int active_choice_count(const std::vector<Choice>& choices) {
+    return static_cast<int>(std::count_if(
+        choices.begin(),
+        choices.end(),
+        [](const Choice& choice) { return choice.probability > 0.0; }));
 }
 
 template <typename Choice>
@@ -789,9 +796,10 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         spec_.composition_base_functions,
         mandatory_base_functions);
 
-    const int coord_family_count = static_cast<int>(normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices()).size());
-    const int value_family_count = static_cast<int>(normalize_choices(spec_.value_transforms, all_value_transform_choices()).size());
+    const int coord_family_count = active_choice_count(normalize_choices(spec_.coordinate_transforms, all_coordinate_transform_choices()));
+    const int value_family_count = active_choice_count(normalize_choices(spec_.value_transforms, all_value_transform_choices()));
     const auto composition_choices = normalize_choices(spec_.compositions, all_composition_choices());
+    const int composition_family_count = active_choice_count(composition_choices);
     const int min_components = spec_.min_components;
     const int max_components = spec_.max_components;
     require(min_components >= 2, "suite spec min_components must be at least 2");
@@ -806,7 +814,7 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         const std::uint64_t coord_choices = saturating_pow(static_cast<std::uint64_t>(coord_family_count), component_count);
         const std::uint64_t value_choices = saturating_pow(static_cast<std::uint64_t>(value_family_count), component_count);
         const std::uint64_t choices = saturating_mul(component_orders, saturating_mul(coord_choices, value_choices));
-        theoretical_composed = saturating_add(theoretical_composed, saturating_mul(choices, static_cast<std::uint64_t>(composition_choices.size())));
+        theoretical_composed = saturating_add(theoretical_composed, saturating_mul(choices, static_cast<std::uint64_t>(composition_family_count)));
     }
     theoretical_max_number_of_functions_ = saturating_add(
         static_cast<std::uint64_t>(mandatory_base_functions.size()),

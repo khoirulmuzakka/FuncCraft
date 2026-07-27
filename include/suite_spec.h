@@ -22,7 +22,7 @@ namespace FuncCraft {
  */
 template <typename Kind>
 struct WeightedChoice {
-    Kind kind;
+    Kind kind{};
     double probability = 1.0;
     std::vector<double> parameters;
 };

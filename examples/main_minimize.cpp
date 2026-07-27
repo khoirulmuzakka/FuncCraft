@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
+#include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
@@ -31,8 +33,59 @@ bool is_integer_arg(const char* text) {
         return false;
     }
     char* end = nullptr;
+    errno = 0;
     std::strtol(text, &end, 10);
-    return end != nullptr && *end == '\0';
+    return errno == 0 && end != nullptr && *end == '\0';
+}
+
+long long parse_integer_arg(const char* text, const std::string& name) {
+    if (text == nullptr || *text == '\0') {
+        throw std::invalid_argument(name + " must be an integer");
+    }
+    char* end = nullptr;
+    errno = 0;
+    const long long value = std::strtoll(text, &end, 10);
+    if (errno != 0 || end == text || end == nullptr || *end != '\0') {
+        throw std::invalid_argument(name + " must be an integer");
+    }
+    return value;
+}
+
+int parse_int_arg(const char* text, const std::string& name) {
+    const long long value = parse_integer_arg(text, name);
+    if (value < INT_MIN || value > INT_MAX) {
+        throw std::out_of_range(name + " is outside the int range");
+    }
+    return static_cast<int>(value);
+}
+
+std::size_t parse_size_arg(const char* text, const std::string& name) {
+    if (text == nullptr || *text == '\0' || *text == '-') {
+        throw std::invalid_argument(name + " must be a non-negative integer");
+    }
+    char* end = nullptr;
+    errno = 0;
+    const unsigned long long value = std::strtoull(text, &end, 10);
+    if (errno != 0 || end == text || end == nullptr || *end != '\0') {
+        throw std::invalid_argument(name + " must be a non-negative integer");
+    }
+    if (value > static_cast<unsigned long long>(std::numeric_limits<std::size_t>::max())) {
+        throw std::out_of_range(name + " is outside the size_t range");
+    }
+    return static_cast<std::size_t>(value);
+}
+
+unsigned long long parse_ull_arg(const char* text, const std::string& name) {
+    if (text == nullptr || *text == '\0' || *text == '-') {
+        throw std::invalid_argument(name + " must be a non-negative integer");
+    }
+    char* end = nullptr;
+    errno = 0;
+    const unsigned long long value = std::strtoull(text, &end, 10);
+    if (errno != 0 || end == text || end == nullptr || *end != '\0') {
+        throw std::invalid_argument(name + " must be a non-negative integer");
+    }
+    return value;
 }
 
 RunConfig parse_cli(int argc, char* argv[]) {
@@ -41,12 +94,21 @@ RunConfig parse_cli(int argc, char* argv[]) {
     if (argc > 1 && !is_integer_arg(argv[1])) {
         config.algo = argv[arg_index++];
     }
-    if (argc > arg_index) config.dimension = std::max(1, std::atoi(argv[arg_index]));
-    if (argc > arg_index + 1) config.max_evals = static_cast<std::size_t>(std::strtoull(argv[arg_index + 1], nullptr, 10));
-    if (argc > arg_index + 2) config.population_size = std::max(0, std::atoi(argv[arg_index + 2]));
-    if (argc > arg_index + 3) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 3], nullptr, 10));
-    if (argc > arg_index + 4) config.low = std::atoi(argv[arg_index + 4]);
-    if (argc > arg_index + 5) config.high = std::atoi(argv[arg_index + 5]);
+    if (argc > arg_index) config.dimension = parse_int_arg(argv[arg_index], "dimension");
+    if (argc > arg_index + 1) config.max_evals = parse_size_arg(argv[arg_index + 1], "maxevals");
+    if (argc > arg_index + 2) config.population_size = parse_int_arg(argv[arg_index + 2], "population_size");
+    if (argc > arg_index + 3) config.seed = parse_ull_arg(argv[arg_index + 3], "seed");
+    if (argc > arg_index + 4) config.low = parse_int_arg(argv[arg_index + 4], "low");
+    if (argc > arg_index + 5) config.high = parse_int_arg(argv[arg_index + 5], "high");
+    if (config.dimension < 1) {
+        throw std::invalid_argument("dimension must be at least 1");
+    }
+    if (config.max_evals < 1) {
+        throw std::invalid_argument("maxevals must be at least 1");
+    }
+    if (config.population_size < 0) {
+        throw std::invalid_argument("population_size must be non-negative");
+    }
     return config;
 }
 
