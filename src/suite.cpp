@@ -851,10 +851,11 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
 
     spec_.max_number_of_functions = static_cast<int>(blueprints_.size());
     function_cache_.resize(blueprints_.size());
-    std::cout << "BenchmarkSuite generated. Requested functions: " << requested_count
-              << ", theoretical max functions: " << std::scientific << static_cast<long double>(theoretical_max_number_of_functions_) << std::defaultfloat
-              << ", generated functions: " << max_number_of_functions()
-              << ", dimension: " << dimension_ << '\n';
+    std::cout << "BenchmarkSuite generated. Contains " << max_number_of_functions()
+              << " benchmark functions out of "
+              << std::scientific << static_cast<long double>(theoretical_max_number_of_functions_)
+              << std::defaultfloat << " possible functions at dimension "
+              << dimension_ << ".\n";
 }
 
 BenchmarkSuite::BenchmarkSuite(const std::string& spec_path, int dimension)
