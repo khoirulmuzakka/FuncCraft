@@ -867,7 +867,6 @@ YAML::Node suite_spec_to_yaml(const SuiteSpec& spec) {
     node["max_nested_composition_depth"] = spec.max_nested_composition_depth;
     node["nested_probability"] = spec.nested_probability;
     node["requested_number_of_functions"] = spec.requested_number_of_functions;
-    node["max_number_of_functions"] = spec.max_number_of_functions;
     node["master_seed"] = spec.master_seed;
     node["lower_bound"] = spec.lower_bound;
     node["upper_bound"] = spec.upper_bound;

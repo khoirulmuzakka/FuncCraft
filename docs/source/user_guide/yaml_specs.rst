@@ -79,7 +79,6 @@ Save a file such as ``my_suite.yaml``:
    max_nested_composition_depth: 1
    nested_probability: 0.1
    requested_number_of_functions: 500
-   max_number_of_functions: 0
    master_seed: 1
    lower_bound: -100
    upper_bound: 100
@@ -143,10 +142,8 @@ Suite fields
    nesting is allowed.
 
 ``requested_number_of_functions``
-   Number of generated functions requested from the suite.
-
-``max_number_of_functions``
-   Optional hard cap. ``0`` means no explicit cap beyond the requested count.
+   Number of generated functions requested from the suite. The runtime
+   ``BenchmarkSuite.size()`` reports the generated count.
 
 ``master_seed``
    Seed for the suite generator.

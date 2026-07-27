@@ -45,15 +45,11 @@ public:
 
     /**
      * @brief Return the number of generated functions.
-     */
-    int size() const;
-    /**
-     * @brief Return the maximum number of lazily generatable functions.
      *
      * This is the number of blueprints prepared by the constructor, so it is
      * the upper bound on valid one-based function indices for this suite.
      */
-    int max_number_of_functions() const;
+    int size() const;
     /**
      * @brief Return the theoretical upper bound implied by the suite spec.
      *

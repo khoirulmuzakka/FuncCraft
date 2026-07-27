@@ -127,7 +127,6 @@ The packaged suite is defined by this YAML file:
    max_nested_composition_depth: 1
    nested_probability: 0.1
    requested_number_of_functions: 1000000
-   max_number_of_functions: 0
    master_seed: 1
    lower_bound: -100
    upper_bound: 100
@@ -209,9 +208,9 @@ What the suite contains
    Components may themselves be composed functions up to one nested level.
    Each eligible component has probability ``0.1`` of becoming nested.
 
-``requested_number_of_functions`` and ``max_number_of_functions``
-   The suite requests 1,000,000 functions. ``max_number_of_functions: 0``
-   means there is no separate hard cap beyond the requested count.
+``requested_number_of_functions``
+   The suite requests 1,000,000 functions. The runtime ``BenchmarkSuite``
+   reports the generated count through ``size()``.
 
 ``master_seed``
    The deterministic seed for suite generation. For a fixed suite YAML,

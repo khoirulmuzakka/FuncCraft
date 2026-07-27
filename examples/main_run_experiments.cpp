@@ -76,7 +76,6 @@ int main(int argc, char* argv[]) {
         std::cout << "Suite collection: " << collection.name()
                   << " (" << collection.year() << "_v" << collection.version() << ")\n";
         std::cout << "Suite generated. size=" << suite.size()
-                  << ", max_number_of_functions=" << suite.max_number_of_functions()
                   << ", dimension=" << suite.dimension()
                   << ", written_functions=" << function_count << "\n";
         std::cout << "Manifest written to: " << manifest_path.string() << "\n";

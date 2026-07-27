@@ -529,7 +529,6 @@ def make_suite_spec(
     max_nested_composition_depth=None,
     nested_probability=None,
     requested_number_of_functions=None,
-    max_number_of_functions=None,
     master_seed=None,
     lower_bound=None,
     upper_bound=None,
@@ -564,8 +563,8 @@ def make_suite_spec(
     - ``min_components``, ``max_components``,
       ``max_nested_composition_depth``, ``nested_probability``:
       component-count and nesting controls.
-    - ``requested_number_of_functions``, ``max_number_of_functions``,
-      ``master_seed``: suite size and deterministic generation controls.
+    - ``requested_number_of_functions`` and ``master_seed``: suite size and
+      deterministic generation controls.
     - ``lower_bound``, ``upper_bound``, ``assigned_fopt``,
       ``xopt_domain_shrink_factor``, ``suite_label``: domain, assigned optimum
       value, optimum sampling, and label defaults.
@@ -632,7 +631,6 @@ def make_suite_spec(
             max_nested_composition_depth=1,
             nested_probability=0.1,
             requested_number_of_functions=1_000_000,
-            max_number_of_functions=0,
             master_seed=1,
             lower_bound=-100.0,
             upper_bound=100.0,
@@ -668,8 +666,6 @@ def make_suite_spec(
         spec.nested_probability = float(nested_probability)
     if requested_number_of_functions is not None:
         spec.requested_number_of_functions = int(requested_number_of_functions)
-    if max_number_of_functions is not None:
-        spec.max_number_of_functions = int(max_number_of_functions)
     if master_seed is not None:
         spec.master_seed = int(master_seed)
     if lower_bound is not None:
@@ -948,8 +944,6 @@ def suite_spec(data):
         spec.nested_probability = float(data["nested_probability"])
     if "requested_number_of_functions" in data:
         spec.requested_number_of_functions = int(data["requested_number_of_functions"])
-    if "max_number_of_functions" in data:
-        spec.max_number_of_functions = int(data["max_number_of_functions"])
     if "master_seed" in data:
         spec.master_seed = int(data["master_seed"])
     if "lower_bound" in data:
@@ -1043,7 +1037,6 @@ def spec_to_dict(spec):
             "max_nested_composition_depth": spec.max_nested_composition_depth,
             "nested_probability": spec.nested_probability,
             "requested_number_of_functions": spec.requested_number_of_functions,
-            "max_number_of_functions": spec.max_number_of_functions,
             "master_seed": spec.master_seed,
             "lower_bound": spec.lower_bound,
             "upper_bound": spec.upper_bound,

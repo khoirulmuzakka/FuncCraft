@@ -275,9 +275,6 @@ SuiteSpec suite_spec_from_yaml_node(const YAML::Node& node) {
     if (node["requested_number_of_functions"]) {
         spec.requested_number_of_functions = node["requested_number_of_functions"].as<int>();
     }
-    if (node["max_number_of_functions"]) {
-        spec.max_number_of_functions = node["max_number_of_functions"].as<int>();
-    }
     if (node["master_seed"]) {
         spec.master_seed = node["master_seed"].as<unsigned long long>();
     }
@@ -849,9 +846,8 @@ BenchmarkSuite::BenchmarkSuite(SuiteSpec spec, int dimension)
         ++sequence;
     }
 
-    spec_.max_number_of_functions = static_cast<int>(blueprints_.size());
     function_cache_.resize(blueprints_.size());
-    std::cout << "BenchmarkSuite generated. Contains " << max_number_of_functions()
+    std::cout << "BenchmarkSuite generated. Contains " << size()
               << " benchmark functions out of "
               << std::scientific << static_cast<long double>(theoretical_max_number_of_functions_)
               << std::defaultfloat << " possible functions at dimension "
@@ -1033,10 +1029,6 @@ int BenchmarkSuite::size() const {
     return static_cast<int>(blueprints_.size());
 }
 
-int BenchmarkSuite::max_number_of_functions() const {
-    return size();
-}
-
 std::uint64_t BenchmarkSuite::theoretical_max_number_of_functions() const {
     return theoretical_max_number_of_functions_;
 }
@@ -1069,7 +1061,6 @@ YAML::Node BenchmarkSuite::export_manifest() const {
     node["suite_spec"] = detail::suite_spec_to_yaml(spec_);
     node["dimension"] = dimension_;
     node["size"] = size();
-    node["max_number_of_functions"] = max_number_of_functions();
     node["theoretical_max_number_of_functions"] = theoretical_max_number_of_functions_;
 
     YAML::Node functions(YAML::NodeType::Sequence);

@@ -125,7 +125,6 @@ struct SuiteSpec {
     int max_nested_composition_depth = 0;
     double nested_probability = 0.0;
     int requested_number_of_functions = 0;
-    int max_number_of_functions = 0;
     std::uint64_t master_seed = 1;
 
     double lower_bound = -100.0;

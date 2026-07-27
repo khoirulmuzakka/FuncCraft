@@ -75,9 +75,9 @@ def make_benchmark_suite(spec, dimension):
           ``value_transforms``, ``compositions``, ``min_components``,
           ``max_components``, ``max_nested_composition_depth``,
           ``nested_probability``, ``requested_number_of_functions``,
-          ``max_number_of_functions``, ``master_seed``, ``lower_bound``,
-          ``upper_bound``, ``assigned_fopt``,
-          ``xopt_domain_shrink_factor``, and ``suite_label``;
+          ``master_seed``, ``lower_bound``, ``upper_bound``,
+          ``assigned_fopt``, ``xopt_domain_shrink_factor``, and
+          ``suite_label``;
         - YAML path containing those same fields.
     dimension:
         Explicit runtime dimension for every generated benchmark function.
@@ -126,7 +126,6 @@ def make_benchmark_suite(spec, dimension):
                 "max_nested_composition_depth": 1,
                 "nested_probability": 0.1,
                 "requested_number_of_functions": 1_000_000,
-                "max_number_of_functions": 0,
                 "master_seed": 1,
                 "lower_bound": -100.0,
                 "upper_bound": 100.0,
@@ -278,11 +277,6 @@ class BenchmarkSuite:
     def theoretical_max_number_of_functions(self):
         """Return the combinatorial upper bound implied by the spec."""
         return self._suite.theoretical_max_number_of_functions
-
-    @property
-    def max_number_of_functions(self):
-        """Return the number of lazily generatable functions."""
-        return self._suite.max_number_of_functions
 
     def function(self, index):
         """Materialize one generated function by one-based index.
