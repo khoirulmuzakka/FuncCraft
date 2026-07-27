@@ -241,24 +241,63 @@ Put this in ``my_function.yaml``:
    dimension: 2
    domain:
      dimension: 2
-     lower_bound: [-5.0, -5.0]
-     upper_bound: [5.0, 5.0]
+     lower_bound: [-10.0, -10.0]
+     upper_bound: [10.0, 10.0]
    components:
-     - base_function: Sphere
+     - base_function: Griewank
        coordinate_transform:
          kind: none
          input_dimension: 2
          output_dimension: 2
-         assigned_xopt: [1.0, -2.0]
+         assigned_xopt: [0.1, 3.6]
        value_transform:
          kind: none
+     - composed_function:
+         dimension: 2
+         domain:
+           dimension: 2
+           lower_bound: [-5.0, -5.0]
+           upper_bound: [5.0, 5.0]
+         components:
+           - base_function: Rosenbrock
+             coordinate_transform:
+               kind: none
+               input_dimension: 2
+               output_dimension: 2
+               assigned_xopt: [1.0, -1.0]
+             value_transform:
+               kind: none
+           - base_function: Schwefel
+             coordinate_transform:
+               kind: rotation
+               input_dimension: 2
+               output_dimension: 2
+               assigned_xopt: [1.0, -1.0]
+               seed: 17
+             value_transform:
+               kind: power
+               parameters: [1.1, 1.0]
+         composition:
+           kind: cpm-wsum
+         assigned_xopt: [1.0, -1.0]
+         assigned_fopt: 0.0
+         seed: 11
+         label: nested-rosenbrock-schwefel
+       coordinate_transform:
+         kind: rotation
+         input_dimension: 2
+         output_dimension: 2
+         assigned_xopt: [0.1, 3.6]
+         seed: 31
+       value_transform:
+         kind: power
+         parameters: [1.25, 1.0]
    composition:
-     kind: none
-   assigned_xopt: [1.0, -2.0]
+     kind: cpm-wsum
+   assigned_xopt: [0.1, 3.6]
    assigned_fopt: 0.0
-   scale_factor: 1.0
-   seed: 7
-   label: cpp-yaml-function
+   seed: 1
+   label: cpp-nested-composed-function
 
 Then load and evaluate it:
 
@@ -274,12 +313,18 @@ Then load and evaluate it:
            FuncCraft::load_function_spec("my_function.yaml");
        FuncCraft::BenchmarkFunction f(config);
 
-       std::vector<double> values =
-           f({{0.0, 0.0}, {1.0, -2.0}});
+       std::vector<std::vector<double>> points = {
+           std::vector<double>(2, 0.0),
+           f.get_xopt(),
+           std::vector<double>(2, 1.0),
+       };
+       std::vector<double> values = f(points);
 
+       std::cout << "dimension: " << f.dimension() << '\n';
        std::cout << f.label() << '\n';
-       std::cout << values.front() << '\n';
-       std::cout << values.back() << '\n';
+       std::cout << "component_types: " << f.component_types() << '\n';
+       std::cout << "fopt: " << f.get_fopt() << '\n';
+       std::cout << "first value: " << values.front() << '\n';
    }
 
 BenchmarkSuite
@@ -412,32 +457,65 @@ Put this in ``my_suite.yaml``:
 
 .. code-block:: yaml
 
-   supported_dimensions: any
-   base_functions: [1, 9, 10]
-   composition_base_functions: [1, 9, 10]
+   supported_dimensions: "2"
+   base_functions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+   composition_base_functions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
    coordinate_transforms:
      - kind: none
-       probability: 1.0
+       probability: 0.0
+       parameters: []
+     - kind: rotation
+       probability: 0.5
+       parameters: []
+     - kind: affine
+       probability: 0.0
+       parameters: []
+     - kind: blockrotation
+       probability: 0.5
        parameters: []
    value_transforms:
      - kind: none
-       probability: 1.0
+       probability: 0.5
        parameters: []
+     - kind: power
+       probability: 0.25
+       parameters: [1.0, 1.0]
+     - kind: oscillatory
+       probability: 0.25
+       parameters: [0.1, 1.0]
+     - kind: cosine-zero
+       probability: 0.0
+       parameters: [1.0]
    compositions:
      - kind: cpmsum
-       probability: 1.0
+       probability: 0.1
        parameters: []
+     - kind: cpmpmean
+       probability: 0.1
+       parameters: [3.0]
+     - kind: cpmpmean
+       probability: 0.1
+       parameters: [0.1]
+     - kind: cpmlwell
+       probability: 0.2
+       parameters: [0.1, 1.0]
+     - kind: dpmsoftmax
+       probability: 0.25
+       parameters: [0.01]
+     - kind: dpmbgsoftmax
+       probability: 0.25
+       parameters: [0.01, 1.0, 0.01]
    min_components: 2
-   max_components: 3
-   max_nested_composition_depth: 0
-   nested_probability: 0.0
-   requested_number_of_functions: 20
+   max_components: 4
+   max_nested_composition_depth: 1
+   nested_probability: 0.1
+   requested_number_of_functions: 200
    master_seed: 1
    lower_bound: -100
    upper_bound: 100
    assigned_fopt: 100.0
    xopt_domain_shrink_factor: 0.8
-   suite_label: cpp-yaml-suite
+   suite_label: cpp-suite
 
 Then load it at an explicit dimension and evaluate F1:
 
@@ -449,17 +527,22 @@ Then load it at an explicit dimension and evaluate F1:
    #include <vector>
 
    int main() {
-       const int dimension = 10;
+       const int dimension = 2;
        FuncCraft::SuiteSpec config =
            FuncCraft::load_suite_spec("my_suite.yaml");
        FuncCraft::BenchmarkSuite suite(config, dimension);
 
-       const FuncCraft::BenchmarkFunction& f = suite.function(1);
-       std::vector<double> values =
-           f({std::vector<double>(dimension, 0.0)});
+       std::cout << "size: " << suite.size() << '\n';
+       std::cout << "dimension: " << suite.dimension() << '\n';
+       std::cout << "capacity: "
+                 << suite.theoretical_max_number_of_functions() << '\n';
 
-       std::cout << f.label() << '\n';
-       std::cout << values.front() << '\n';
+       for (int index = 1; index <= 5; ++index) {
+           const FuncCraft::BenchmarkFunction& f = suite.function(index);
+           std::cout << "F" << index << ": "
+                     << f.component_types() << " | "
+                     << f.label() << '\n';
+       }
    }
 
 Shipped suite: FuncCraft Benchmark Suite 2026 v1

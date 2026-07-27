@@ -23,8 +23,21 @@ mechanisms without assuming either interface.
    :caption: Start Here
 
    installation
-   getting_started
 
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Shared Concepts
+
+   concepts/overview
+   concepts/construction_model
+   concepts/mechanisms
+   concepts/benchmark_function
+   concepts/benchmark_suite
+   concepts/suite_2026_v1
+   concepts/primitive_base_functions
+   
+   
 .. toctree::
    :maxdepth: 2
    :caption: Examples and API
@@ -32,17 +45,6 @@ mechanisms without assuming either interface.
    python/index
    cpp/index
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Shared Concepts
-
-   concepts/overview
-   concepts/benchmark_function
-   concepts/benchmark_suite
-   concepts/suite_2026_v1
-   concepts/primitive_base_functions
-   concepts/construction_model
-   concepts/mechanisms
 
 .. toctree::
    :maxdepth: 1
