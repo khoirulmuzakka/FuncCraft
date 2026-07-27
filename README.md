@@ -15,13 +15,6 @@ black-box optimization benchmark suites. It builds benchmark functions from
 editable YAML specifications, packaged suite collections, primitive benchmark
 functions, coordinate transforms, value transforms, and composition rules.
 
-The two central runtime objects are:
-
-- `BenchmarkSuite`: a materialized collection of benchmark functions for one
-  chosen dimension.
-- `BenchmarkFunction`: one concrete benchmark function that evaluates batches
-  of points.
-
 ## Why FuncCraft?
 
 Common black-box optimization benchmark suites are intentionally finite. For
