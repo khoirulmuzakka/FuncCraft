@@ -63,9 +63,9 @@ Coordinate transforms and optimum placement
 -------------------------------------------
 
 The coordinate transform is responsible for placing the component optimum in
-the generated search space. The public spec stores ``assigned_xopt``. The
-target optimum of the primitive or nested child is determined internally by
-FuncCraft, including domain scaling for primitive base functions.
+the generated search space. The YAML field ``assigned_xopt`` stores that
+location. The target optimum of the primitive or nested child is determined
+internally by FuncCraft, including domain scaling for primitive base functions.
 
 For full-dimensional transforms, ``assigned_xopt`` has length equal to the
 ambient dimension. For block rotation, ``assigned_xopt`` has length equal to
@@ -88,15 +88,14 @@ FuncCraft uses two broad composition modes:
 Suite generation
 ----------------
 
-A ``SuiteSpec`` does not describe one function directly. It describes pools
-and probabilities. The suite generator samples from those choices, creates
-``FunctionSpec`` objects, and then materializes runtime ``BenchmarkFunction``
-objects for a requested dimension.
+A suite YAML/dictionary does not describe one function directly. It describes
+pools and probabilities. The suite generator samples from those choices and
+materializes runtime ``BenchmarkFunction`` objects for a requested dimension.
 
-The standard suite collection is also a YAML ``SuiteSpec``. Use
-``suite_collection(year=2026, version=1)`` when you want the packaged suite,
-or ``load_suite_spec("my_suite.yaml")`` when you want to edit the YAML
-yourself.
+The standard suite collection is also a YAML suite recipe. Use
+``SuiteCollection(year=2026, version=1)`` when you want the packaged suite,
+or ``BenchmarkSuite("my_suite.yaml", dimension)`` when you want to edit the
+YAML yourself.
 
 .. _design-constraints:
 
@@ -127,7 +126,7 @@ change coordinates that already existed. The intended guarantee is stable
 function identity and related geometry, not identical embedded function
 values.
 
-Cross-platform robustness means that generated specifications and sampled
+Cross-platform robustness means that generated YAML records and sampled
 values should not depend strongly on differences between standard-library
 implementations. FuncCraft therefore uses deterministic integer-based random
 streams, fixed lookup tables for generated rotation pairs and affine row
@@ -143,8 +142,8 @@ mantissa to a fixed ``2^-40`` grid, and reconstructs the value with ``ldexp``.
 Because the rounding is relative to the value's magnitude, large and small
 component values keep about the same effective precision.
 
-Exported specs include materialized matrices and generated centers, so loading
-an exported function avoids regenerating those parameters. Some primitives are
+Exported YAML files include materialized matrices and generated centers, so
+loading an exported function avoids regenerating those parameters. Some primitives are
 intentionally nonsmooth or highly oscillatory, so exact bitwise equality across
 platforms is not a design target; the CI value comparison checks agreement
 statistically rather than requiring every sampled point to match.
@@ -167,7 +166,7 @@ quantization used for component stabilization, takes the 25th percentile
    \end{cases}
 
 This keeps typical values comparable while preserving the assigned optimum
-value. The estimator is deterministic for a fixed materialized function spec:
+value. The estimator is deterministic for a fixed materialized function YAML:
 the sample points are generated from the function seed without random jitter,
 and the raw values are computed before the final scale and bias are applied.
 

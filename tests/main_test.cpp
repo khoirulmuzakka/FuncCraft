@@ -305,6 +305,9 @@ void check_composed_function_component(const std::filesystem::path& path) {
     require(
         function.component_types() == "1 level-1 nested",
         "composed function component type summary mismatch");
+    require(
+        function.label() == function.spec().label,
+        "benchmark function label accessor mismatch");
 
     function.export_spec(path.string());
     const FuncCraft::BenchmarkFunction imported = FuncCraft::make_benchmark_function(path.string());

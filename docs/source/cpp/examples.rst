@@ -5,6 +5,81 @@ Use ``#include "funccraft.h"`` for the public C++ API. Evaluations are
 batched: pass ``std::vector<std::vector<double>>`` and receive one value per
 point.
 
+Quick start
+-----------
+
+This complete program loads F1 from the packaged FuncCraft 2026 v1 suite at
+dimension 10 and evaluates two points.
+
+.. code-block:: cpp
+
+   #include "funccraft.h"
+
+   #include <iostream>
+   #include <vector>
+
+   int main() {
+       const int dimension = 10;
+       const int function_index = 1;
+
+       FuncCraft::BenchmarkSuite suite =
+           FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);
+       const FuncCraft::BenchmarkFunction& f =
+           suite.function(function_index);
+
+       std::vector<std::vector<double>> points = {
+           std::vector<double>(dimension, 0.0),
+           std::vector<double>(dimension, 1.0),
+       };
+       std::vector<double> values = f(points);
+
+       std::cout << f.label() << '\n';
+       std::cout << f.get_fopt() << '\n';
+       std::cout << values.front() << '\n';
+   }
+
+Function indices are one-based. ``suite.function(1)`` returns F1; ``0`` and
+negative indices are invalid.
+
+Minimal CMake project
+~~~~~~~~~~~~~~~~~~~~~
+
+For a new CMake project, put the quick-start C++ code above in ``main.cpp``
+and use this ``CMakeLists.txt``:
+
+.. code-block:: cmake
+
+   cmake_minimum_required(VERSION 3.18)
+   project(funccraft_quick_start LANGUAGES CXX)
+
+   include(FetchContent)
+
+   set(BUILD_LIBRARY ON CACHE BOOL "" FORCE)
+   set(BUILD_PYTHON OFF CACHE BOOL "" FORCE)
+   set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+   set(BUILD_TEST OFF CACHE BOOL "" FORCE)
+
+   FetchContent_Declare(
+       funccraft
+       GIT_REPOSITORY https://github.com/khoirulmuzakka/FuncCraft.git
+       GIT_TAG master
+   )
+   FetchContent_MakeAvailable(funccraft)
+
+   add_executable(funccraft_quick_start main.cpp)
+   target_link_libraries(funccraft_quick_start PRIVATE funccraft)
+
+Build and run it:
+
+.. code-block:: shell
+
+   cmake -S . -B build
+   cmake --build build --config Release
+   ./build/funccraft_quick_start
+
+On Windows with Visual Studio generators, the executable is usually under
+``build/Release/funccraft_quick_start.exe``.
+
 Construction framework
 ----------------------
 
@@ -115,7 +190,7 @@ function.
        std::vector<double> values = f(points);
 
        std::cout << "dimension: " << f.dimension() << '\n';
-       std::cout << "label: " << f.spec().label << '\n';
+       std::cout << "label: " << f.label() << '\n';
        std::cout << "component_types: " << f.component_types() << '\n';
        std::cout << "fopt: " << f.get_fopt() << '\n';
        std::cout << "first value: " << values.front() << '\n';
@@ -129,13 +204,83 @@ other materialized values needed to reproduce the exact function.
 
 .. code-block:: cpp
 
-   f.export_spec("manual_function.yaml");
+   #include "funccraft.h"
 
-   FuncCraft::BenchmarkFunction reloaded =
-       FuncCraft::make_benchmark_function("manual_function.yaml");
+   #include <iostream>
+   #include <vector>
 
-   std::vector<double> original_values = f(points);
-   std::vector<double> reloaded_values = reloaded(points);
+   int main() {
+       FuncCraft::BenchmarkSuite suite =
+           FuncCraft::suite_collection(2026, 1).benchmark_suite(2);
+       const FuncCraft::BenchmarkFunction& f = suite.function(1);
+
+       f.export_spec("manual_function.yaml");
+
+       FuncCraft::BenchmarkFunction reloaded =
+           FuncCraft::make_benchmark_function("manual_function.yaml");
+
+       std::vector<std::vector<double>> points = {
+           std::vector<double>(2, 0.0),
+           f.get_xopt(),
+       };
+       std::vector<double> original_values = f(points);
+       std::vector<double> reloaded_values = reloaded(points);
+
+       std::cout << f.label() << '\n';
+       std::cout << original_values.front() << '\n';
+       std::cout << reloaded_values.front() << '\n';
+   }
+
+Load one function from YAML
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Put this in ``my_function.yaml``:
+
+.. code-block:: yaml
+
+   dimension: 2
+   domain:
+     dimension: 2
+     lower_bound: [-5.0, -5.0]
+     upper_bound: [5.0, 5.0]
+   components:
+     - base_function: Sphere
+       coordinate_transform:
+         kind: none
+         input_dimension: 2
+         output_dimension: 2
+         assigned_xopt: [1.0, -2.0]
+       value_transform:
+         kind: none
+   composition:
+     kind: none
+   assigned_xopt: [1.0, -2.0]
+   assigned_fopt: 0.0
+   scale_factor: 1.0
+   seed: 7
+   label: cpp-yaml-function
+
+Then load and evaluate it:
+
+.. code-block:: cpp
+
+   #include "funccraft.h"
+
+   #include <iostream>
+   #include <vector>
+
+   int main() {
+       FuncCraft::FunctionSpec config =
+           FuncCraft::load_function_spec("my_function.yaml");
+       FuncCraft::BenchmarkFunction f(config);
+
+       std::vector<double> values =
+           f({{0.0, 0.0}, {1.0, -2.0}});
+
+       std::cout << f.label() << '\n';
+       std::cout << values.front() << '\n';
+       std::cout << values.back() << '\n';
+   }
 
 BenchmarkSuite
 --------------
@@ -201,7 +346,7 @@ to keep an option visible but disabled.
            const BenchmarkFunction& f = suite.function(index);
            std::cout << "F" << index << ": "
                      << f.component_types() << " | "
-                     << f.spec().label << '\n';
+                     << f.label() << '\n';
        }
    }
 
@@ -213,13 +358,109 @@ function spec, so the exact benchmark set can be reused later.
 
 .. code-block:: cpp
 
-   suite.export_manifest("generated_suite_manifest.yaml");
+   #include "funccraft.h"
 
-   FuncCraft::BenchmarkSuite reloaded_suite(
-       "generated_suite_manifest.yaml",
-       suite.dimension());
+   #include <iostream>
+   #include <vector>
 
-   const FuncCraft::BenchmarkFunction& f1 = reloaded_suite.function(1);
+   int main() {
+       const int dimension = 10;
+       FuncCraft::SuiteSpec spec;
+       spec.supported_dimensions = "any";
+       spec.base_functions = {
+           FuncCraft::BasicFunctionId::Sphere,
+           FuncCraft::BasicFunctionId::Rosenbrock,
+           FuncCraft::BasicFunctionId::Rastrigin,
+       };
+       spec.composition_base_functions = spec.base_functions;
+       spec.coordinate_transforms = {
+           FuncCraft::make_choice(FuncCraft::CoordinateTransformKind::None, 1.0),
+       };
+       spec.value_transforms = {
+           FuncCraft::make_choice(FuncCraft::ValueTransformKind::None, 1.0),
+       };
+       spec.compositions = {
+           FuncCraft::make_choice(FuncCraft::CompositionKind::CpmWeightedSum, 1.0),
+       };
+       spec.min_components = 2;
+       spec.max_components = 3;
+       spec.requested_number_of_functions = 5;
+       spec.master_seed = 1;
+       spec.suite_label = "small-export-suite";
+
+       FuncCraft::BenchmarkSuite suite(spec, dimension);
+
+       suite.export_manifest("generated_suite_manifest.yaml");
+
+       FuncCraft::BenchmarkSuite reloaded_suite(
+           "generated_suite_manifest.yaml",
+           dimension);
+
+       const FuncCraft::BenchmarkFunction& f1 = reloaded_suite.function(1);
+       std::vector<double> values =
+           f1({std::vector<double>(dimension, 0.0)});
+
+       std::cout << reloaded_suite.size() << '\n';
+       std::cout << f1.label() << '\n';
+       std::cout << values.front() << '\n';
+   }
+
+Load one suite from YAML
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Put this in ``my_suite.yaml``:
+
+.. code-block:: yaml
+
+   supported_dimensions: any
+   base_functions: [1, 9, 10]
+   composition_base_functions: [1, 9, 10]
+   coordinate_transforms:
+     - kind: none
+       probability: 1.0
+       parameters: []
+   value_transforms:
+     - kind: none
+       probability: 1.0
+       parameters: []
+   compositions:
+     - kind: cpmsum
+       probability: 1.0
+       parameters: []
+   min_components: 2
+   max_components: 3
+   max_nested_composition_depth: 0
+   nested_probability: 0.0
+   requested_number_of_functions: 20
+   master_seed: 1
+   lower_bound: -100
+   upper_bound: 100
+   assigned_fopt: 100.0
+   xopt_domain_shrink_factor: 0.8
+   suite_label: cpp-yaml-suite
+
+Then load it at an explicit dimension and evaluate F1:
+
+.. code-block:: cpp
+
+   #include "funccraft.h"
+
+   #include <iostream>
+   #include <vector>
+
+   int main() {
+       const int dimension = 10;
+       FuncCraft::SuiteSpec config =
+           FuncCraft::load_suite_spec("my_suite.yaml");
+       FuncCraft::BenchmarkSuite suite(config, dimension);
+
+       const FuncCraft::BenchmarkFunction& f = suite.function(1);
+       std::vector<double> values =
+           f({std::vector<double>(dimension, 0.0)});
+
+       std::cout << f.label() << '\n';
+       std::cout << values.front() << '\n';
+   }
 
 Shipped suite: FuncCraft Benchmark Suite 2026 v1
 ------------------------------------------------
@@ -247,7 +488,7 @@ dimension you want.
        std::cout << "suite dimension: " << suite.dimension() << '\n';
 
        const FuncCraft::BenchmarkFunction& f1 = suite.function(1);
-       std::cout << "F1 label: " << f1.spec().label << '\n';
+       std::cout << "F1 label: " << f1.label() << '\n';
        std::cout << "F1 component_types: "
                  << f1.component_types() << '\n';
    }
@@ -261,14 +502,18 @@ FuncCraft documentation, see the Python example page.
 
 .. code-block:: cpp
 
+   #include "funccraft.h"
+
    #include <string>
 
-   FuncCraft::BenchmarkSuite suite =
-       FuncCraft::suite_collection(2026, 1).benchmark_suite(2);
+   int main() {
+       FuncCraft::BenchmarkSuite suite =
+           FuncCraft::suite_collection(2026, 1).benchmark_suite(2);
 
-   for (int index = 1; index <= 500; ++index) {
-       const FuncCraft::BenchmarkFunction& f = suite.function(index);
-       f.export_spec("function_" + std::to_string(index) + ".yaml");
+       for (int index = 1; index <= 500; ++index) {
+           const FuncCraft::BenchmarkFunction& f = suite.function(index);
+           f.export_spec("function_" + std::to_string(index) + ".yaml");
+       }
    }
 
 Minimize F45 at 10D with Minion
@@ -331,7 +576,7 @@ dependency. Function indices are one-based, so ``F45`` is loaded with
        const double error = std::abs(result.fun - f45.get_fopt());
 
        std::cout << "function: F" << function_index << '\n';
-       std::cout << "label: " << f45.spec().label << '\n';
+       std::cout << "label: " << f45.label() << '\n';
        std::cout << "dimension: " << f45.dimension() << '\n';
        std::cout << "assigned fopt: " << f45.get_fopt() << '\n';
        std::cout << "best value: " << result.fun << '\n';
@@ -367,5 +612,5 @@ Primitive functions can be evaluated directly with ``BasicF``. Use
        }
    }
 
-See :doc:`../user_guide/primitive_base_functions` for the full primitive
+See :doc:`../concepts/primitive_base_functions` for the full primitive
 function ID table.

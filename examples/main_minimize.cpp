@@ -198,8 +198,7 @@ int main(int argc, char* argv[]) {
         for (int i = config.low; i <= config.high; ++i) {
             try {
                 const auto& function = suite.function(i);
-                const auto& spec = function.spec();
-                const auto fields = split_class_label(spec.label);
+                const auto fields = split_class_label(function.label());
                 const auto bounds = function.domain();
                 std::vector<std::pair<double, double>> minion_bounds;
                 minion_bounds.reserve(static_cast<std::size_t>(bounds.dimension()));
@@ -250,7 +249,7 @@ int main(int argc, char* argv[]) {
             } catch (const std::exception& e) {
                 const auto& function = suite.function(i);
                 std::cerr << "run_minimize failed at index " << i
-                          << " label=" << function.spec().label
+                          << " label=" << function.label()
                           << ": " << e.what() << "\n";
                 throw;
             }

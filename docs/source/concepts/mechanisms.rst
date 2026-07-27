@@ -3,7 +3,7 @@ Implemented mechanisms
 
 This page lists the implemented coordinate transforms, value transforms, and
 composition modes. The primitive base-function ID table is in
-:doc:`primitive_base_functions`. YAML/spec parsers normalize case, spaces,
+:doc:`primitive_base_functions`. YAML parsers normalize case, spaces,
 hyphens, and underscores before matching names.
 
 Base functions

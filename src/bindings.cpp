@@ -255,6 +255,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .def("get_fopt", &FuncCraft::BenchmarkFunction::get_fopt)
         .def("get_xopt", &FuncCraft::BenchmarkFunction::get_xopt, py::return_value_policy::reference_internal)
         .def_property_readonly("component_types", &FuncCraft::BenchmarkFunction::component_types)
+        .def_property_readonly("label", &FuncCraft::BenchmarkFunction::label)
         .def_property_readonly("spec", &FuncCraft::BenchmarkFunction::spec, py::return_value_policy::reference_internal)
         .def("export_spec", [](const FuncCraft::BenchmarkFunction& self, const std::string& path) {
             self.export_spec(path);

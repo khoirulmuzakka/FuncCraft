@@ -12,7 +12,7 @@
 
 FuncCraft is a C++17 library with a Python interface for generating scalable
 black-box optimization benchmark suites. It builds benchmark functions from
-editable YAML specifications, packaged suite collections, primitive benchmark
+editable YAML files, packaged suite collections, primitive benchmark
 functions, coordinate transforms, value transforms, and composition rules.
 
 ## Why FuncCraft?
@@ -97,9 +97,7 @@ collection of benchmark functions for one chosen dimension. A
 evaluations are batched: pass a list of points and receive one value per
 point.
 
-FuncCraft ships the `2026_v1` benchmark suite. It is backed by
-`suites/2026_v1.yaml` and exposed through `suite_collection(year=2026,
-version=1)`:
+In Python, the recommended custom-suite workflow is a YAML-shaped dictionary:
 
 ```python
 import funccraft as fc
@@ -107,26 +105,135 @@ import funccraft as fc
 dimension = 10
 function_index = 1
 
-suite = fc.suite_collection(year=2026, version=1).benchmark_suite(dimension)
+suite_config = {
+    "supported_dimensions": "any",
+    "base_functions": list(range(1, 35)),
+    "composition_base_functions": [
+        4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20,
+        21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27,
+    ],
+    "coordinate_transforms": [
+        {"kind": "none", "probability": 0.0, "parameters": []},
+        {"kind": "rotation", "probability": 0.34, "parameters": []},
+        {"kind": "affine", "probability": 0.33, "parameters": []},
+        {"kind": "blockrotation", "probability": 0.33, "parameters": []},
+    ],
+    "value_transforms": [
+        {"kind": "none", "probability": 0.5, "parameters": []},
+        {"kind": "power", "probability": 0.25, "parameters": []},
+        {"kind": "osc", "probability": 0.25, "parameters": []},
+        {"kind": "cosine-zero", "probability": 0.0, "parameters": []},
+    ],
+    "compositions": [
+        {"kind": "cpmsum", "probability": 0.1, "parameters": []},
+        {"kind": "cpmpmean", "probability": 0.1, "parameters": [3.0]},
+        {"kind": "cpmpmean", "probability": 0.1, "parameters": [0.1]},
+        {"kind": "cpmlwell", "probability": 0.2, "parameters": []},
+        {"kind": "dpmsoftmax", "probability": 0.25, "parameters": [0.005]},
+        {"kind": "dpmbgsoftmax", "probability": 0.25, "parameters": [0.005, 1.0, 0.01]},
+    ],
+    "min_components": 2,
+    "max_components": 5,
+    "max_nested_composition_depth": 1,
+    "nested_probability": 0.1,
+    "requested_number_of_functions": 500,
+    "master_seed": 1,
+    "lower_bound": -100,
+    "upper_bound": 100,
+    "assigned_fopt": 100.0,
+    "xopt_domain_shrink_factor": 0.8,
+    "suite_label": "readme-python-suite",
+}
+
+suite = fc.BenchmarkSuite(suite_config, dimension)
 f = suite.function(function_index)
 
 points = [[0.0] * dimension, [1.0] * dimension]
 values = f.evaluate(points)
 
-print(f.spec.label)
+print(f.label)
 print(f.get_xopt())
 print(f.get_fopt())
 print(values)
 ```
 
-More Python examples are in `docs/source/examples/python.rst` and the
+For the packaged benchmark suite, use
+`fc.SuiteCollection(year=2026, version=1).benchmark_suite(dimension)`.
+
+More Python examples are in `docs/source/python/examples.rst` and the
 `examples/` folder.
 
 ## C++ Quick Start
 
 The C++ API uses the same model: materialize a `BenchmarkSuite` at an explicit
 dimension, select a `BenchmarkFunction` by index, and evaluate a batch of
-points. Use `#include "funccraft.h"` for the public C++ API:
+points. For C++, the natural custom-suite workflow is a suite YAML file.
+
+Save this as `my_suite.yaml`:
+
+```yaml
+supported_dimensions: any
+base_functions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+composition_base_functions: [4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27]
+coordinate_transforms:
+  - kind: none
+    probability: 0.0
+    parameters: []
+  - kind: rotation
+    probability: 0.34
+    parameters: []
+  - kind: affine
+    probability: 0.33
+    parameters: []
+  - kind: blockrotation
+    probability: 0.33
+    parameters: []
+value_transforms:
+  - kind: none
+    probability: 0.5
+    parameters: []
+  - kind: power
+    probability: 0.25
+    parameters: []
+  - kind: osc
+    probability: 0.25
+    parameters: []
+  - kind: cosine-zero
+    probability: 0.0
+    parameters: []
+compositions:
+  - kind: cpmsum
+    probability: 0.1
+    parameters: []
+  - kind: cpmpmean
+    probability: 0.1
+    parameters: [3.0]
+  - kind: cpmpmean
+    probability: 0.1
+    parameters: [0.1]
+  - kind: cpmlwell
+    probability: 0.2
+    parameters: []
+  - kind: dpmsoftmax
+    probability: 0.25
+    parameters: [0.005]
+  - kind: dpmbgsoftmax
+    probability: 0.25
+    parameters: [0.005, 1.0, 0.01]
+min_components: 2
+max_components: 5
+max_nested_composition_depth: 1
+nested_probability: 0.1
+requested_number_of_functions: 500
+master_seed: 1
+lower_bound: -100
+upper_bound: 100
+assigned_fopt: 100.0
+xopt_domain_shrink_factor: 0.8
+suite_label: readme-cpp-suite
+```
+
+Then load it with `#include "funccraft.h"`:
 
 ```cpp
 #include "funccraft.h"
@@ -138,8 +245,8 @@ int main() {
     const int dimension = 10;
     const int function_index = 1;
 
-    FuncCraft::BenchmarkSuite suite =
-        FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);
+    FuncCraft::SuiteSpec config = FuncCraft::load_suite_spec("my_suite.yaml");
+    FuncCraft::BenchmarkSuite suite(config, dimension);
     const FuncCraft::BenchmarkFunction& f = suite.function(function_index);
 
     std::vector<std::vector<double>> points = {
@@ -148,13 +255,13 @@ int main() {
     };
     std::vector<double> values = f(points);
 
-    std::cout << f.spec().label << '\n';
+    std::cout << f.label() << '\n';
     std::cout << f.get_fopt() << '\n';
     std::cout << values.front() << '\n';
 }
 ```
 
-More C++ examples are in `docs/source/examples/cpp.rst` and the `examples/`
+More C++ examples are in `docs/source/cpp/examples.rst` and the `examples/`
 folder.
 
 ## Documentation

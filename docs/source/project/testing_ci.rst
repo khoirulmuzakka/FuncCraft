@@ -110,13 +110,13 @@ The C++ binary prints a named report with 17 checks and finishes with
    geometry is an exact prefix of the higher-dimensional geometry.
 
 ``Function YAML roundtrip`` and ``Suite YAML roundtrip``
-   Export materialized function specs and suite manifests, reload them, and
+   Export materialized function YAML records and suite manifests, reload them, and
    require matching evaluations on deterministic candidate points.
 
 ``Packaged suite manifest exact function-spec roundtrip``
    Builds 500 functions from the packaged suite at dimension 10. For each
    function, it evaluates 1000 deterministic points, exports the suite
-   manifest, rebuilds each exported ``function_spec`` as a standalone
+   manifest, rebuilds each exported function YAML record as a standalone
    ``BenchmarkFunction``, and requires exact ``double`` equality on the same
    points.
 

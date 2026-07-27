@@ -23,38 +23,14 @@ try:
         BasicFunctionId,
         BenchmarkFunction,
         BenchmarkSuite,
-        CompositionKind,
-        load_suite_spec,
-        make_component,
-        make_composition,
-        make_composition_choice,
-        make_coordinate_transform,
-        make_domain,
-        make_function_spec,
-        make_suite_spec,
-        make_value_transform,
-        make_benchmark_function,
-        suite_collection,
-        suite_collection_number_of_functions,
+        SuiteCollection,
     )
 except ModuleNotFoundError:
     from funccraft import (
         BasicFunctionId,
         BenchmarkFunction,
         BenchmarkSuite,
-        CompositionKind,
-        load_suite_spec,
-        make_component,
-        make_composition,
-        make_composition_choice,
-        make_coordinate_transform,
-        make_domain,
-        make_function_spec,
-        make_suite_spec,
-        make_value_transform,
-        make_benchmark_function,
-        suite_collection,
-        suite_collection_number_of_functions,
+        SuiteCollection,
     )
 
 
@@ -74,8 +50,9 @@ def candidate_points(function):
     return [x_star, zero, pattern]
 
 
-def check_optima(suite, *, tolerance=20.0):
-    for index in range(1, len(suite) + 1):
+def check_optima(suite, *, count=None, tolerance=20.0):
+    end = len(suite) if count is None else min(count, len(suite))
+    for index in range(1, end + 1):
         function = suite.function(index)
         x_star = function.get_xopt()
         value = function.evaluate([x_star])[0]
@@ -89,9 +66,9 @@ def check_optima(suite, *, tolerance=20.0):
 def check_function_yaml_roundtrip(function, path):
     points = candidate_points(function)
     before = function.evaluate(points)
-    function.export_spec(str(path))
+    function.export_yaml(str(path))
 
-    imported_function = make_benchmark_function(str(path))
+    imported_function = BenchmarkFunction(str(path))
     after = imported_function.evaluate(points)
     assert_close_sequence(after, before)
 
@@ -112,52 +89,60 @@ def check_suite_yaml_roundtrip(suite, path):
         assert_close_sequence(after, before[index])
 
 
-def alias_function_spec(kind):
-    return make_function_spec(
-        dimension=2,
-        domain=make_domain(2, -10.0, 10.0),
-        components=[
-            make_component(
-                base_function=BasicFunctionId.Sphere,
-                coordinate_transform=make_coordinate_transform(
-                    kind="none",
-                    input_dimension=2,
-                    output_dimension=2,
-                    assigned_xopt=[float(index), 0.0],
-                ),
-                value_transform=make_value_transform("none"),
-                seed=11 + index,
-            )
+def alias_function_config(kind):
+    return {
+        "dimension": 2,
+        "domain": {
+            "dimension": 2,
+            "lower_bound": [-10.0, -10.0],
+            "upper_bound": [10.0, 10.0],
+        },
+        "components": [
+            {
+                "base_function": "Sphere",
+                "coordinate_transform": {
+                    "kind": "none",
+                    "input_dimension": 2,
+                    "output_dimension": 2,
+                    "assigned_xopt": [float(index), 0.0],
+                },
+                "value_transform": {"kind": "none"},
+                "seed": 11 + index,
+            }
             for index in range(2)
         ],
-        composition=make_composition(kind, parameters=[0.01, 1.0, 0.01]),
-        assigned_xopt=[0.0, 0.0],
-        assigned_fopt=0.0,
-        seed=7,
-    )
+        "composition": {"kind": kind, "parameters": [0.01, 1.0, 0.01]},
+        "assigned_xopt": [0.0, 0.0],
+        "assigned_fopt": 0.0,
+        "seed": 7,
+    }
 
 
 def check_composition_kinds():
-    for kind in (CompositionKind.DpmSoftmax, CompositionKind.DpmBgSoftmax):
-        function = BenchmarkFunction(alias_function_spec(kind))
-        if function.spec.composition.kind != kind:
+    expected_names = {
+        "dpm-softmax": "DpmSoftmax",
+        "dpm-bgsoftmax": "DpmBgSoftmax",
+    }
+    for kind, expected_name in expected_names.items():
+        function = BenchmarkFunction(alias_function_config(kind))
+        if function._function.spec.composition.kind.name != expected_name:
             raise AssertionError(f"composition kind did not roundtrip: {kind!r}")
         values = function.evaluate([[0.0, 0.0], [1.0, 0.0]])
         if len(values) != 2:
             raise AssertionError(f"composition evaluation failed: {kind!r}")
 
-    suite_spec = make_suite_spec(
-        compositions=[
-            make_composition_choice(CompositionKind.DpmBgSoftmax, 1.0, [0.01, 1.0, 0.01])
+    suite_config = {
+        "compositions": [
+            {"kind": "dpm-bgsoftmax", "probability": 1.0, "parameters": [0.01, 1.0, 0.01]},
         ],
-        requested_number_of_functions=40,
-        max_components=3,
-        master_seed=19,
-    )
+        "requested_number_of_functions": 40,
+        "max_components": 3,
+        "master_seed": 19,
+    }
 
-    suite = BenchmarkSuite(suite_spec, 2)
+    suite = BenchmarkSuite(suite_config, 2)
     if not any(
-        suite.function(index).spec.composition.kind == CompositionKind.DpmBgSoftmax
+        suite.function(index)._function.spec.composition.kind.name == "DpmBgSoftmax"
         for index in range(1, len(suite) + 1)
     ):
         raise AssertionError("suite composition choice did not generate DPM bg softmax functions")
@@ -169,7 +154,7 @@ def check_basic_function_ids_start_at_one():
     if values != expected:
         raise AssertionError(f"basic function ids are not contiguous from 1: {values!r}")
     try:
-        make_suite_spec(base_functions=[0])
+        BenchmarkSuite({"base_functions": [0]}, 2)
     except ValueError:
         return
     raise AssertionError("base function id 0 was accepted")
@@ -177,32 +162,29 @@ def check_basic_function_ids_start_at_one():
 
 def main():
     dimension = 3
-    default_suite_path = Path(__file__).resolve().parents[1] / "suites" / "2026_v1.yaml"
 
     check_basic_function_ids_start_at_one()
 
     suite_year = 2026
     suite_version = 1
-    collection = suite_collection(suite_year, suite_version)
-    if collection.number_of_functions != suite_collection_number_of_functions(suite_year, suite_version):
+    collection = SuiteCollection(suite_year, suite_version)
+    if collection.number_of_functions <= 0:
         raise AssertionError("suite collection function count mismatch")
     collection_suite = collection.benchmark_suite(2)
-    value = collection_suite.function(1).evaluate([collection_suite.function(1).spec.assigned_xopt])[0]
+    first_function = collection_suite.function(1)
+    value = first_function.evaluate([first_function.get_xopt()])[0]
     if not math.isfinite(value):
         raise AssertionError("suite collection generated a nonfinite value")
 
-    optimum_suite_spec = load_suite_spec(str(default_suite_path))
-    optimum_suite_spec.requested_number_of_functions = OPTIMUM_FUNCTION_COUNT
-    optimum_suite = BenchmarkSuite(optimum_suite_spec, 2)
-    check_optima(optimum_suite)
+    check_optima(collection_suite, count=OPTIMUM_FUNCTION_COUNT)
     check_composition_kinds()
 
-    roundtrip_suite_spec = make_suite_spec(
-        requested_number_of_functions=100,
-        max_components=4,
-        master_seed=123,
-    )
-    roundtrip_suite = BenchmarkSuite(roundtrip_suite_spec, dimension)
+    roundtrip_suite_config = {
+        "requested_number_of_functions": 100,
+        "max_components": 4,
+        "master_seed": 123,
+    }
+    roundtrip_suite = BenchmarkSuite(roundtrip_suite_config, dimension)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)

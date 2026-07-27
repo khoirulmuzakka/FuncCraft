@@ -1,48 +1,33 @@
-Getting started
+Getting Started
 ===============
 
 FuncCraft evaluates benchmark functions in batches. A point is a vector of
 numbers, and an evaluation input is a collection of points. Install FuncCraft
-first from :doc:`installation`.
+first from :doc:`installation`, then choose the interface you want to use.
 
-The usual workflow is:
+Python
+------
 
-.. code-block:: text
-
-   SuiteSpec or packaged collection
-       -> BenchmarkSuite(spec, dimension)
-       -> suite.function(index)
-       -> BenchmarkFunction
-       -> f.evaluate(points)
-
-Python quick start
-------------------
-
-Use the packaged suite when you want a published FuncCraft benchmark suite
-exactly as shipped:
+Python users usually start with the packaged suite or a YAML file:
 
 .. code-block:: python
 
    import funccraft as fc
 
    dimension = 10
-   function_index = 1
+   suite = fc.SuiteCollection(2026, 1).benchmark_suite(dimension)
+   f = suite.function(1)
+   values = f.evaluate([[0.0] * dimension, [1.0] * dimension])
 
-   suite = fc.suite_collection(year=2026, version=1).benchmark_suite(dimension)
-   f = suite.function(function_index)
-
-   points = [[0.0] * dimension, [1.0] * dimension]
-   values = f.evaluate(points)
-
-   print(f.spec.label)
-   print(f.get_xopt())
-   print(f.get_fopt())
+   print(f.label)
    print(values)
 
-C++ quick start
----------------
+Continue with :doc:`python/examples`.
 
-Use ``#include "funccraft.h"`` for normal C++ code:
+C++
+---
+
+C++ users can use packaged suites, YAML loading, or direct typed construction:
 
 .. code-block:: cpp
 
@@ -53,12 +38,9 @@ Use ``#include "funccraft.h"`` for normal C++ code:
 
    int main() {
        const int dimension = 10;
-       const int function_index = 1;
-
        FuncCraft::BenchmarkSuite suite =
            FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);
-       const FuncCraft::BenchmarkFunction& f =
-           suite.function(function_index);
+       const FuncCraft::BenchmarkFunction& f = suite.function(1);
 
        std::vector<std::vector<double>> points = {
            std::vector<double>(dimension, 0.0),
@@ -66,15 +48,8 @@ Use ``#include "funccraft.h"`` for normal C++ code:
        };
        std::vector<double> values = f(points);
 
-       std::cout << f.spec().label << '\n';
-       std::cout << f.get_fopt() << '\n';
+       std::cout << f.label() << '\n';
        std::cout << values.front() << '\n';
    }
 
-Where to go next
-----------------
-
-Read :doc:`concepts/benchmark_function` and
-:doc:`concepts/benchmark_suite` for the runtime object model. Use
-:doc:`user_guide/yaml_specs` when you want to edit or author suite recipes,
-and use :doc:`examples/python` or :doc:`examples/cpp` for longer examples.
+Continue with :doc:`cpp/examples`.

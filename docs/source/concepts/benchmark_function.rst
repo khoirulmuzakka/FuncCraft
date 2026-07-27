@@ -14,7 +14,7 @@ Python
 
    import funccraft as fc
 
-   suite = fc.suite_collection(year=2026, version=1).benchmark_suite(10)
+   suite = fc.SuiteCollection(year=2026, version=1).benchmark_suite(10)
    f = suite.function(1)
 
    values = f.evaluate([[0.0] * 10, [1.0] * 10])
@@ -52,25 +52,22 @@ A ``BenchmarkFunction`` can come from:
 ``suite.function(index)``
    Access one function materialized by a ``BenchmarkSuite``.
 
-``BenchmarkFunction(FunctionSpec)``
-   Build one function directly from a loaded or programmatically constructed
-   function spec.
+``BenchmarkFunction({...})``
+   Build one function directly from a YAML-shaped Python dictionary.
 
 ``BenchmarkFunction("function_materialized.yaml")``
-   Reload an exported materialized function spec in Python.
-
-``make_benchmark_function("function_materialized.yaml")``
-   Reload an exported materialized function spec in C++.
+   Reload an exported materialized function YAML file in Python.
 
 Exporting
 ---------
 
-Use ``export_spec`` to write a materialized YAML record:
+Use ``export_yaml`` to write a materialized YAML record:
 
 .. code-block:: python
 
-   f.export_spec("function_materialized.yaml")
+   f.export_yaml("function_materialized.yaml")
 
 The exported file contains generated matrices, centers, optima, seeds, and
 other values needed to reproduce the already-built function without rerunning
-the suite generator. See :doc:`../user_guide/exporting` for details.
+the suite generator. See :doc:`../python/examples` and
+:doc:`../cpp/examples` for details.

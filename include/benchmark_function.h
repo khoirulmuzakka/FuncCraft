@@ -70,6 +70,10 @@ public:
      */
     const std::string& component_types() const;
     /**
+     * @brief Return the human-readable class label for this function.
+     */
+    const std::string& label() const;
+    /**
      * @brief Return the complete specification used to build this function.
      *
      * The returned spec is the normalized source record, including the

@@ -1,63 +1,48 @@
-FuncCraft documentation
+FuncCraft Documentation
 =======================
 
 FuncCraft is a C++17 library with a Python interface for generating scalable
-black-box optimization benchmark suites. It is designed around editable YAML
-specifications: write or edit a suite YAML file, load it in C++ or Python,
-choose a dimension, and evaluate the generated benchmark functions in batches.
+black-box optimization benchmark suites. It builds benchmark functions from
+editable YAML files, packaged suite collections, primitive benchmark
+functions, coordinate transforms, value transforms, and composition rules.
 
-A suite specification can generate hundreds, thousands, or practically
-unlimited numbers of distinct benchmark functions across dimensions while
-controlling the constructed optimum location and optimum value. The generated
-landscapes are assembled from primitive benchmark functions, coordinate
-transforms, value transforms, and composition rules.
+Choose the language track first:
 
-Start with :doc:`installation` and :doc:`getting_started`. The two central
-runtime objects are :doc:`concepts/benchmark_function` and
-:doc:`concepts/benchmark_suite`.
+``Python``
+   A compact YAML/dictionary-first interface with a small public API.
+
+``C++``
+   A native API with runtime objects plus typed construction structs for
+   advanced control.
+
+The shared concept pages explain the construction model and implemented
+mechanisms without assuming either interface.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Start here
+   :caption: Start Here
 
    installation
    getting_started
 
 .. toctree::
    :maxdepth: 2
-   :caption: Core concepts
+   :caption: Examples and API
+
+   python/index
+   cpp/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Shared Concepts
 
    concepts/overview
    concepts/benchmark_function
    concepts/benchmark_suite
-   concepts/specs_vs_runtime
-
-.. toctree::
-   :maxdepth: 2
-   :caption: User guide
-
-   user_guide/packaged_suites
-   user_guide/suite
-   user_guide/yaml_specs
-   user_guide/primitive_base_functions
-   user_guide/construction_model
-   user_guide/mechanisms
-   user_guide/exporting
-   user_guide/plotting
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Examples
-
-   examples/python
-   examples/cpp
-
-.. toctree::
-   :maxdepth: 2
-   :caption: API reference
-
-   api/python
-   api/cpp
+   concepts/suite_2026_v1
+   concepts/primitive_base_functions
+   concepts/construction_model
+   concepts/mechanisms
 
 .. toctree::
    :maxdepth: 1

@@ -1,157 +1,9 @@
-"""Python helpers for FuncCraft specs.
+"""Private conversion helpers for FuncCraft's Python wrappers.
 
-The C++ bindings expose the actual plain-data spec structs. This module adds
-dict-to-spec conversion and convenience ``make_*`` factory functions. Prefer
-YAML-shaped dictionaries for user-facing examples because they mirror the YAML
-files used by FuncCraft.
-
-Terminology
------------
-``DomainSpec``
-    Search bounds in the generated coordinates.
-``CoordinateTransformSpec``
-    Moves from generated/search coordinates into the component's primitive
-    coordinates. ``input_dimension`` is the parent/search dimension,
-    ``output_dimension`` is the component dimension after transformation, and
-    ``assigned_xopt`` is output-dimensional. The primitive optimum target is
-    resolved internally from the selected base function and domain scaling.
-``ValueTransformSpec``
-    Optional value-shape transform applied to a component output.
-``ComponentSpec``
-    One component in a function. A component is either a basic function such as
-    ``"Rastrigin"`` or a nested composed function via ``composed_function``.
-``CompositionSpec``
-    Combines component values. ``"none"`` is the identity/single-component
-    case, ``"cpm-..."`` choices are continuous composition methods, and
-    ``"dpm-..."`` choices are deceptive composition methods. DPM centers and
-    biases live on the composition spec because they define deceptive local
-    traps.
-``FunctionSpec``
-    Complete description of one benchmark function, including assigned global
-    optimum location/value and scale factor.
-``SuiteSpec``
-    Sampling rules for generating many distinct function specs.
-
-Examples
---------
-Create a single 2D function and evaluate it through ``BenchmarkFunction``::
-
-    from funccraft import BenchmarkFunction
-
-    spec = {
-        "dimension": 2,
-        "domain": {
-            "dimension": 2,
-            "lower_bound": [-10.0, -10.0],
-            "upper_bound": [10.0, 10.0],
-        },
-        "components": [
-            {
-                "base_function": "Sphere",
-                "coordinate_transform": {
-                    "kind": "rotation",
-                    "input_dimension": 2,
-                    "output_dimension": 2,
-                    "assigned_xopt": [1.0, -1.0],
-                    "seed": 1,
-                },
-                "value_transform": {"kind": "none"},
-            },
-        ],
-        "composition": {"kind": "none"},
-        "assigned_xopt": [1.0, -1.0],
-        "assigned_fopt": 0.0,
-        "scale_factor": 1.0,
-        "seed": 10,
-    }
-    f = BenchmarkFunction(spec)
-    y = f([[1.0, -1.0], [0.0, 0.0]])
-
-Create a small deceptive composition from two base functions::
-
-    spec = {
-        "dimension": 2,
-        "domain": {
-            "dimension": 2,
-            "lower_bound": [-10.0, -10.0],
-            "upper_bound": [10.0, 10.0],
-        },
-        "components": [
-            {
-                "base_function": "Rastrigin",
-                "coordinate_transform": {
-                    "kind": "none",
-                    "input_dimension": 2,
-                    "output_dimension": 2,
-                    "assigned_xopt": [2.0, -3.0],
-                },
-                "value_transform": {"kind": "none"},
-            },
-            {
-                "base_function": "Ackley",
-                "coordinate_transform": {
-                    "kind": "none",
-                    "input_dimension": 2,
-                    "output_dimension": 2,
-                    "assigned_xopt": [2.0, -3.0],
-                },
-                "value_transform": {"kind": "none"},
-            },
-        ],
-        "composition": {
-            "kind": "dpm-softmax",
-            "parameters": [0.01],
-            "biases": [0.0, 20.0],
-        },
-        "assigned_xopt": [2.0, -3.0],
-        "scale_factor": 1.0,
-        "seed": 11,
-    }
-
-Create a suite spec. Choice probabilities in each choice table are fractions
-and should sum to one::
-
-    suite_spec = {
-        "supported_dimensions": "any",
-        "base_functions": list(range(1, 35)),
-        "composition_base_functions": [
-            4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20,
-            21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27,
-        ],
-        "coordinate_transforms": [
-            {"kind": "none", "probability": 0.0, "parameters": []},
-            {"kind": "rotation", "probability": 0.34, "parameters": []},
-            {"kind": "affine", "probability": 0.33, "parameters": []},
-            {"kind": "block-rotation", "probability": 0.33, "parameters": []},
-        ],
-        "value_transforms": [
-            {"kind": "none", "probability": 0.5, "parameters": []},
-            {"kind": "power", "probability": 0.25, "parameters": []},
-            {"kind": "oscillatory", "probability": 0.25, "parameters": []},
-            {"kind": "cosine-zero", "probability": 0.0, "parameters": []},
-        ],
-        "compositions": [
-            {"kind": "cpm-wsum", "probability": 0.1, "parameters": []},
-            {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [3.0]},
-            {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [0.1]},
-            {"kind": "cpm-level-well", "probability": 0.2, "parameters": []},
-            {"kind": "dpm-softmax", "probability": 0.25, "parameters": [0.005]},
-            {"kind": "dpm-bgsoftmax", "probability": 0.25, "parameters": [0.005, 1.0, 0.01]},
-        ],
-        "min_components": 2,
-        "max_components": 5,
-        "max_nested_composition_depth": 1,
-        "nested_probability": 0.1,
-        "requested_number_of_functions": 500,
-        "master_seed": 1,
-        "lower_bound": -100.0,
-        "upper_bound": 100.0,
-        "assigned_fopt": 100.0,
-        "xopt_domain_shrink_factor": 0.8,
-        "suite_label": "custom-suite",
-    }
+This module is intentionally not part of the public API. Public code should use
+``funccraft.BenchmarkFunction``, ``funccraft.BenchmarkSuite``, dictionaries,
+YAML files, and the small set of names exported from ``funccraft``.
 """
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -180,7 +32,7 @@ TransformSpec = CoordinateTransformSpec
 ChoiceSpec = CompositionChoice
 
 
-def make_domain(dimension, lower_bound=-100.0, upper_bound=100.0):
+def _make_domain(dimension, lower_bound=-100.0, upper_bound=100.0):
     """Create a native ``DomainSpec``.
 
     ``lower_bound`` and ``upper_bound`` may be scalars or length-``dimension``
@@ -209,7 +61,7 @@ def make_domain(dimension, lower_bound=-100.0, upper_bound=100.0):
     return spec
 
 
-def make_coordinate_transform(
+def _make_coordinate_transform(
     kind="none",
     input_dimension=0,
     output_dimension=0,
@@ -286,7 +138,7 @@ def make_coordinate_transform(
     return spec
 
 
-def make_value_transform(kind="none", parameters=None):
+def _make_value_transform(kind="none", parameters=None):
     """Create a native ``ValueTransformSpec``.
 
     Parameters
@@ -316,7 +168,7 @@ def make_value_transform(kind="none", parameters=None):
     return spec
 
 
-def make_component(
+def _make_component(
     base_function=None,
     composed_function=None,
     coordinate_transform=None,
@@ -385,7 +237,7 @@ def make_component(
     return spec
 
 
-def make_composition(kind="none", parameters=None, biases=None, centers=None):
+def _make_composition(kind="none", parameters=None, biases=None, centers=None):
     """Create a native ``CompositionSpec``.
 
     Parameters
@@ -433,7 +285,7 @@ def make_composition(kind="none", parameters=None, biases=None, centers=None):
     return spec
 
 
-def make_function_spec(
+def _make_function_spec(
     dimension,
     domain=None,
     components=None,
@@ -508,7 +360,7 @@ def make_function_spec(
     return spec
 
 
-def make_coordinate_transform_choice(kind, probability=1.0, parameters=None):
+def _make_coordinate_transform_choice(kind, probability=1.0, parameters=None):
     """Create a weighted coordinate-transform choice for ``SuiteSpec``.
 
     Choice probabilities in the same table are interpreted as fractions and
@@ -525,7 +377,7 @@ def make_coordinate_transform_choice(kind, probability=1.0, parameters=None):
     return spec
 
 
-def make_value_transform_choice(kind, probability=1.0, parameters=None):
+def _make_value_transform_choice(kind, probability=1.0, parameters=None):
     """Create a weighted value-transform choice for ``SuiteSpec``.
 
     Choice probabilities in the same table are interpreted as fractions and
@@ -542,7 +394,7 @@ def make_value_transform_choice(kind, probability=1.0, parameters=None):
     return spec
 
 
-def make_composition_choice(kind, probability=1.0, parameters=None):
+def _make_composition_choice(kind, probability=1.0, parameters=None):
     """Create a weighted composition choice for ``SuiteSpec``.
 
     Choice probabilities in the same table are interpreted as fractions and
@@ -561,16 +413,16 @@ def make_composition_choice(kind, probability=1.0, parameters=None):
     return spec
 
 
-def make_choice(kind, probability=1.0, parameters=None):
+def _make_choice(kind, probability=1.0, parameters=None):
     """Alias for ``make_composition_choice``.
 
     Use the explicit ``make_coordinate_transform_choice`` or
     ``make_value_transform_choice`` when constructing those choice tables.
     """
-    return make_composition_choice(kind, probability, parameters)
+    return _make_composition_choice(kind, probability, parameters)
 
 
-def make_suite_spec(
+def _make_suite_spec(
     supported_dimensions=None,
     base_functions=None,
     composition_base_functions=None,
@@ -911,7 +763,7 @@ def composition_spec(data):
 
 def function_spec(data):
     if hasattr(data, "spec"):
-        return function_spec(spec_to_dict(data.spec))
+        return function_spec(_spec_to_dict(data.spec))
     if isinstance(data, FunctionSpec):
         return data
     if not isinstance(data, Mapping):
@@ -932,7 +784,7 @@ def function_spec(data):
 
 def _owned_function_spec(data):
     """Return a FunctionSpec instance safe to store in shared_ptr fields."""
-    return function_spec(spec_to_dict(function_spec(data)))
+    return function_spec(_spec_to_dict(function_spec(data)))
 
 
 def coordinate_transform_choice(data):
@@ -1012,7 +864,7 @@ def suite_spec(data):
     return spec
 
 
-def spec_to_dict(spec):
+def _spec_to_dict(spec):
     """Convert a native C++ spec/choice object to a plain Python dict."""
     if isinstance(spec, DomainSpec):
         return {
@@ -1035,12 +887,12 @@ def spec_to_dict(spec):
         return {"kind": spec.kind.name, "parameters": _list(spec.parameters)}
     if isinstance(spec, ComponentSpec):
         result = {
-            "coordinate_transform": spec_to_dict(spec.coordinate_transform),
-            "value_transform": spec_to_dict(spec.value_transform),
+            "coordinate_transform": _spec_to_dict(spec.coordinate_transform),
+            "value_transform": _spec_to_dict(spec.value_transform),
             "seed": spec.seed,
         }
         if spec.composed_function is not None:
-            result["composed_function"] = spec_to_dict(spec.composed_function)
+            result["composed_function"] = _spec_to_dict(spec.composed_function)
         else:
             if spec.base_function is None:
                 raise ValueError("basic component requires base_function")
@@ -1061,9 +913,9 @@ def spec_to_dict(spec):
     if isinstance(spec, FunctionSpec):
         return {
             "dimension": spec.dimension,
-            "domain": spec_to_dict(spec.domain),
-            "components": [spec_to_dict(item) for item in spec.components],
-            "composition": spec_to_dict(spec.composition),
+            "domain": _spec_to_dict(spec.domain),
+            "components": [_spec_to_dict(item) for item in spec.components],
+            "composition": _spec_to_dict(spec.composition),
             "assigned_xopt": _list(spec.assigned_xopt),
             "assigned_fopt": spec.assigned_fopt,
             "scale_factor": spec.scale_factor,
@@ -1082,9 +934,9 @@ def spec_to_dict(spec):
             "supported_dimensions": spec.supported_dimensions,
             "base_functions": [item.name for item in spec.base_functions],
             "composition_base_functions": [item.name for item in spec.composition_base_functions],
-            "coordinate_transforms": [spec_to_dict(item) for item in spec.coordinate_transforms],
-            "value_transforms": [spec_to_dict(item) for item in spec.value_transforms],
-            "compositions": [spec_to_dict(item) for item in spec.compositions],
+            "coordinate_transforms": [_spec_to_dict(item) for item in spec.coordinate_transforms],
+            "value_transforms": [_spec_to_dict(item) for item in spec.value_transforms],
+            "compositions": [_spec_to_dict(item) for item in spec.compositions],
             "min_components": spec.min_components,
             "max_components": spec.max_components,
             "max_nested_composition_depth": spec.max_nested_composition_depth,
@@ -1100,48 +952,4 @@ def spec_to_dict(spec):
     raise TypeError(f"unsupported spec object: {type(spec)!r}")
 
 
-__all__ = [
-    "BasicFunctionId",
-    "ChoiceSpec",
-    "ComponentSpec",
-    "CompositionChoice",
-    "CompositionKind",
-    "CompositionSpec",
-    "CoordinateTransformChoice",
-    "CoordinateTransformKind",
-    "CoordinateTransformSpec",
-    "Domain",
-    "DomainSpec",
-    "FunctionSpec",
-    "SuiteSpec",
-    "TransformSpec",
-    "ValueTransformChoice",
-    "ValueTransformKind",
-    "ValueTransformSpec",
-    "basic_function_id",
-    "component_spec",
-    "composition_choice",
-    "composition_kind",
-    "composition_spec",
-    "coordinate_transform_choice",
-    "coordinate_transform_kind",
-    "coordinate_transform_spec",
-    "domain_spec",
-    "function_spec",
-    "make_choice",
-    "make_component",
-    "make_composition",
-    "make_composition_choice",
-    "make_coordinate_transform",
-    "make_coordinate_transform_choice",
-    "make_domain",
-    "make_function_spec",
-    "make_suite_spec",
-    "make_value_transform",
-    "make_value_transform_choice",
-    "spec_to_dict",
-    "suite_spec",
-    "value_transform_choice",
-    "value_transform_kind",
-    "value_transform_spec",
-]
+__all__ = []

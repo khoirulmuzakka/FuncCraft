@@ -70,9 +70,8 @@ void write_manifest(
     out << "idx label assigned_fopt\n";
     for (int i = 1; i <= function_count; ++i) {
         const auto& function = suite.function(i);
-        const auto& spec = function.spec();
         out << i << ' '
-            << spec.label << ' '
+            << function.label() << ' '
             << std::scientific << std::setprecision(16) << function.get_fopt()
             << '\n';
     }

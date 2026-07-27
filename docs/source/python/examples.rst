@@ -1,16 +1,15 @@
 Python examples
 ===============
 
-This page is generated from ``funccraft.ipynb`` and mirrors the notebook workflow.
+This page mirrors the ``funccraft.ipynb`` workflow.
 
-This notebook shows the main FuncCraft workflow with YAML-shaped Python dictionaries:
+This guide shows the main FuncCraft workflow with YAML-shaped Python dictionaries:
 create one ``BenchmarkFunction``, export and reload it, create one ``BenchmarkSuite``, export and reload it, then use the shipped ``2026_v1`` benchmark suite.
 
-A Python dictionary has the same structure as the YAML files used by FuncCraft, so the examples below can be copied directly into a YAML file later if you want a file-based workflow. The notebook keeps everything inline to avoid external input files.
+A Python dictionary has the same structure as the YAML files used by FuncCraft, so the examples below can be copied directly into a YAML file later if you want a file-based workflow. The guide keeps everything inline to avoid external input files.
 
 .. code-block:: python
 
-   import sys
    from pathlib import Path
    
    from matplotlib.backends.backend_pdf import PdfPages
@@ -18,15 +17,12 @@ A Python dictionary has the same structure as the YAML files used by FuncCraft, 
    import numpy as np
    import textwrap
    
-   sys.path.append(str(Path('..').resolve()))
-   
    from funccraft import (
        BasicF,
        BasicFunctionId,
        BenchmarkFunction,
        BenchmarkSuite,
-       make_benchmark_function,
-       suite_collection,
+       SuiteCollection,
    )
    
    
@@ -47,15 +43,15 @@ The main runtime objects are:
 - ``BenchmarkFunction``: one concrete callable benchmark function with a fixed dimension, domain, assigned optimum, components, transforms, composition rule, and scale factor.
 - ``BenchmarkSuite``: a materialized collection of benchmark functions for one chosen dimension. Use ``suite.function(index)`` to retrieve one ``BenchmarkFunction``. Function indices are one-based.
 
-The main spec records are:
+The main YAML/dictionary configuration shapes are:
 
-- Function spec: describes one benchmark function.
-- Suite spec: describes how many functions to generate and which base functions, coordinate transforms, value transforms, composition rules, and nesting options are allowed.
+- Function YAML/dictionary: describes one benchmark function.
+- Suite YAML/dictionary: describes how many functions to generate and which base functions, coordinate transforms, value transforms, composition rules, and nesting options are allowed.
 
 BenchmarkFunction
 -----------------
 
-This section creates one composed ``BenchmarkFunction`` from an inline Python dictionary. The dictionary mirrors a YAML function spec: it defines the dimension, domain, components, coordinate transforms, value transforms, composition rule, assigned optimum, and label. One component is itself a nested composed function.
+This section creates one composed ``BenchmarkFunction`` from an inline Python dictionary. The dictionary mirrors a function YAML file: it defines the dimension, domain, components, coordinate transforms, value transforms, composition rule, assigned optimum, and label. One component is itself a nested composed function.
 
 A ``BenchmarkFunction`` evaluates batches: pass a list of points and receive one value per point.
 
@@ -66,7 +62,7 @@ A ``BenchmarkFunction`` evaluates batches: pass a list of points and receive one
    assigned_xopt = rng.uniform(-4.0, 4.0, size=dimension).tolist()
    nested_xopt = [1.0, -1.0]
    
-   nested_function_spec = {
+   nested_function_config = {
        'dimension': dimension,
        'domain': {
            'dimension': dimension,
@@ -103,7 +99,7 @@ A ``BenchmarkFunction`` evaluates batches: pass a list of points and receive one
        'label': 'nested-rosenbrock-rastrigin',
    }
    
-   function_spec = {
+   function_config = {
        'dimension': dimension,
        'domain': {
            'dimension': dimension,
@@ -122,7 +118,7 @@ A ``BenchmarkFunction`` evaluates batches: pass a list of points and receive one
                'value_transform': {'kind': 'none'},
            },
            {
-               'composed_function': nested_function_spec,
+               'composed_function': nested_function_config,
                'coordinate_transform': {
                    'kind': 'rotation',
                    'input_dimension': dimension,
@@ -140,12 +136,12 @@ A ``BenchmarkFunction`` evaluates batches: pass a list of points and receive one
        'label': 'notebook-nested-composed-function',
    }
    
-   f = BenchmarkFunction(function_spec)
+   f = BenchmarkFunction(function_config)
    points = [zeros(dimension), assigned_xopt, [1.0] * dimension]
    values = f.evaluate(points)
    
    print('dimension:', f.dimension)
-   print('label:', f.spec.label)
+   print('label:', f.label)
    print('component_types:', f.component_types)
    print('xopt:', f.get_xopt())
    print('fopt:', f.get_fopt())
@@ -168,7 +164,7 @@ Plot the composed function as a 3D surface over its two-dimensional domain.
    ax.plot_surface(xx, yy, plot_values, cmap='viridis', linewidth=0.0, antialiased=True, alpha=0.95)
    ax.contour(xx, yy, plot_values, zdir='z', offset=float(np.nanpercentile(plot_values, 5)), cmap='viridis', linewidths=0.5)
    ax.scatter([assigned_xopt[0]], [assigned_xopt[1]], [float(np.nanmin(plot_values))], color='crimson', s=40)
-   ax.set_title(f.spec.label, fontsize=10)
+   ax.set_title(f.label, fontsize=10)
    ax.set_xlabel('x1')
    ax.set_ylabel('x2')
    ax.set_zlabel('f')
@@ -176,24 +172,24 @@ Plot the composed function as a 3D surface over its two-dimensional domain.
    plt.tight_layout()
    plt.show()
 
-Export the materialized function spec to YAML and reload it. The exported file contains generated matrices, resolved scale factor, and other values needed to reproduce this exact function.
+Export the materialized function YAML record to YAML and reload it. The exported file contains generated matrices, resolved scale factor, and other values needed to reproduce this exact function.
 
 .. code-block:: python
 
    function_yaml_path = Path('manual_function.yaml')
-   f.export_spec(str(function_yaml_path))
-   reloaded_f = make_benchmark_function(str(function_yaml_path))
+   f.export_yaml(str(function_yaml_path))
+   reloaded_f = BenchmarkFunction(str(function_yaml_path))
    
    check_points = [zeros(dimension), assigned_xopt, [1.0] * dimension]
    print('wrote:', function_yaml_path.resolve())
-   print('same label:', reloaded_f.spec.label)
+   print('same label:', reloaded_f.label)
    print('original:', f(check_points))
    print('reloaded:', reloaded_f(check_points))
 
 BenchmarkSuite
 --------------
 
-This section creates a custom ``BenchmarkSuite`` from an inline Python dictionary. The dictionary mirrors a YAML suite spec and lists all currently available mechanism families. Set an option's probability to ``0.0`` to keep it visible but disable it.
+This section creates a custom ``BenchmarkSuite`` from an inline Python dictionary. The dictionary mirrors a suite YAML file and lists all currently available mechanism families. Set an option's probability to ``0.0`` to keep it visible but disable it.
 
 .. code-block:: python
 
@@ -204,7 +200,7 @@ This section creates a custom ``BenchmarkSuite`` from an inline Python dictionar
        'BentCigar', 'HappyCat', 'HGBat', 'HCF', 'SchafferF6', 'Step', 'Quartic', 'Exponential', 'StyblinskiTang',
    ]
    
-   suite_spec = {
+   suite_config = {
        'supported_dimensions': '2',
        'base_functions': suite_base_functions,
        'composition_base_functions': suite_base_functions,
@@ -241,15 +237,15 @@ This section creates a custom ``BenchmarkSuite`` from an inline Python dictionar
        'suite_label': 'notebook-suite',
    }
    
-   suite = BenchmarkSuite(suite_spec, 2)
+   suite = BenchmarkSuite(suite_config, 2)
    print('size:', suite.size)
    print('dimension:', suite.dimension)
    print('theoretical_max_number_of_functions:', suite.theoretical_max_number_of_functions)
    for idx in range(1, min(5, len(suite)) + 1):
        function = suite.function(idx)
-       print(f'F{idx}: {function.component_types} | {function.spec.label}')
+       print(f'F{idx}: {function.component_types} | {function.label}')
 
-Export the materialized suite manifest to YAML and reload it. The manifest contains the normalized suite spec and every generated function spec, so the exact benchmark set can be reused later.
+Export the materialized suite manifest to YAML and reload it. The manifest contains the normalized suite YAML record and every generated function YAML record, so the exact benchmark set can be reused later.
 
 .. code-block:: python
 
@@ -258,16 +254,16 @@ Export the materialized suite manifest to YAML and reload it. The manifest conta
    reloaded_suite = BenchmarkSuite(str(suite_yaml_path), suite.dimension)
    print('wrote:', suite_yaml_path.resolve())
    print('reloaded size:', len(reloaded_suite))
-   print('F1 label:', reloaded_suite.function(1).spec.label)
+   print('F1 label:', reloaded_suite.function(1).label)
 
 Shipped suite: FuncCraft Benchmark Suite 2026 v1
 ------------------------------------------------
 
-FuncCraft ships the versioned ``2026_v1`` benchmark suite. Load it through ``suite_collection(year=2026, version=1)``, then materialize a ``BenchmarkSuite`` at the dimension you want.
+FuncCraft ships the versioned ``2026_v1`` benchmark suite. Load it through ``SuiteCollection(year=2026, version=1)``, then materialize a ``BenchmarkSuite`` at the dimension you want.
 
 .. code-block:: python
 
-   collection = suite_collection(year=2026, version=1)
+   collection = SuiteCollection(year=2026, version=1)
    shipped_suite = collection.benchmark_suite(dimension=2)
    
    print(collection)
@@ -276,7 +272,7 @@ FuncCraft ships the versioned ``2026_v1`` benchmark suite. Load it through ``sui
    print('suite dimension:', shipped_suite.dimension)
    
    function = shipped_suite.function(1)
-   print('F1 label:', function.spec.label)
+   print('F1 label:', function.label)
    print('F1 component_types:', function.component_types)
 
 Plot functions 1 through 500 from the shipped suite at dimension 2 as 3D surfaces and save the pages to a PDF.
@@ -336,7 +332,7 @@ Plot functions 1 through 500 from the shipped suite at dimension 2 as 3D surface
                ax = fig.add_subplot(num_rows, num_columns, pos, projection='3d')
                ax.plot_surface(xx, yy, plot_values, cmap='viridis', linewidth=0.3, antialiased=True)
                ax.contour(xx, yy, plot_values, zdir='z', offset=zmin, cmap='viridis', linewidths=0.5)
-               ax.set_title(wrap_title(idx, function.spec.label), fontsize=8, pad=14)
+               ax.set_title(wrap_title(idx, function.label), fontsize=8, pad=14)
                ax.set_xlabel('x1', fontsize=7)
                ax.set_ylabel('x2', fontsize=7)
                ax.set_zlabel('log10(f)', fontsize=7)
@@ -382,7 +378,7 @@ Minimize function ``F45`` from the shipped suite at dimension 10 with MinionPy.
        best_error = abs(result.fun - f45.get_fopt())
    
        print('function:', f'F{function_index}')
-       print('label:', f45.spec.label)
+       print('label:', f45.label)
        print('dimension:', f45.dimension)
        print('assigned fopt:', f45.get_fopt())
        print('best value:', result.fun)
@@ -392,7 +388,7 @@ Minimize function ``F45`` from the shipped suite at dimension 10 with MinionPy.
 Primitive base functions
 ------------------------
 
-Use the string names below in a component spec's ``base_function`` field, or
+Use the string names below in a component YAML entry's ``base_function`` field, or
 use the matching ``BasicFunctionId.<name>`` enum when constructing ``BasicF``
 directly:
 

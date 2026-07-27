@@ -3,7 +3,7 @@ FuncCraft 2026 v1 suite
 
 The packaged ``2026_v1`` suite is the default published FuncCraft benchmark
 suite. It is stored as YAML in ``suites/2026_v1.yaml`` and exposed through
-``suite_collection(year=2026, version=1)``.
+``SuiteCollection(year=2026, version=1)``.
 
 Load it in Python:
 
@@ -12,7 +12,7 @@ Load it in Python:
    import funccraft as fc
 
    dimension = 10
-   suite = fc.suite_collection(year=2026, version=1).benchmark_suite(dimension)
+   suite = fc.SuiteCollection(year=2026, version=1).benchmark_suite(dimension)
 
 Load it in C++:
 
@@ -229,7 +229,7 @@ What the suite contains
    the benchmark domain.
 
 ``suite_label``
-   The human-readable label stored in generated function specs and exported
+   The human-readable label stored in generated function YAML records and exported
    manifests.
 
 Disabling options

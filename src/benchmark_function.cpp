@@ -736,6 +736,10 @@ const std::string& BenchmarkFunction::component_types() const {
     return component_types_;
 }
 
+const std::string& BenchmarkFunction::label() const {
+    return spec_.label;
+}
+
 const FunctionSpec& BenchmarkFunction::spec() const {
     return spec_;
 }
