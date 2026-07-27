@@ -5,7 +5,16 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+TEST_INSTALLED_PACKAGE = "--installed" in sys.argv
+if TEST_INSTALLED_PACKAGE:
+    sys.argv.remove("--installed")
+    sys.path = [
+        path for path in sys.path
+        if Path(path or ".").resolve() != PROJECT_ROOT
+    ]
+else:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 OPTIMUM_FUNCTION_COUNT = 500
 

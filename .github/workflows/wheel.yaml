@@ -42,7 +42,7 @@ jobs:
           CIBW_SKIP: "pp* *-musllinux_*"
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_BUILD_VERBOSITY: "1"
-          CIBW_TEST_COMMAND: "python {project}/tests/test.py"
+          CIBW_TEST_COMMAND: "python {project}/tests/test.py --installed"
           CIBW_ENVIRONMENT: >-
             CMAKE_ARGS="-DBUILD_PYTHON=ON"
             SKBUILD_CONFIGURE_OPTIONS="-DBUILD_PYTHON=ON"
