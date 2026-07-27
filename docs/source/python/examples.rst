@@ -364,6 +364,13 @@ Plot functions 1 through 500 from the shipped suite at dimension 2 as 3D surface
 Minimize function ``F45`` from the shipped suite at dimension 10 with MinionPy.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The repository also includes ``examples/run_minimize.py``, which mirrors the
+C++ ``run_minimize`` executable:
+
+.. code-block:: shell
+
+   python examples/run_minimize.py ARRDE 10 50000 0 1 45 45
+
 .. code-block:: python
 
    try:

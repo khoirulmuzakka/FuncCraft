@@ -37,6 +37,7 @@ FuncCraft is designed to:
 - define reproducible custom benchmark functions with YAML;
 - preserve useful function identity under dimension changes;
 - improve cross-platform robustness for generated suites;
+- evaluate points in batches, which keeps Python calls efficient;
 - expose the same suite-generation model from C++ and Python.
 
 ## Mechanism Summary

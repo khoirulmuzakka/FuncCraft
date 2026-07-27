@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <chrono>
 #include <climits>
 #include <cmath>
 #include <cstdlib>
@@ -194,6 +195,7 @@ int main(int argc, char* argv[]) {
                   << "\n";
         std::cout << std::string(110, '-') << "\n";
 
+        const auto start_time = std::chrono::steady_clock::now();
         int failed = 0;
         for (int i = config.low; i <= config.high; ++i) {
             try {
@@ -254,6 +256,11 @@ int main(int argc, char* argv[]) {
                 throw;
             }
         }
+        const auto end_time = std::chrono::steady_clock::now();
+        const std::chrono::duration<double> elapsed = end_time - start_time;
+        std::cout << "\nTotal elapsed time: "
+                  << std::fixed << std::setprecision(3)
+                  << elapsed.count() << " seconds\n";
 
         return failed == 0 ? 0 : 1;
     } catch (const std::exception& e) {
