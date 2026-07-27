@@ -105,7 +105,7 @@ version=1)`:
 import funccraft as fc
 
 dimension = 10
-function_index = 0
+function_index = 1
 
 suite = fc.suite_collection(year=2026, version=1).benchmark_suite(dimension)
 f = suite.function(function_index)
@@ -136,7 +136,7 @@ points. Use `#include "funccraft.h"` for the public C++ API:
 
 int main() {
     const int dimension = 10;
-    const int function_index = 0;
+    const int function_index = 1;
 
     FuncCraft::BenchmarkSuite suite =
         FuncCraft::suite_collection(2026, 1).benchmark_suite(dimension);

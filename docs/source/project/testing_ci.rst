@@ -148,7 +148,8 @@ The C++ test binary supports value-table generation:
    ./bin/funccraft_test --generate-values linux values_linux.txt
 
 The generated table uses the packaged ``2026_v1`` suite at dimension 10,
-records 500 functions, and evaluates 1000 deterministic points per function.
+records one-based function indices ``1`` through ``500``, and evaluates 1000
+deterministic points per function.
 
 In ``ci.yml``, Linux, macOS arm, and Windows each upload one value table. The
 ``compare-values`` job downloads all tables and runs:

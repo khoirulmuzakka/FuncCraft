@@ -1046,8 +1046,8 @@ int BenchmarkSuite::dimension() const {
 }
 
 const BenchmarkFunction& BenchmarkSuite::function(int index) const {
-    require(index >= 0 && index < size(), "benchmark function index out of range");
-    const std::size_t pos = static_cast<std::size_t>(index);
+    require(index >= 1 && index <= size(), "benchmark function index out of range; function indices start at 1");
+    const std::size_t pos = static_cast<std::size_t>(index - 1);
     if (!function_cache_[pos].has_value()) {
         function_cache_[pos].emplace(build_function(blueprints_[pos]));
     }
@@ -1073,7 +1073,7 @@ YAML::Node BenchmarkSuite::export_manifest() const {
     node["theoretical_max_number_of_functions"] = theoretical_max_number_of_functions_;
 
     YAML::Node functions(YAML::NodeType::Sequence);
-    for (int i = 0; i < size(); ++i) {
+    for (int i = 1; i <= size(); ++i) {
         YAML::Node entry = function(i).export_spec();
         entry["index"] = i;
         functions.push_back(entry);

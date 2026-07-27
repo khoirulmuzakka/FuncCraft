@@ -42,7 +42,7 @@ void write_manifest(
     int function_count) {
     std::ofstream out(path);
     out << "idx label assigned_fopt\n";
-    for (int i = 0; i < function_count; ++i) {
+    for (int i = 1; i <= function_count; ++i) {
         const auto function = suite.function(i);
         const auto& spec = function.spec();
         out << i << ' '

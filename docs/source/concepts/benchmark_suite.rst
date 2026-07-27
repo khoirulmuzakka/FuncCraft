@@ -6,7 +6,8 @@ for one chosen dimension. It is built from a ``SuiteSpec`` or from a packaged
 suite collection.
 
 The suite owns the generated function list. Retrieve a function by index when
-you want to inspect it or pass it to an optimizer:
+you want to inspect it or pass it to an optimizer. Function indices are
+one-based: valid indices are ``1`` through ``suite.size()``.
 
 .. code-block:: python
 
@@ -15,7 +16,7 @@ you want to inspect it or pass it to an optimizer:
    spec = fc.load_suite_spec("my_suite.yaml")
    suite = fc.BenchmarkSuite(spec, dimension=10)
 
-   f = suite.function(0)
+   f = suite.function(1)
    values = f.evaluate([[0.0] * 10])
 
 For a packaged suite:
@@ -24,15 +25,17 @@ For a packaged suite:
 
    suite = fc.suite_collection(year=2026, version=1).benchmark_suite(10)
 
-Direct suite evaluation
------------------------
+Evaluation
+----------
 
-``suite.evaluate(function_index, points)`` is a convenience form for retrieving
-the function and evaluating it:
+The recommended workflow is to materialize the benchmark function first, then
+evaluate it:
 
 .. code-block:: python
 
-   values = suite.evaluate(0, [[0.0] * 10, [1.0] * 10])
+   function_index = 1
+   f = suite.function(function_index)
+   values = f.evaluate([[0.0] * 10, [1.0] * 10])
 
 In C++, use ``suite.function(index)`` and call the returned function object:
 
@@ -40,7 +43,7 @@ In C++, use ``suite.function(index)`` and call the returned function object:
 
    FuncCraft::BenchmarkSuite suite =
        FuncCraft::suite_collection(2026, 1).benchmark_suite(10);
-   const FuncCraft::BenchmarkFunction& f = suite.function(0);
+   const FuncCraft::BenchmarkFunction& f = suite.function(1);
    std::vector<double> values = f({std::vector<double>(10, 0.0)});
 
 Dimension and identity

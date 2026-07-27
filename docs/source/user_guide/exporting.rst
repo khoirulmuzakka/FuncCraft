@@ -18,7 +18,7 @@ Python:
 
    import funccraft as fc
 
-   function_index = 0
+   function_index = 1
    year = 2026
    version = 1
    f = fc.suite_collection(year, version).benchmark_suite(2).function(function_index)
@@ -30,7 +30,7 @@ C++:
 
 .. code-block:: cpp
 
-   const int function_index = 0;
+   const int function_index = 1;
    const FuncCraft::BenchmarkFunction& f = suite.function(function_index);
    f.export_spec("function_materialized.yaml");
 

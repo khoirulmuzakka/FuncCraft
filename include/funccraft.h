@@ -58,9 +58,12 @@
  * - `BenchmarkSuite::export_manifest(path)`
  * - `BenchmarkSuite::export_spec(path)`
  *
- * Evaluation is batched:
- * - `BenchmarkFunction::operator()(std::vector<std::vector<double>>)`
- * - `BenchmarkSuite::operator()(index, std::vector<std::vector<double>>)`
+ * Recommended evaluation flow:
+ * - materialize a function with `BenchmarkSuite::function(index)`
+ * - evaluate it with `BenchmarkFunction::operator()(std::vector<std::vector<double>>)`
+ *
+ * `BenchmarkSuite::operator()(index, points)` remains available as a shortcut,
+ * but examples should instantiate `BenchmarkFunction` first.
  *
  * Minimal example:
  *
@@ -69,7 +72,7 @@
  *
  * int main() {
  *     const int dimension = 10;
- *     const int function_index = 0;
+ *     const int function_index = 1;
  *     const int year = 2026;
  *     const int version = 1;
  *     FuncCraft::SuiteCollection collection =

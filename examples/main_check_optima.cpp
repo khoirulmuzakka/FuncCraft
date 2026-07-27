@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
         std::cout << std::string(110, '-') << "\n";
 
         const int function_count = std::min(config.max_functions, suite.size());
-        for (int i = 0; i < function_count; ++i) {
+        for (int i = 1; i <= function_count; ++i) {
             const auto function = suite.function(i);
             const auto& spec = function.spec();
             const auto fields = split_class_label(spec.label);

@@ -17,7 +17,8 @@ Use the built-in suite collection::
     version = 1
     collection = fc.suite_collection(year, version)
     suite = collection.benchmark_suite(dimension=10)
-    values = suite.evaluate(0, [[0.0] * 10])
+    f = suite.function(1)
+    values = f.evaluate([[0.0] * 10])
 
 Create one function manually::
 

@@ -22,8 +22,8 @@ struct RunConfig {
     std::size_t max_evals = 10000;
     int population_size = 0;
     unsigned long long seed = 1;
-    int low = 0;
-    int high = 31;
+    int low = 1;
+    int high = 32;
 };
 
 bool is_integer_arg(const char* text) {
@@ -45,8 +45,8 @@ RunConfig parse_cli(int argc, char* argv[]) {
     if (argc > arg_index + 1) config.max_evals = static_cast<std::size_t>(std::strtoull(argv[arg_index + 1], nullptr, 10));
     if (argc > arg_index + 2) config.population_size = std::max(0, std::atoi(argv[arg_index + 2]));
     if (argc > arg_index + 3) config.seed = static_cast<unsigned long long>(std::strtoull(argv[arg_index + 3], nullptr, 10));
-    if (argc > arg_index + 4) config.low = std::max(0, std::atoi(argv[arg_index + 4]));
-    if (argc > arg_index + 5) config.high = std::max(0, std::atoi(argv[arg_index + 5]));
+    if (argc > arg_index + 4) config.low = std::max(1, std::atoi(argv[arg_index + 4]));
+    if (argc > arg_index + 5) config.high = std::max(1, std::atoi(argv[arg_index + 5]));
     return config;
 }
 
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
         if (config.high < config.low) {
             throw std::invalid_argument("high must be greater than or equal to low");
         }
-        if (config.low >= suite.size() || config.high >= suite.size()) {
+        if (config.low > suite.size() || config.high > suite.size()) {
             throw std::out_of_range("requested function index range is outside the suite size");
         }
         const int processed_functions = config.high - config.low + 1;
@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
                 for (int d = 0; d < bounds.dimension(); ++d) {
                     minion_bounds.emplace_back(bounds.lower[static_cast<std::size_t>(d)], bounds.upper[static_cast<std::size_t>(d)]);
                 }
-                std::mt19937_64 rng(static_cast<std::uint64_t>(config.seed) ^ (0x9E3779B97F4A7C15ULL + static_cast<std::uint64_t>(i + 1)));
+                std::mt19937_64 rng(static_cast<std::uint64_t>(config.seed) ^ (0x9E3779B97F4A7C15ULL + static_cast<std::uint64_t>(i)));
                 std::vector<double> x0(static_cast<std::size_t>(bounds.dimension()), 0.0);
                 for (int d = 0; d < bounds.dimension(); ++d) {
                     const double lo = bounds.lower[static_cast<std::size_t>(d)];

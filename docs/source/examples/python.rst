@@ -12,7 +12,7 @@ Load a suite YAML
    import funccraft as fc
 
    dimension = 10
-   function_index = 0
+   function_index = 1
 
    spec = fc.load_suite_spec("my_suite.yaml")
    suite = fc.BenchmarkSuite(spec, dimension)
@@ -38,8 +38,9 @@ Use a packaged suite collection
    year = 2026
    version = 1
    suite = fc.suite_collection(year, version).benchmark_suite(dimension)
-   function_index = 0
-   values = suite.evaluate(function_index, [[0.0] * dimension])
+   function_index = 1
+   f = suite.function(function_index)
+   values = f.evaluate([[0.0] * dimension])
 
 Create one function in Python
 -----------------------------
@@ -115,7 +116,7 @@ batched interface:
    import funccraft as fc
 
    dimension = 10
-   function_index = 0
+   function_index = 1
    year = 2026
    version = 1
    suite = fc.suite_collection(year, version).benchmark_suite(dimension)
@@ -142,7 +143,7 @@ initial guesses as a list of lists:
    import minionpy as mpy
 
    dimension = 10
-   function_index = 0
+   function_index = 1
    year = 2026
    version = 1
    suite = fc.suite_collection(year, version).benchmark_suite(dimension)

@@ -75,7 +75,7 @@ def candidate_points(function):
 
 
 def check_optima(suite, *, tolerance=20.0):
-    for index in range(len(suite)):
+    for index in range(1, len(suite) + 1):
         function = suite.function(index)
         x_star = function.get_xopt()
         value = function.evaluate([x_star])[0]
@@ -97,8 +97,8 @@ def check_function_yaml_roundtrip(function, path):
 
 
 def check_suite_yaml_roundtrip(suite, path):
-    first_composed = len(BasicFunctionId.__members__)
-    indices = [0, first_composed + 2, len(suite) - 1]
+    first_composed = len(BasicFunctionId.__members__) + 1
+    indices = [1, first_composed + 2, len(suite)]
     before = {
         index: suite.function(index).evaluate(candidate_points(suite.function(index)))
         for index in indices
@@ -158,7 +158,7 @@ def check_composition_kinds():
     suite = BenchmarkSuite(suite_spec, 2)
     if not any(
         suite.function(index).spec.composition.kind == CompositionKind.DpmBgSoftmax
-        for index in range(len(suite))
+        for index in range(1, len(suite) + 1)
     ):
         raise AssertionError("suite composition choice did not generate DPM bg softmax functions")
 
@@ -187,7 +187,7 @@ def main():
     if collection.number_of_functions != suite_collection_number_of_functions(suite_year, suite_version):
         raise AssertionError("suite collection function count mismatch")
     collection_suite = collection.benchmark_suite(2)
-    value = collection_suite.function(0).evaluate([collection_suite.function(0).spec.assigned_xopt])[0]
+    value = collection_suite.function(1).evaluate([collection_suite.function(1).spec.assigned_xopt])[0]
     if not math.isfinite(value):
         raise AssertionError("suite collection generated a nonfinite value")
 
@@ -207,7 +207,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         check_function_yaml_roundtrip(
-            roundtrip_suite.function(len(BasicFunctionId.__members__) + 2),
+            roundtrip_suite.function(len(BasicFunctionId.__members__) + 3),
             tmpdir / "function.yaml",
         )
         check_suite_yaml_roundtrip(roundtrip_suite, tmpdir / "suite.yaml")

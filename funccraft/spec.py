@@ -178,8 +178,10 @@ def make_coordinate_transform(
     ----------
     kind:
         One of ``"none"``, ``"rotation"``, ``"affine"``, or
-        ``"block-rotation"``. Names are normalized, so ``"Block Rotation"``,
-        ``"block_rotation"``, and ``"block-rotation"`` are equivalent.
+        ``"block-rotation"``. Enum names ``"None"``, ``"Rotation"``,
+        ``"Affine"``, and ``"BlockRotation"`` are also accepted. Names are
+        normalized, so ``"Block Rotation"``, ``"block_rotation"``, and
+        ``"block-rotation"`` are equivalent.
     input_dimension:
         Ambient/search dimension. Leave as ``0`` to let FuncCraft infer it
         from the parent function dimension.
@@ -192,9 +194,14 @@ def make_coordinate_transform(
         center, depending on the suite construction mode.
     selected_indices:
         Optional coordinate subset used by block rotation.
+    parameters:
+        Optional transform-specific parameters. Current built-in transforms do
+        not require user parameters.
     matrix:
         Optional materialized transform matrix. Users normally omit this;
         exported materialized specs include it.
+    seed:
+        Seed used when generated transform data such as rotations is omitted.
 
     Examples
     --------
@@ -229,12 +236,24 @@ def make_coordinate_transform(
 def make_value_transform(kind="none", parameters=None):
     """Create a native ``ValueTransformSpec``.
 
+    Parameters
+    ----------
+    kind:
+        One of ``"none"``, ``"power"``, ``"oscillatory"``, or
+        ``"cosine-zero"``. Enum names ``"None"``, ``"Power"``,
+        ``"Oscillatory"``, and ``"CosineZero"`` are also accepted.
+    parameters:
+        Optional value-transform parameters. Current suite defaults use empty
+        parameter lists.
+
     Examples
     --------
-    Use no value transform, or add an implemented value transform by name::
+    Use any implemented value transform by name::
 
         identity = make_value_transform("none")
+        power = make_value_transform("power")
         warped = make_value_transform("oscillatory")
+        cosine = make_value_transform("cosine-zero")
 
     Names are normalized across case, spaces, hyphens, and underscores.
     """
@@ -259,6 +278,26 @@ def make_component(
     a ``spec`` attribute such as ``BenchmarkFunction``.
     ``coordinate_transform`` and ``value_transform`` may be native specs or
     dictionaries with the same field names.
+
+    Available primitive base functions
+    ----------------------------------
+    ``1`` ``"Sphere"``, ``2`` ``"Ellipsoidal"``,
+    ``3`` ``"SumDifferentPowers"``, ``4`` ``"BuecheRastrigin"``,
+    ``5`` ``"LinearSlope"``, ``6`` ``"AttractiveSector"``,
+    ``7`` ``"StepEllipsoidal"``, ``8`` ``"StepRastrigin"``,
+    ``9`` ``"Rosenbrock"``, ``10`` ``"Ackley"``,
+    ``11`` ``"Rastrigin"``, ``12`` ``"Griewank"``,
+    ``13`` ``"Schwefel"``, ``14`` ``"SharpRidge"``,
+    ``15`` ``"Weierstrass"``, ``16`` ``"SchafferF7"``,
+    ``17`` ``"SchafferF7Cond1000"``, ``18`` ``"GriewankRosenbrock"``,
+    ``19`` ``"Gallagher21"``, ``20`` ``"Katsuura"``,
+    ``21`` ``"LunacekBiRastrigin"``, ``22`` ``"Zakharov"``,
+    ``23`` ``"Levy"``, ``24`` ``"Michalewicz"``,
+    ``25`` ``"DixonPrice"``, ``26`` ``"BentCigar"``,
+    ``27`` ``"HappyCat"``, ``28`` ``"HGBat"``, ``29`` ``"HCF"``,
+    ``30`` ``"SchafferF6"``, ``31`` ``"Step"``,
+    ``32`` ``"Quartic"``, ``33`` ``"Exponential"``,
+    ``34`` ``"StyblinskiTang"``.
 
     Examples
     --------
@@ -301,7 +340,9 @@ def make_composition(kind="none", parameters=None, biases=None, centers=None):
     kind:
         ``"none"`` for a single identity component, ``"cpm-wsum"``,
         ``"cpm-power-mean"``, ``"cpm-level-well"``, ``"dpm-softmax"``, or
-        ``"dpm-bgsoftmax"``.
+        ``"dpm-bgsoftmax"``. Enum names ``"None"``, ``"CpmWeightedSum"``,
+        ``"CpmPowerMean"``, ``"CpmLevelWell"``, ``"DpmSoftmax"``, and
+        ``"DpmBgSoftmax"`` are also accepted.
     parameters:
         Composition-specific numeric parameters.
     biases:
@@ -356,6 +397,20 @@ def make_function_spec(
     ``components`` may contain native ``ComponentSpec`` objects or dictionaries.
     ``scale_factor=None`` lets FuncCraft choose the scale internally.
 
+    Available fields
+    ----------------
+    - ``dimension``: function dimension.
+    - ``domain``: ``DomainSpec`` or dict with ``dimension``,
+      ``lower_bound``, and ``upper_bound``.
+    - ``components``: list of ``ComponentSpec`` objects or dicts. Each
+      component can use a primitive ``base_function`` or a nested
+      ``composed_function``.
+    - ``composition``: ``CompositionSpec`` or dict with ``kind``,
+      ``parameters``, optional ``biases``, and optional ``centers``.
+    - ``assigned_xopt``, ``assigned_fopt``, ``scale_factor``, ``seed``,
+      ``label``, ``metadata``: materialized function metadata and generation
+      controls.
+
     Important fields
     ----------------
     ``assigned_xopt``
@@ -405,6 +460,10 @@ def make_coordinate_transform_choice(kind, probability=1.0, parameters=None):
 
     Choice probabilities in the same table are interpreted as fractions and
     should sum to one.
+
+    Available ``kind`` values are ``"none"``, ``"rotation"``, ``"affine"``,
+    and ``"block-rotation"``. Set ``probability=0.0`` to keep an option visible
+    but disabled.
     """
     spec = CoordinateTransformChoice()
     spec.kind = coordinate_transform_kind(kind)
@@ -418,6 +477,10 @@ def make_value_transform_choice(kind, probability=1.0, parameters=None):
 
     Choice probabilities in the same table are interpreted as fractions and
     should sum to one.
+
+    Available ``kind`` values are ``"none"``, ``"power"``,
+    ``"oscillatory"``, and ``"cosine-zero"``. Set ``probability=0.0`` to keep
+    an option visible but disabled.
     """
     spec = ValueTransformChoice()
     spec.kind = value_transform_kind(kind)
@@ -431,6 +494,12 @@ def make_composition_choice(kind, probability=1.0, parameters=None):
 
     Choice probabilities in the same table are interpreted as fractions and
     should sum to one.
+
+    Available ``kind`` values are ``"cpm-wsum"``, ``"cpm-power-mean"``,
+    ``"cpm-level-well"``, ``"dpm-softmax"``, and ``"dpm-bgsoftmax"``.
+    ``"none"`` is available for direct single-component functions, but suite
+    generation normally uses composed choices. Set ``probability=0.0`` to keep
+    an option visible but disabled.
     """
     spec = CompositionChoice()
     spec.kind = composition_kind(kind)
@@ -476,6 +545,31 @@ def make_suite_spec(
     primitive components. Larger values allow composed functions as components;
     ``nested_probability`` controls how often each component is nested.
 
+    Available fields
+    ----------------
+    - ``supported_dimensions``: string such as ``"any"`` or
+      ``"2,5,10,20"``.
+    - ``base_functions``: primitive base functions used for the leading
+      primitive-function prefix. Accepts IDs ``1`` through ``34`` or names
+      listed in ``make_component``.
+    - ``composition_base_functions``: primitive base functions available to
+      generated composed functions. Nested composed functions are also allowed
+      as base components up to ``max_nested_composition_depth``.
+    - ``coordinate_transforms``: choices for ``"none"``, ``"rotation"``,
+      ``"affine"``, and ``"block-rotation"``.
+    - ``value_transforms``: choices for ``"none"``, ``"power"``,
+      ``"oscillatory"``, and ``"cosine-zero"``.
+    - ``compositions``: choices for ``"cpm-wsum"``, ``"cpm-power-mean"``,
+      ``"cpm-level-well"``, ``"dpm-softmax"``, and ``"dpm-bgsoftmax"``.
+    - ``min_components``, ``max_components``,
+      ``max_nested_composition_depth``, ``nested_probability``:
+      component-count and nesting controls.
+    - ``requested_number_of_functions``, ``max_number_of_functions``,
+      ``master_seed``: suite size and deterministic generation controls.
+    - ``lower_bound``, ``upper_bound``, ``assigned_fopt``,
+      ``xopt_domain_shrink_factor``, ``suite_label``: domain, assigned optimum
+      value, optimum sampling, and label defaults.
+
     Examples
     --------
     Generate 1,000 functions using default choices except for dimensions,
@@ -501,6 +595,50 @@ def make_suite_spec(
                 make_composition_choice("cpm-level-well", 0.2),
                 make_composition_choice("dpm-softmax", 0.4, [0.01]),
             ],
+        )
+
+    Full option table, mirroring the packaged ``2026_v1`` YAML. Set a
+    probability to ``0.0`` to disable that option while keeping it documented::
+
+        spec = make_suite_spec(
+            supported_dimensions="any",
+            base_functions=list(range(1, 35)),
+            composition_base_functions=[
+                4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20,
+                21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27,
+            ],
+            coordinate_transforms=[
+                make_coordinate_transform_choice("none", 0.0),
+                make_coordinate_transform_choice("rotation", 0.34),
+                make_coordinate_transform_choice("affine", 0.33),
+                make_coordinate_transform_choice("block-rotation", 0.33),
+            ],
+            value_transforms=[
+                make_value_transform_choice("none", 0.5),
+                make_value_transform_choice("power", 0.25),
+                make_value_transform_choice("oscillatory", 0.25),
+                make_value_transform_choice("cosine-zero", 0.0),
+            ],
+            compositions=[
+                make_composition_choice("cpm-wsum", 0.1),
+                make_composition_choice("cpm-power-mean", 0.1, [3.0]),
+                make_composition_choice("cpm-power-mean", 0.1, [0.1]),
+                make_composition_choice("cpm-level-well", 0.2),
+                make_composition_choice("dpm-softmax", 0.25, [0.005]),
+                make_composition_choice("dpm-bgsoftmax", 0.25, [0.005, 1.0, 0.01]),
+            ],
+            min_components=2,
+            max_components=5,
+            max_nested_composition_depth=1,
+            nested_probability=0.1,
+            requested_number_of_functions=1_000_000,
+            max_number_of_functions=0,
+            master_seed=1,
+            lower_bound=-100.0,
+            upper_bound=100.0,
+            assigned_fopt=100.0,
+            xopt_domain_shrink_factor=0.8,
+            suite_label="Funccraft-2026-benchmark-suite-v1",
         )
     """
     spec = SuiteSpec()

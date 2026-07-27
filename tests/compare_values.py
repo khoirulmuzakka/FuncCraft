@@ -78,7 +78,7 @@ def summarize_differences(
         agreement = within_tolerance / point_count
         required_agreement = (
             strict_point_agreement_threshold
-            if function_index < strict_function_count
+            if function_index <= strict_function_count
             else point_agreement_threshold
         )
         failed = agreement < required_agreement
@@ -109,8 +109,8 @@ def print_report(
     strict_function_count,
     strict_point_agreement_threshold,
 ):
-    strict_reports = [row for row in reports if row[0] < strict_function_count]
-    statistical_reports = [row for row in reports if row[0] >= strict_function_count]
+    strict_reports = [row for row in reports if row[0] <= strict_function_count]
+    statistical_reports = [row for row in reports if row[0] > strict_function_count]
     strict_failed = [row[0] for row in strict_reports if row[-1]]
     statistical_failed = [row[0] for row in statistical_reports if row[-1]]
     statistical_passed = len(statistical_reports) - len(statistical_failed)
@@ -145,7 +145,7 @@ def print_report(
     for function_index, min_diff, median_diff, max_diff, agreement, required_agreement, failed in reports:
         status = "FAIL" if failed else "OK"
         print(
-            f"F{function_index + 1:<7d}  "
+            f"F{function_index:<7d}  "
             f"{min_diff:14.6e}  "
             f"{median_diff:14.6e}  "
             f"{max_diff:14.6e}  "
@@ -163,7 +163,7 @@ def print_report(
     print(f"Failed statistical functions: {len(statistical_failed)} / {len(statistical_reports)}")
     print(f"Overall status: {'FAIL' if suite_failed else 'OK'}")
     if failed_functions:
-        shown = ", ".join(f"F{index + 1}" for index in failed_functions[:25])
+        shown = ", ".join(f"F{index}" for index in failed_functions[:25])
         suffix = " ..." if len(failed_functions) > 25 else ""
         print(f"Failures: {shown}{suffix}")
     return suite_failed

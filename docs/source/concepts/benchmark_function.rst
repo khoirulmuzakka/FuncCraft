@@ -15,7 +15,7 @@ Python
    import funccraft as fc
 
    suite = fc.suite_collection(year=2026, version=1).benchmark_suite(10)
-   f = suite.function(0)
+   f = suite.function(1)
 
    values = f.evaluate([[0.0] * 10, [1.0] * 10])
 
@@ -31,7 +31,7 @@ C++
 
    FuncCraft::BenchmarkSuite suite =
        FuncCraft::suite_collection(2026, 1).benchmark_suite(10);
-   const FuncCraft::BenchmarkFunction& f = suite.function(0);
+   const FuncCraft::BenchmarkFunction& f = suite.function(1);
 
    std::vector<double> values = f({
        std::vector<double>(10, 0.0),

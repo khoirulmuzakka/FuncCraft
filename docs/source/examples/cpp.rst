@@ -17,7 +17,7 @@ Load a suite YAML
 
    int main() {
        const int dimension = 10;
-       const int function_index = 0;
+       const int function_index = 1;
 
        FuncCraft::SuiteSpec spec =
            FuncCraft::load_suite_spec("my_suite.yaml");
@@ -134,7 +134,7 @@ dependency. ``examples/main_minimize.cpp`` contains a fuller program.
 
    int main() {
        const int dimension = 10;
-       const int function_index = 0;
+       const int function_index = 1;
        const int year = 2026;
        const int version = 1;
 

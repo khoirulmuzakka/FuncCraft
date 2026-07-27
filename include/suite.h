@@ -9,7 +9,7 @@
  * dimension. The suite container consumes that spec, resolves its sampling
  * rules deterministically, and stores blueprints only. Concrete
  * `BenchmarkFunction` objects are created lazily when the caller requests a
- * specific function index.
+ * specific one-based function index.
  */
 
 #include "benchmark_function.h"
@@ -51,7 +51,7 @@ public:
      * @brief Return the maximum number of lazily generatable functions.
      *
      * This is the number of blueprints prepared by the constructor, so it is
-     * the upper bound on valid function indices for this suite.
+     * the upper bound on valid one-based function indices for this suite.
      */
     int max_number_of_functions() const;
     /**
@@ -67,10 +67,15 @@ public:
     int dimension() const;
     /**
      * @brief Build one generated function lazily for the suite dimension.
+     *
+     * Function indices are one-based: valid indices are 1 through size().
      */
     const BenchmarkFunction& function(int index) const;
     /**
-     * @brief Batch-evaluate one generated function at multiple points.
+     * @brief Shortcut for batch-evaluating one generated function by index.
+     *
+     * Prefer `suite.function(index)(points)` in new code when the caller will
+     * inspect, reuse, or export the materialized `BenchmarkFunction`.
      */
     std::vector<double> operator()(int index, const std::vector<std::vector<double>>& X) const;
     /**

@@ -81,7 +81,7 @@ std::vector<std::vector<double>> candidate_points(const FuncCraft::BenchmarkFunc
 }
 
 int first_composed_function_index() {
-    return static_cast<int>(FuncCraft::list_basic_functions().size());
+    return static_cast<int>(FuncCraft::list_basic_functions().size()) + 1;
 }
 
 void check_optima() {
@@ -90,7 +90,7 @@ void check_optima() {
     const FuncCraft::BenchmarkSuite suite = FuncCraft::suite_collection(suite_year, suite_version).benchmark_suite(10);
 
     const int checked_count = std::min(kCrossPlatformFunctionCount, suite.size());
-    for (int i = 0; i < checked_count; ++i) {
+    for (int i = 1; i <= checked_count; ++i) {
         const FuncCraft::BenchmarkFunction& function = suite.function(i);
         const double value = function({function.get_xopt()}).front();
         require_close(
@@ -138,7 +138,7 @@ void check_suite_collection() {
 
     const FuncCraft::BenchmarkSuite suite = collection.benchmark_suite(2);
     require(suite.size() == collection.number_of_functions(), "suite collection benchmark suite size mismatch");
-    const FuncCraft::BenchmarkFunction& function = suite.function(0);
+    const FuncCraft::BenchmarkFunction& function = suite.function(1);
     require(function.dimension() == 2, "suite collection function dimension mismatch");
 }
 
@@ -438,7 +438,7 @@ void check_composition_kind_aliases() {
 
     const FuncCraft::BenchmarkSuite suite(suite_spec, 2);
     bool found_composed_function = false;
-    for (int i = 0; i < suite.size(); ++i) {
+    for (int i = 1; i <= suite.size(); ++i) {
         const FuncCraft::CompositionKind kind = suite.function(i).spec().composition.kind;
         if (kind == FuncCraft::CompositionKind::DpmBgSoftmax) {
             found_composed_function = true;
@@ -591,7 +591,7 @@ void check_suite_structure_stable_across_dimensions() {
     const FuncCraft::BenchmarkSuite suite_2d(suite_spec, 2);
     const FuncCraft::BenchmarkSuite suite_5d(suite_spec, 5);
     require(suite_2d.size() == suite_5d.size(), "dimension-stability suite size mismatch");
-    for (int i = 0; i < suite_2d.size(); ++i) {
+    for (int i = 1; i <= suite_2d.size(); ++i) {
         require_same_generated_structure(
             suite_2d.function(i).spec(),
             suite_5d.function(i).spec(),
@@ -614,7 +614,7 @@ void check_suite_geometry_prefix_stable_across_dimensions() {
     const FuncCraft::BenchmarkSuite suite_4d(suite_spec, 4);
     const FuncCraft::BenchmarkSuite suite_8d(suite_spec, 8);
     require(suite_4d.size() == suite_8d.size(), "geometry-prefix suite size mismatch");
-    for (int i = 0; i < suite_4d.size(); ++i) {
+    for (int i = 1; i <= suite_4d.size(); ++i) {
         require_prefix_generated_geometry(
             suite_4d.function(i).spec(),
             suite_8d.function(i).spec(),
@@ -691,7 +691,7 @@ void check_function_yaml_roundtrip(const std::filesystem::path& path) {
 
 void check_suite_yaml_roundtrip(const std::filesystem::path& path) {
     const FuncCraft::BenchmarkSuite suite = make_roundtrip_suite();
-    const std::vector<int> indices = {0, first_composed_function_index() + 2, suite.size() - 1};
+    const std::vector<int> indices = {1, first_composed_function_index() + 2, suite.size()};
     std::vector<std::vector<double>> before;
     before.reserve(indices.size());
     for (int index : indices) {
@@ -724,7 +724,7 @@ void check_packaged_suite_function_spec_manifest_exact_roundtrip(const std::file
     std::vector<std::vector<double>> before;
     points.reserve(static_cast<std::size_t>(function_count));
     before.reserve(static_cast<std::size_t>(function_count));
-    for (int index = 0; index < function_count; ++index) {
+    for (int index = 1; index <= function_count; ++index) {
         const FuncCraft::BenchmarkFunction& function = suite.function(index);
         points.push_back(sample_cross_platform_points(function.domain(), index));
         before.push_back(function(points.back()));
@@ -737,8 +737,8 @@ void check_packaged_suite_function_spec_manifest_exact_roundtrip(const std::file
         static_cast<int>(manifest["functions"].size()) == function_count,
         "suite manifest function count mismatch");
 
-    for (int index = 0; index < function_count; ++index) {
-        const YAML::Node entry = manifest["functions"][static_cast<std::size_t>(index)];
+    for (int index = 1; index <= function_count; ++index) {
+        const YAML::Node entry = manifest["functions"][static_cast<std::size_t>(index - 1)];
         require(
             static_cast<bool>(entry["function_spec"]),
             "suite manifest function entry is missing function_spec");
@@ -756,10 +756,10 @@ void check_packaged_suite_function_spec_manifest_exact_roundtrip(const std::file
         }
 
         const FuncCraft::BenchmarkFunction imported = FuncCraft::make_benchmark_function(function_path.string());
-        const std::vector<double> after = imported(points[static_cast<std::size_t>(index)]);
+        const std::vector<double> after = imported(points[static_cast<std::size_t>(index - 1)]);
         require_exact_vector(
             after,
-            before[static_cast<std::size_t>(index)],
+            before[static_cast<std::size_t>(index - 1)],
             "packaged suite function-spec exact roundtrip mismatch for function " + std::to_string(index));
     }
 }
@@ -780,7 +780,7 @@ void write_cross_platform_values(const std::string& platform, const std::filesys
     out << std::scientific << std::setprecision(std::numeric_limits<double>::max_digits10);
 
     const int function_count = std::min(kCrossPlatformFunctionCount, suite.size());
-    for (int index = 0; index < function_count; ++index) {
+    for (int index = 1; index <= function_count; ++index) {
         const FuncCraft::BenchmarkFunction& function = suite.function(index);
         const std::vector<double> values = function(sample_cross_platform_points(function.domain(), index));
         out << index;

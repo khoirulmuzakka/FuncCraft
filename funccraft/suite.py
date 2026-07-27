@@ -19,8 +19,8 @@ suite definition shipped with the package::
     print(collection.name, collection.number_of_functions)
 
     suite = collection.benchmark_suite(dimension=10)
-    f0 = suite.function(0)
-    values = suite.evaluate(0, [[0.0] * suite.dimension])
+    f1 = suite.function(1)
+    values = f1.evaluate([[0.0] * suite.dimension])
 
 Build a custom suite from Python specs when you want to control the sampling
 rules directly::
@@ -63,13 +63,79 @@ def _as_native_suite_spec(spec):
 def make_benchmark_suite(spec, dimension):
     """Build a :class:`BenchmarkSuite` for the requested dimension.
 
+    Parameters
+    ----------
+    spec:
+        One of:
+
+        - native :class:`SuiteSpec`;
+        - compatible dictionary with the ``make_suite_spec`` fields:
+          ``supported_dimensions``, ``base_functions``,
+          ``composition_base_functions``, ``coordinate_transforms``,
+          ``value_transforms``, ``compositions``, ``min_components``,
+          ``max_components``, ``max_nested_composition_depth``,
+          ``nested_probability``, ``requested_number_of_functions``,
+          ``max_number_of_functions``, ``master_seed``, ``lower_bound``,
+          ``upper_bound``, ``assigned_fopt``,
+          ``xopt_domain_shrink_factor``, and ``suite_label``;
+        - YAML path containing those same fields.
+    dimension:
+        Explicit runtime dimension for every generated benchmark function.
+
     Examples
     --------
     ``spec`` may be a native ``SuiteSpec``, compatible dictionary, or YAML
     path::
 
         suite = make_benchmark_suite("default_suite.yaml", dimension=10)
-        y = suite.evaluate(0, [[0.0] * suite.dimension])
+        f = suite.function(1)
+        y = f.evaluate([[0.0] * suite.dimension])
+
+    Dictionary input can expose all suite options directly::
+
+        suite = make_benchmark_suite(
+            {
+                "supported_dimensions": "any",
+                "base_functions": list(range(1, 35)),
+                "composition_base_functions": [
+                    4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20,
+                    21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27,
+                ],
+                "coordinate_transforms": [
+                    {"kind": "none", "probability": 0.0, "parameters": []},
+                    {"kind": "rotation", "probability": 0.34, "parameters": []},
+                    {"kind": "affine", "probability": 0.33, "parameters": []},
+                    {"kind": "block-rotation", "probability": 0.33, "parameters": []},
+                ],
+                "value_transforms": [
+                    {"kind": "none", "probability": 0.5, "parameters": []},
+                    {"kind": "power", "probability": 0.25, "parameters": []},
+                    {"kind": "oscillatory", "probability": 0.25, "parameters": []},
+                    {"kind": "cosine-zero", "probability": 0.0, "parameters": []},
+                ],
+                "compositions": [
+                    {"kind": "cpm-wsum", "probability": 0.1, "parameters": []},
+                    {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [3.0]},
+                    {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [0.1]},
+                    {"kind": "cpm-level-well", "probability": 0.2, "parameters": []},
+                    {"kind": "dpm-softmax", "probability": 0.25, "parameters": [0.005]},
+                    {"kind": "dpm-bgsoftmax", "probability": 0.25, "parameters": [0.005, 1.0, 0.01]},
+                ],
+                "min_components": 2,
+                "max_components": 5,
+                "max_nested_composition_depth": 1,
+                "nested_probability": 0.1,
+                "requested_number_of_functions": 1_000_000,
+                "max_number_of_functions": 0,
+                "master_seed": 1,
+                "lower_bound": -100.0,
+                "upper_bound": 100.0,
+                "assigned_fopt": 100.0,
+                "xopt_domain_shrink_factor": 0.8,
+                "suite_label": "Funccraft-2026-benchmark-suite-v1",
+            },
+            dimension=10,
+        )
     """
     return BenchmarkSuite(spec, dimension)
 
@@ -164,8 +230,9 @@ class BenchmarkSuite:
     The suite does not eagerly build every function. It keeps the generated
     blueprint list internally and materializes one function at a time.
 
-    All evaluation is batched. ``suite.evaluate(i, points)`` evaluates
-    function index ``i`` on ``points``, where ``points`` is a list of vectors.
+    The recommended workflow is to materialize a
+    :class:`BenchmarkFunction` first with ``suite.function(i)``, then evaluate
+    that function on a batch of points.
 
     Examples
     --------
@@ -173,7 +240,7 @@ class BenchmarkSuite:
 
         suite = BenchmarkSuite("suites/2026_v1.yaml", dimension=10)
         f10 = suite.function(10)
-        y = suite(10, [[0.0] * 10, list(f10.spec.assigned_xopt)])
+        y = f10.evaluate([[0.0] * 10, list(f10.spec.assigned_xopt)])
         suite.export_manifest("suite_10d_manifest.yaml")
     """
 
@@ -218,7 +285,7 @@ class BenchmarkSuite:
         return self._suite.max_number_of_functions
 
     def function(self, index):
-        """Materialize one generated function by index.
+        """Materialize one generated function by one-based index.
 
         This returns a Python :class:`BenchmarkFunction` wrapper built from the
         function's normalized spec.
@@ -234,19 +301,28 @@ class BenchmarkSuite:
         return BenchmarkFunction(self._suite.function(index))
 
     def evaluate(self, index, points):
-        """Evaluate one generated function on a batch of candidate points.
+        """Shortcut for evaluating one generated function by index.
+
+        Prefer materializing the benchmark function first when writing new
+        code::
+
+            f = suite.function(index)
+            values = f.evaluate(points)
 
         Parameters
         ----------
         index:
-            Zero-based function index.
+            One-based function index.
         points:
             List of vectors with length equal to ``suite.dimension``.
         """
         return self._suite.evaluate(index, points)
 
     def __call__(self, index, points):
-        """Alias for :meth:`evaluate`."""
+        """Alias for :meth:`evaluate`.
+
+        Prefer ``suite.function(index).evaluate(points)`` in new code.
+        """
         return self._suite(index, points)
 
     def export_manifest(self, path):
@@ -282,7 +358,7 @@ class SuiteCollection:
 
     Examples
     --------
-    Create the standard 2026 v1 suite at two dimensions::
+    Create the standard 2026 v1 suite at two and ten dimensions::
 
         year = 2026
         version = 1
@@ -292,7 +368,8 @@ class SuiteCollection:
 
         suite_2d = collection.benchmark_suite(2)
         suite_10d = collection.benchmark_suite(10)
-        y = suite_10d.evaluate(0, [[0.0] * 10])
+        f = suite_10d.function(1)
+        y = f.evaluate([[0.0] * 10])
 
     Get the underlying suite spec when you want to inspect the YAML-derived
     defaults before constructing a runtime suite::
