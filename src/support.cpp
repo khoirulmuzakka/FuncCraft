@@ -399,6 +399,43 @@ std::vector<std::vector<double>> prefix_stable_latin_hypercube_points_in_domain(
     return points;
 }
 
+std::vector<std::vector<double>> deterministic_stratified_points_in_domain(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const Domain& domain,
+    int count) {
+    require(count >= 0, "deterministic stratified sample count must be nonnegative");
+    require(domain.dimension() > 0, "deterministic stratified domain dimension must be positive");
+
+    std::vector<std::vector<double>> points(
+        static_cast<std::size_t>(count),
+        std::vector<double>(static_cast<std::size_t>(domain.dimension()), 0.0));
+    if (count == 0) {
+        return points;
+    }
+
+    for (int d = 0; d < domain.dimension(); ++d) {
+        std::vector<int> strata(static_cast<std::size_t>(count), 0);
+        for (int i = 0; i < count; ++i) {
+            strata[static_cast<std::size_t>(i)] = i;
+        }
+
+        std::mt19937_64 permutation_rng(indexed_seed(seed, role, static_cast<std::uint64_t>(d), 0x57A71F1EDULL));
+        stable_shuffle(strata, permutation_rng);
+
+        const auto dim = static_cast<std::size_t>(d);
+        const double lo = domain.lower[dim];
+        const double hi = domain.upper[dim];
+        for (int i = 0; i < count; ++i) {
+            const double t = (static_cast<double>(strata[static_cast<std::size_t>(i)]) + 0.5)
+                / static_cast<double>(count);
+            points[static_cast<std::size_t>(i)][dim] = lo + (hi - lo) * t;
+        }
+    }
+
+    return points;
+}
+
 std::vector<std::vector<double>> prefix_stable_latin_hypercube_centers(
     std::uint64_t seed,
     std::uint64_t role,

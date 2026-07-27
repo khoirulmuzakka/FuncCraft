@@ -153,8 +153,10 @@ Final scaling
 -------------
 
 If ``scale_factor`` is omitted, FuncCraft estimates it from the raw unscaled
-function. It samples 100 deterministic points in the active domain, computes
-raw values, takes the 25th percentile :math:`q`, and uses
+function. It samples 128 deterministic centered stratified points in the
+active domain, computes raw values, applies the same relative numeric
+quantization used for component stabilization, takes the 25th percentile
+:math:`q`, and uses
 
 .. math::
 
@@ -166,8 +168,8 @@ raw values, takes the 25th percentile :math:`q`, and uses
 
 This keeps typical values comparable while preserving the assigned optimum
 value. The estimator is deterministic for a fixed materialized function spec:
-the sample points are generated from the function seed, and the raw values are
-computed before the final scale and bias are applied.
+the sample points are generated from the function seed without random jitter,
+and the raw values are computed before the final scale and bias are applied.
 
 For the exact formulas of each transform and composition mode, see
 :doc:`mechanisms`.

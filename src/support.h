@@ -102,6 +102,14 @@ std::vector<std::vector<double>> prefix_stable_latin_hypercube_points_in_domain(
     const Domain& domain,
     int count);
 /**
+ * @brief Generate deterministic centered stratified points without random jitter.
+ */
+std::vector<std::vector<double>> deterministic_stratified_points_in_domain(
+    std::uint64_t seed,
+    std::uint64_t role,
+    const Domain& domain,
+    int count);
+/**
  * @brief Generate centered Latin-hypercube points whose coordinate prefixes are stable across dimensions.
  */
 std::vector<std::vector<double>> prefix_stable_latin_hypercube_centers(

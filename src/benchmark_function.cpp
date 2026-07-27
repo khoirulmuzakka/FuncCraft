@@ -8,7 +8,6 @@
 #include <limits>
 #include <map>
 #include <memory>
-#include <random>
 #include <sstream>
 #include <utility>
 
@@ -408,17 +407,6 @@ std::string summarize_component_types(const std::vector<ComponentSpec>& componen
     return out.str();
 }
 
-std::vector<double> random_point_in_domain(std::mt19937_64& rng, const Domain& domain) {
-    const int dimension = domain.dimension();
-    std::vector<double> x(static_cast<std::size_t>(dimension), 0.0);
-    for (int i = 0; i < dimension; ++i) {
-        const double lo = domain.lower[static_cast<std::size_t>(i)];
-        const double hi = domain.upper[static_cast<std::size_t>(i)];
-        x[static_cast<std::size_t>(i)] = lo + (hi - lo) * detail::uniform01(rng);
-    }
-    return x;
-}
-
 double percentile(std::vector<double> values, double q) {
     if (values.empty()) {
         return 0.0;
@@ -435,19 +423,21 @@ double percentile(std::vector<double> values, double q) {
 }
 
 double estimate_lambda(const ComposedFunction& raw_function, const Domain& domain, std::uint64_t seed) {
-    constexpr std::size_t kSampleCount = 100;
+    constexpr int kSampleCount = 128;
     constexpr double kTargetScale = 1.0e5;
     constexpr double kMinRepresentativeScale = 1.0e-12;
     constexpr double kMaxLambda = 1.0e8;
 
-    std::mt19937_64 rng(detail::mix_seed(seed ^ 0xD1CEB00B5EEDULL));
-    std::vector<std::vector<double>> batch;
-    batch.reserve(kSampleCount);
-    for (std::size_t i = 0; i < kSampleCount; ++i) {
-        batch.push_back(random_point_in_domain(rng, domain));
-    }
+    const std::vector<std::vector<double>> batch = detail::deterministic_stratified_points_in_domain(
+        seed,
+        0x1A4BDAE57EEDULL,
+        domain,
+        kSampleCount);
 
     std::vector<double> values = raw_function(batch);
+    for (double& value : values) {
+        value = detail::stable_numeric_value(value);
+    }
     values.erase(
         std::remove_if(values.begin(), values.end(), [](double value) {
             return !std::isfinite(value);
