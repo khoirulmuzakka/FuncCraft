@@ -66,7 +66,7 @@ normalized before matching.
 
 ## Install
 
-Install the Python package from PyPI:
+For supported Python versions and platforms, install FuncCraft from PyPI:
 
 ```bash
 python -m pip install --upgrade funccraft
@@ -78,13 +78,28 @@ Optional optimization examples use SciPy or MinionPy:
 python -m pip install scipy minionpy
 ```
 
-To build and install from a local checkout:
+For C++ usage, unsupported platforms, unsupported Python versions, or local
+development, build FuncCraft from source. The Python package can be built and
+installed from a checkout with:
 
 ```bash
 python -m pip install .
 ```
 
+Native C++ builds and detailed source-install instructions are covered in
+`docs/source/installation.rst`.
+
 ## Python Quick Start
+
+FuncCraft has two central runtime objects. A `BenchmarkSuite` is a materialized
+collection of benchmark functions for one chosen dimension. A
+`BenchmarkFunction` is one concrete callable benchmark function. All
+evaluations are batched: pass a list of points and receive one value per
+point.
+
+FuncCraft ships the `2026_v1` benchmark suite. It is backed by
+`suites/2026_v1.yaml` and exposed through `suite_collection(year=2026,
+version=1)`:
 
 ```python
 import funccraft as fc
@@ -104,12 +119,14 @@ print(f.get_fopt())
 print(values)
 ```
 
-All evaluations are batched: pass a list of points and receive one value per
-point.
+More Python examples are in `docs/source/examples/python.rst` and the
+`examples/` folder.
 
 ## C++ Quick Start
 
-Use `#include "funccraft.h"` for the public C++ API:
+The C++ API uses the same model: materialize a `BenchmarkSuite` at an explicit
+dimension, select a `BenchmarkFunction` by index, and evaluate a batch of
+points. Use `#include "funccraft.h"` for the public C++ API:
 
 ```cpp
 #include "funccraft.h"
@@ -137,18 +154,8 @@ int main() {
 }
 ```
 
-## YAML Suites
-
-FuncCraft suites are usually configured with YAML. A `SuiteSpec` describes a
-generator recipe for many functions; a `FunctionSpec` describes one function.
-The packaged suite collection is also backed by YAML and is available through:
-
-```python
-collection = fc.suite_collection(year=2026, version=1)
-```
-
-The repository ships the standard suite at `suites/2026_v1.yaml`.
-
+More C++ examples are in `docs/source/examples/cpp.rst` and the `examples/`
+folder.
 
 ## Documentation
 
