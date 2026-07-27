@@ -1,10 +1,18 @@
 Testing and CI
 ==============
 
-The standard CI builds the C++ library, Python interface, and C++ test binary
-on supported platforms, runs the C++ and Python tests, validates generated
-benchmark values across platforms, and checks that the source package can be
-built. The separate wheel workflow builds and tests installable wheels.
+FuncCraft uses two GitHub Actions workflows:
+
+``ci.yml``
+   Builds the C++ library, Python extension, and C++ test binary on Linux,
+   macOS arm, and Windows. It runs the C++ tests, runs the Python public-API
+   test, builds the Python source/wheel artifacts with ``python -m build``,
+   generates cross-platform value tables, and compares those tables.
+
+``wheel.yaml``
+   Builds installable wheels with ``cibuildwheel`` for CPython 3.9 through
+   3.14 on Linux, macOS arm, macOS x86_64, and Windows. Each wheel is installed
+   and tested with the Python test in installed-package mode.
 
 Local checks
 ------------
@@ -14,130 +22,155 @@ Build and run the C++ test binary:
 .. code-block:: shell
 
    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=ON
-   cmake --build build --config Release
-   ./bin/funccraft_test.exe
+   cmake --build build --config Release --target funccraft_test
+   ./bin/funccraft_test
 
-On Linux and macOS, the executable is named ``funccraft_test``. The test
-prints a named report such as ``[ 1/16] RUN ...`` and ``[ 1/16] PASS ...``,
-then ends with the number of passed and failed checks. A successful run ends
-with ``Overall status: PASS``.
+On Windows, run:
 
-The same test can also be launched through CTest:
+.. code-block:: bat
+
+   .\bin\funccraft_test.exe
+
+The C++ test binary can also be launched through CTest:
 
 .. code-block:: shell
 
    ctest --test-dir build --output-on-failure -C Release
 
-Run the Python test:
+Run the Python test against the local source-tree package and locally compiled
+extension:
 
 .. code-block:: shell
 
    python tests/test.py
 
+Run the same Python test against an installed package or wheel:
+
+.. code-block:: shell
+
+   python tests/test.py --installed
+
+In installed-package mode, the test removes the repository root from
+``sys.path`` so it cannot accidentally import the checkout's ``funccraft/``
+directory instead of the installed wheel.
 
 C++ test coverage
 -----------------
 
-The C++ test binary prints a named report. The checks cover these groups:
+The C++ binary prints a named report with 17 checks and finishes with
+``Overall status: PASS`` on success. The checks are:
 
-- ``Packaged suite optima``: builds the packaged ``2026_v1`` suite at
-  dimension 2 and verifies that the
-  first primitive benchmark functions evaluate close to their assigned optimum
-  value at ``assigned_xopt``.
+``Basic function registry ids``
+   Verifies that the primitive base-function registry is nonempty, contiguous
+   from ID 1, and starts with the expected leading functions.
 
-- ``Suite collection API``: verifies that the collection registry can find
-  ``2026_v1``, that the
-  reported year/version/function count match the loaded suite spec, and that
-  a materialized suite has the requested dimension.
+``Packaged suite optima``
+   Builds the packaged ``2026_v1`` suite at dimension 10 and checks the first
+   500 functions, or fewer if the suite is smaller. Each checked function is
+   evaluated at ``assigned_xopt`` and compared with its assigned optimum value.
 
-- ``Identity transform assigned optimum``,
-  ``Native-domain scaled optimum``, and
-  ``Native-domain optimum in high dimension``: check that assigned optima
-  remain correct after coordinate transforms and after mapping between the
-  benchmark domain and each primitive base function's native domain.
+``Suite collection API``
+   Verifies the collection registry, ``2026_v1`` year/version metadata,
+   reported function count, suite label, materialized suite size, and function
+   dimension.
 
-- ``Block rotation subspace output``: checks the low-level block-rotation
-  transform directly. The transform
-  selects a subspace from the parent vector and returns only the rotated
-  child-space coordinates.
+``Identity transform assigned optimum``, ``Native-domain scaled optimum``, and ``Native-domain optimum in high dimension``
+   Check assigned optimum behavior for primitive functions, coordinate
+   transforms, and mapping between benchmark domains and primitive native
+   domains. The high-dimensional check covers dimensions 1 and 100.
 
-- ``Composed function component`` and
-  ``Reject nonzero nested assigned_fopt``: check nested benchmark-function
-  components. Nested components must have ``assigned_fopt = 0`` because only
-  the outermost function owns the final optimum value.
+``Block rotation subspace output``
+   Checks the low-level block-rotation transform directly, including selected
+   subspace output and input/output dimensions.
 
-- ``Suite YAML accepts base-function names``,
-  ``Composition kind aliases``,
-  ``Function YAML roundtrip``, and
-  ``Suite YAML roundtrip``: check YAML parsing, canonical name aliases,
-  exported function specs, and exported suite manifests. Roundtrip checks
-  evaluate the function before and after export/import and require matching
-  values.
+``Composed function component`` and ``Reject nonzero nested assigned_fopt``
+   Check nested composed-function components. Nested components must have
+   ``assigned_fopt = 0`` because only the outermost function owns the final
+   optimum value.
 
-- ``Packaged suite manifest exact function-spec roundtrip``: builds the
-  packaged ``2026_v1`` suite at dimension 10 with 500 functions. For each
-  function, it evaluates 1000 deterministic random points, exports the suite
-  manifest, extracts each exported ``function_spec``, constructs a standalone
-  ``BenchmarkFunction`` from that spec, and evaluates the same points again.
-  This test requires exact ``double`` equality, so it verifies that exported
-  materialized function specs contain all information needed to reproduce the
-  already-built function.
+``Suite YAML accepts base-function names`` and ``Composition kind aliases``
+   Check YAML parsing for base-function names and canonical handling of DPM
+   composition aliases.
 
-- ``Suite structure stable across dimensions``: builds the same suite spec at
-  dimensions 2 and 5. For every generated
-  function index, it checks that the generated structure is the same:
-  function seed, component count, composition kind and parameters, DPM biases,
-  component seeds, base-vs-nested source, base-function choices, coordinate
-  transform kind and seed, value-transform kind and parameters, and the same
-  recursive structure inside nested composed components. This test checks
-  stable function identity, not coordinate values or matrices.
+``Suite structure stable across dimensions``
+   Builds the same generated suite at dimensions 2 and 5 and checks that every
+   function keeps the same generated structure: seeds, component counts,
+   base-vs-nested choices, base-function choices, composition kind and
+   parameters, transform choices, value-transform choices, and recursive nested
+   structure.
 
-- ``Suite geometry prefix-stable across dimensions``: builds a non-nested DPM
-  suite that uses only block rotation, then compares
-  dimensions 4 and 8. It checks that ``assigned_xopt`` and each DPM center in
-  4D are exact prefixes of the corresponding 8D vectors. It also checks that
-  each component's coordinate-transform ``assigned_xopt`` and block
-  ``selected_indices`` are prefix-stable. The test is intentionally
-  non-nested, because nested block rotation can reduce the local child
-  dimension; if the local dimension is smaller than the component count,
-  subspace reuse may be necessary.
+``Suite geometry prefix-stable across dimensions``
+   Builds a non-nested block-rotation DPM suite at dimensions 4 and 8. It
+   checks prefix-stability of ``assigned_xopt``, DPM centers, component
+   transform ``assigned_xopt`` values, and block ``selected_indices``.
 
-- ``Direct function geometry prefix-stable``: constructs two hand-written DPM
-  ``FunctionSpec`` objects directly, one at
-  dimension 1 and one at dimension 4, with omitted ``assigned_xopt`` and DPM
-  centers. The ``BenchmarkFunction`` constructor generates those values and
-  the test checks that the lower-dimensional generated geometry is an exact
-  prefix of the higher-dimensional geometry. This validates prefix-stable
-  behavior outside the suite generator.
-  
+``Direct function geometry prefix-stable``
+   Constructs direct DPM ``FunctionSpec`` objects at dimensions 1 and 4 with
+   omitted generated geometry, then checks that generated lower-dimensional
+   geometry is an exact prefix of the higher-dimensional geometry.
+
+``Function YAML roundtrip`` and ``Suite YAML roundtrip``
+   Export materialized function specs and suite manifests, reload them, and
+   require matching evaluations on deterministic candidate points.
+
+``Packaged suite manifest exact function-spec roundtrip``
+   Builds 500 functions from the packaged suite at dimension 10. For each
+   function, it evaluates 1000 deterministic points, exports the suite
+   manifest, rebuilds each exported ``function_spec`` as a standalone
+   ``BenchmarkFunction``, and requires exact ``double`` equality on the same
+   points.
 
 Python test coverage
 --------------------
 
-The Python test is a public-API smoke and regression test. It verifies that the
-installed or local ``funccraft`` package can import the main classes and helper
-constructors, load the packaged ``2026_v1`` suite collection, build benchmark
-suites, evaluate functions, export a function spec to YAML, reload it, export a
-suite manifest to YAML, reload it, and reproduce the same sampled function
-values after each roundtrip. It also checks the exposed DPM composition kinds
-through the Python interface. The detailed numerical and construction checks
-live in the C++ test binary.
+``tests/test.py`` is a public-API smoke and regression test. It verifies that
+the package can import the main classes, enums, helper constructors, packaged
+suite collections, and roundtrip helpers.
 
+The Python test checks:
+
+- primitive base-function IDs are contiguous from 1, and ID 0 is rejected;
+- the packaged ``2026_v1`` collection reports consistent metadata;
+- packaged suites can be materialized and evaluated;
+- the first 500 packaged-suite functions evaluate near their assigned optima;
+- DPM composition kinds roundtrip through direct functions and generated
+  suites;
+- function YAML export/import reproduces sampled values;
+- suite manifest export/import reproduces sampled values.
 
 Cross-platform value comparison
 -------------------------------
 
-The C++ test can generate platform value tables. The Python script
-``tests/compare_values.py`` compares the generated tables and reports
-per-function relative differences and the fraction of sampled points within
-the configured relative tolerance.
+The C++ test binary supports value-table generation:
 
-This is intended to catch platform-sensitive changes in floating-point
-behavior while allowing small numerical drift from library/compiler
-differences.
+.. code-block:: shell
 
-In CI, the first 34 functions are treated as the primitive-function prefix and
-must have every sampled value agree within ``1e-8`` relative error. For the
-remaining generated functions, the comparison succeeds when at least 75% of
-functions have at least 75% of sampled values agree within ``1e-8`` relative
-error.
+   ./bin/funccraft_test --generate-values linux values_linux.txt
+
+The generated table uses the packaged ``2026_v1`` suite at dimension 10,
+records 500 functions, and evaluates 1000 deterministic points per function.
+
+In ``ci.yml``, Linux, macOS arm, and Windows each upload one value table. The
+``compare-values`` job downloads all tables and runs:
+
+.. code-block:: shell
+
+   python tests/compare_values.py value_tables/values_linux.txt value_tables/values_macos_arm.txt value_tables/values_windows.txt --tolerance 1e-8 --strict-function-count 34 --strict-point-agreement 1.0 --point-agreement 0.75 --function-agreement 0.75
+
+The first 34 functions are the primitive-function prefix and must have 100%
+point agreement within ``1e-8`` relative tolerance. The remaining functions
+are checked statistically: at least 75% of sampled points must agree for a
+function to pass, and at least 75% of those generated functions must pass.
+
+Wheel testing
+-------------
+
+The wheel workflow builds wheels through ``cibuildwheel`` and uses:
+
+.. code-block:: shell
+
+   python {project}/tests/test.py --installed
+
+This command runs the repository's test file but imports ``funccraft`` from the
+installed wheel. This catches missing wheel files, extension import failures,
+and packaging mistakes that local source-tree tests may hide.

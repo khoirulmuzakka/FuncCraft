@@ -22,6 +22,30 @@ The two central runtime objects are:
 - `BenchmarkFunction`: one concrete benchmark function that evaluates batches
   of points.
 
+## Why FuncCraft?
+
+Common black-box optimization benchmark suites are intentionally finite. For
+example, CEC2017 has 30 functions, CEC2020 has 10, CEC2022 has 12, and
+BBOB/COCO 2009 has 24. They also target fixed dimension sets, such as
+10/30/50/100 for CEC2017, 5/10/15/20 for CEC2020, and 2/5/10/20/40 for
+BBOB/COCO 2009. These suites are useful standards, but they limit how many
+distinct landscapes and dimensions can be used in large-scale experiments.
+
+Many traditional benchmarks also rely mainly on shifting and rotation.
+FuncCraft generalizes that idea by combining 34 primitive base functions with
+a wider set of coordinate transformations, value transformations, composition
+functions, and optional nested composed functions. This makes the number of
+possible benchmark-function combinations practically unlimited.
+
+FuncCraft is designed to:
+
+- generate practically unlimited benchmark functions at any dimension;
+- define reproducible benchmark suites by editing YAML files;
+- define reproducible custom benchmark functions with YAML;
+- preserve useful function identity under dimension changes;
+- improve cross-platform robustness for generated suites;
+- expose the same suite-generation model from C++ and Python.
+
 ## Mechanism Summary
 
 FuncCraft builds functions from primitive benchmark landscapes, coordinate

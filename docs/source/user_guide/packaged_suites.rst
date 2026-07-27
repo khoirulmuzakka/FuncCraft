@@ -45,6 +45,9 @@ suite exactly as shipped.
 Use ``load_suite_spec("my_suite.yaml")`` when you want to edit the suite
 recipe yourself. The YAML fields are described in :doc:`yaml_specs`.
 
+See :doc:`suite` for the full ``2026_v1`` YAML file and a field-by-field
+explanation of what the packaged suite contains.
+
 Dimension and seeds
 -------------------
 

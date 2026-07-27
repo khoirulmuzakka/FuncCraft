@@ -37,6 +37,7 @@ runtime objects are :doc:`concepts/benchmark_function` and
    :caption: User guide
 
    user_guide/packaged_suites
+   user_guide/suite
    user_guide/yaml_specs
    user_guide/primitive_base_functions
    user_guide/construction_model
