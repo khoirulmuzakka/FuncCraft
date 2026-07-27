@@ -3,7 +3,7 @@
 Importing :mod:`funccraft` gives you both the plain-data specification types
 and the runtime benchmark wrappers:
 
-- spec types and ``make_*`` helpers live in :mod:`funccraft.spec`;
+- spec types and dictionary/YAML conversion live in :mod:`funccraft.spec`;
 - one-function runtime wrappers live in :mod:`funccraft.benchmark_function`;
 - suite-level runtime wrappers live in :mod:`funccraft.suite`.
 
@@ -24,13 +24,29 @@ Create one function manually::
 
     import funccraft as fc
 
-    spec = fc.make_function_spec(
-        dimension=2,
-        domain=fc.make_domain(2, -10.0, 10.0),
-        components=[fc.make_component(base_function="Ackley")],
-        assigned_xopt=[0.0, 0.0],
-        scale_factor=1.0,
-    )
+    spec = {
+        "dimension": 2,
+        "domain": {
+            "dimension": 2,
+            "lower_bound": [-10.0, -10.0],
+            "upper_bound": [10.0, 10.0],
+        },
+        "components": [
+            {
+                "base_function": "Ackley",
+                "coordinate_transform": {
+                    "kind": "none",
+                    "input_dimension": 2,
+                    "output_dimension": 2,
+                    "assigned_xopt": [0.0, 0.0],
+                },
+                "value_transform": {"kind": "none"},
+            },
+        ],
+        "composition": {"kind": "none"},
+        "assigned_xopt": [0.0, 0.0],
+        "scale_factor": 1.0,
+    }
     f = fc.BenchmarkFunction(spec)
     y = f([[0.0, 0.0]])
 """

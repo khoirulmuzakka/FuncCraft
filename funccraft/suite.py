@@ -25,21 +25,47 @@ suite definition shipped with the package::
 Build a custom suite from Python specs when you want to control the sampling
 rules directly::
 
-    from funccraft import (
-        BenchmarkSuite,
-        make_composition_choice,
-        make_suite_spec,
-    )
+    from funccraft import BenchmarkSuite
 
-    spec = make_suite_spec(
-        requested_number_of_functions=100,
-        max_components=4,
-        master_seed=1,
-        compositions=[
-            make_composition_choice("cpm-wsum", 0.5),
-            make_composition_choice("dpm-softmax", 0.5, [0.01]),
+    spec = {
+        "supported_dimensions": "any",
+        "base_functions": list(range(1, 35)),
+        "composition_base_functions": [
+            4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20,
+            21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27,
         ],
-    )
+        "coordinate_transforms": [
+            {"kind": "none", "probability": 0.0, "parameters": []},
+            {"kind": "rotation", "probability": 0.34, "parameters": []},
+            {"kind": "affine", "probability": 0.33, "parameters": []},
+            {"kind": "block-rotation", "probability": 0.33, "parameters": []},
+        ],
+        "value_transforms": [
+            {"kind": "none", "probability": 0.5, "parameters": []},
+            {"kind": "power", "probability": 0.25, "parameters": []},
+            {"kind": "oscillatory", "probability": 0.25, "parameters": []},
+            {"kind": "cosine-zero", "probability": 0.0, "parameters": []},
+        ],
+        "compositions": [
+            {"kind": "cpm-wsum", "probability": 0.1, "parameters": []},
+            {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [3.0]},
+            {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [0.1]},
+            {"kind": "cpm-level-well", "probability": 0.2, "parameters": []},
+            {"kind": "dpm-softmax", "probability": 0.25, "parameters": [0.005]},
+            {"kind": "dpm-bgsoftmax", "probability": 0.25, "parameters": [0.005, 1.0, 0.01]},
+        ],
+        "min_components": 2,
+        "max_components": 5,
+        "max_nested_composition_depth": 1,
+        "nested_probability": 0.1,
+        "requested_number_of_functions": 100,
+        "master_seed": 1,
+        "lower_bound": -100.0,
+        "upper_bound": 100.0,
+        "assigned_fopt": 100.0,
+        "xopt_domain_shrink_factor": 0.8,
+        "suite_label": "custom-suite",
+    }
     suite = BenchmarkSuite(spec, dimension=5)
 """
 
@@ -69,7 +95,7 @@ def make_benchmark_suite(spec, dimension):
         One of:
 
         - native :class:`SuiteSpec`;
-        - compatible dictionary with the ``make_suite_spec`` fields:
+        - compatible YAML-shaped dictionary with the suite-spec fields:
           ``supported_dimensions``, ``base_functions``,
           ``composition_base_functions``, ``coordinate_transforms``,
           ``value_transforms``, ``compositions``, ``min_components``,

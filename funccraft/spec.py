@@ -1,8 +1,9 @@
 """Python helpers for FuncCraft specs.
 
 The C++ bindings expose the actual plain-data spec structs. This module adds
-readable ``make_*`` factory functions and dict-to-spec conversion so Python
-users can construct FuncCraft functions without knowing the C++ headers.
+dict-to-spec conversion and convenience ``make_*`` factory functions. Prefer
+YAML-shaped dictionaries for user-facing examples because they mirror the YAML
+files used by FuncCraft.
 
 Terminology
 -----------
@@ -35,68 +36,120 @@ Examples
 --------
 Create a single 2D function and evaluate it through ``BenchmarkFunction``::
 
-    from funccraft import (
-        BenchmarkFunction,
-        make_component,
-        make_coordinate_transform,
-        make_domain,
-        make_function_spec,
-    )
+    from funccraft import BenchmarkFunction
 
-    spec = make_function_spec(
-        dimension=2,
-        domain=make_domain(2, -10.0, 10.0),
-        components=[
-            make_component(
-                base_function="Sphere",
-                coordinate_transform=make_coordinate_transform(
-                    "rotation",
-                    assigned_xopt=[1.0, -1.0],
-                    seed=1,
-                ),
-            ),
+    spec = {
+        "dimension": 2,
+        "domain": {
+            "dimension": 2,
+            "lower_bound": [-10.0, -10.0],
+            "upper_bound": [10.0, 10.0],
+        },
+        "components": [
+            {
+                "base_function": "Sphere",
+                "coordinate_transform": {
+                    "kind": "rotation",
+                    "input_dimension": 2,
+                    "output_dimension": 2,
+                    "assigned_xopt": [1.0, -1.0],
+                    "seed": 1,
+                },
+                "value_transform": {"kind": "none"},
+            },
         ],
-        assigned_xopt=[1.0, -1.0],
-        assigned_fopt=0.0,
-        scale_factor=1.0,
-        seed=10,
-    )
+        "composition": {"kind": "none"},
+        "assigned_xopt": [1.0, -1.0],
+        "assigned_fopt": 0.0,
+        "scale_factor": 1.0,
+        "seed": 10,
+    }
     f = BenchmarkFunction(spec)
     y = f([[1.0, -1.0], [0.0, 0.0]])
 
 Create a small deceptive composition from two base functions::
 
-    spec = make_function_spec(
-        dimension=2,
-        domain=make_domain(2, -10.0, 10.0),
-        components=[
-            make_component(base_function="Rastrigin"),
-            make_component(base_function="Ackley"),
+    spec = {
+        "dimension": 2,
+        "domain": {
+            "dimension": 2,
+            "lower_bound": [-10.0, -10.0],
+            "upper_bound": [10.0, 10.0],
+        },
+        "components": [
+            {
+                "base_function": "Rastrigin",
+                "coordinate_transform": {
+                    "kind": "none",
+                    "input_dimension": 2,
+                    "output_dimension": 2,
+                    "assigned_xopt": [2.0, -3.0],
+                },
+                "value_transform": {"kind": "none"},
+            },
+            {
+                "base_function": "Ackley",
+                "coordinate_transform": {
+                    "kind": "none",
+                    "input_dimension": 2,
+                    "output_dimension": 2,
+                    "assigned_xopt": [2.0, -3.0],
+                },
+                "value_transform": {"kind": "none"},
+            },
         ],
-        composition=make_composition(
-            "dpm-softmax",
-            parameters=[0.01],
-            biases=[0.0, 20.0],
-        ),
-        assigned_xopt=[2.0, -3.0],
-        scale_factor=1.0,
-        seed=11,
-    )
+        "composition": {
+            "kind": "dpm-softmax",
+            "parameters": [0.01],
+            "biases": [0.0, 20.0],
+        },
+        "assigned_xopt": [2.0, -3.0],
+        "scale_factor": 1.0,
+        "seed": 11,
+    }
 
 Create a suite spec. Choice probabilities in each choice table are fractions
 and should sum to one::
 
-    suite_spec = make_suite_spec(
-        requested_number_of_functions=500,
-        max_components=4,
-        master_seed=1,
-        compositions=[
-            make_composition_choice("cpm-wsum", 0.25),
-            make_composition_choice("cpm-power-mean", 0.25),
-            make_composition_choice("dpm-softmax", 0.25, [0.01]),
-            make_composition_choice("dpm-bgsoftmax", 0.25, [0.01, 1.0, 0.01]),
+    suite_spec = {
+        "supported_dimensions": "any",
+        "base_functions": list(range(1, 35)),
+        "composition_base_functions": [
+            4, 8, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20,
+            21, 23, 28, 30, 34, 33, 2, 3, 5, 9, 26, 27,
         ],
-    )
+        "coordinate_transforms": [
+            {"kind": "none", "probability": 0.0, "parameters": []},
+            {"kind": "rotation", "probability": 0.34, "parameters": []},
+            {"kind": "affine", "probability": 0.33, "parameters": []},
+            {"kind": "block-rotation", "probability": 0.33, "parameters": []},
+        ],
+        "value_transforms": [
+            {"kind": "none", "probability": 0.5, "parameters": []},
+            {"kind": "power", "probability": 0.25, "parameters": []},
+            {"kind": "oscillatory", "probability": 0.25, "parameters": []},
+            {"kind": "cosine-zero", "probability": 0.0, "parameters": []},
+        ],
+        "compositions": [
+            {"kind": "cpm-wsum", "probability": 0.1, "parameters": []},
+            {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [3.0]},
+            {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [0.1]},
+            {"kind": "cpm-level-well", "probability": 0.2, "parameters": []},
+            {"kind": "dpm-softmax", "probability": 0.25, "parameters": [0.005]},
+            {"kind": "dpm-bgsoftmax", "probability": 0.25, "parameters": [0.005, 1.0, 0.01]},
+        ],
+        "min_components": 2,
+        "max_components": 5,
+        "max_nested_composition_depth": 1,
+        "nested_probability": 0.1,
+        "requested_number_of_functions": 500,
+        "master_seed": 1,
+        "lower_bound": -100.0,
+        "upper_bound": 100.0,
+        "assigned_fopt": 100.0,
+        "xopt_domain_shrink_factor": 0.8,
+        "suite_label": "custom-suite",
+    }
 """
 
 from __future__ import annotations

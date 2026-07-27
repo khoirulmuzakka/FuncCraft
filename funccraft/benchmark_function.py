@@ -10,31 +10,34 @@ Examples
 Build and evaluate one function. FuncCraft evaluation is batched, so pass a
 list of candidate vectors even when evaluating a single point::
 
-    from funccraft import (
-        BenchmarkFunction,
-        make_component,
-        make_coordinate_transform,
-        make_domain,
-        make_function_spec,
-    )
+    from funccraft import BenchmarkFunction
 
-    spec = make_function_spec(
-        dimension=2,
-        domain=make_domain(2, -10.0, 10.0),
-        components=[
-            make_component(
-                base_function="Rastrigin",
-                coordinate_transform=make_coordinate_transform(
-                    "rotation",
-                    seed=123,
-                ),
-            ),
+    spec = {
+        "dimension": 2,
+        "domain": {
+            "dimension": 2,
+            "lower_bound": [-10.0, -10.0],
+            "upper_bound": [10.0, 10.0],
+        },
+        "components": [
+            {
+                "base_function": "Rastrigin",
+                "coordinate_transform": {
+                    "kind": "rotation",
+                    "input_dimension": 2,
+                    "output_dimension": 2,
+                    "assigned_xopt": [3.0, -2.0],
+                    "seed": 123,
+                },
+                "value_transform": {"kind": "none"},
+            },
         ],
-        assigned_xopt=[3.0, -2.0],
-        assigned_fopt=10.0,
-        scale_factor=1.0,
-        seed=7,
-    )
+        "composition": {"kind": "none"},
+        "assigned_xopt": [3.0, -2.0],
+        "assigned_fopt": 10.0,
+        "scale_factor": 1.0,
+        "seed": 7,
+    }
 
     f = BenchmarkFunction(spec)
     values = f([[0.0, 0.0], [3.0, -2.0]])

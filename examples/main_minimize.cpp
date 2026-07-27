@@ -219,7 +219,7 @@ int main(int argc, char* argv[]) {
                 };
 
                 auto settings = minion::DefaultSettings().getDefaultSettings(config.algo);
-                settings["convergence_tol"] = 1e-8;
+                settings["convergence_tol"] = 0.0;
                 settings["population_size"] = config.population_size;
                 minion::Minimizer optimizer(
                     objective,
