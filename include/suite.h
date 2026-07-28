@@ -49,6 +49,16 @@ public:
     ~BenchmarkSuite() = default;
 
     /**
+     * @brief Apply suite value-transform choices to mandatory base functions.
+     *
+     * Defaults to false, preserving the normal suite convention that F1-F34 are
+     * primitive base-function entries with no value transform. Set this to true
+     * before calling function(), operator(), export_manifest(), or export_spec()
+     * when a controlled experiment needs F1-F34 to use value_transforms.
+     */
+    bool apply_value_transforms_to_basic = false;
+
+    /**
      * @brief Return the number of generated functions.
      *
      * This is the number of blueprints prepared by the constructor, so it is

@@ -872,7 +872,8 @@ BenchmarkSuite::BenchmarkSuite(const std::string& spec_path, int dimension)
 }
 
 BenchmarkSuite::BenchmarkSuite(const BenchmarkSuite& other)
-    : spec_(other.spec_),
+    : apply_value_transforms_to_basic(other.apply_value_transforms_to_basic),
+      spec_(other.spec_),
       dimension_(other.dimension_),
       theoretical_max_number_of_functions_(other.theoretical_max_number_of_functions_),
       blueprints_(other.blueprints_),
@@ -883,6 +884,7 @@ BenchmarkSuite& BenchmarkSuite::operator=(const BenchmarkSuite& other) {
     if (this == &other) {
         return *this;
     }
+    apply_value_transforms_to_basic = other.apply_value_transforms_to_basic;
     spec_ = other.spec_;
     dimension_ = other.dimension_;
     theoretical_max_number_of_functions_ = other.theoretical_max_number_of_functions_;
@@ -931,7 +933,13 @@ BenchmarkFunction BenchmarkSuite::build_function(const FunctionBlueprint& bluepr
             x_star,
             blueprint.seed,
             is_subspace_rotation_choice(blueprint.coordinate_transform_choice) ? &full_subspace : nullptr);
-        component.value_transform.kind = ValueTransformKind::None;
+        if (apply_value_transforms_to_basic) {
+            auto value_choices = normalize_choices(spec_.value_transforms, all_value_transform_choices());
+            std::mt19937_64 value_rng(mix_seed(blueprint.seed ^ 0x5A17E7A11CE5EEDULL));
+            component.value_transform = make_value_transform_spec(choose_weighted(value_choices, value_rng));
+        } else {
+            component.value_transform.kind = ValueTransformKind::None;
+        }
         component.seed = blueprint.seed;
         function_spec.components.push_back(std::move(component));
 

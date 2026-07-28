@@ -139,14 +139,14 @@ def main() -> int:
             experiment,
             "avg_tre",
             "Average transformed relative error",
-            fig_dir / f"{experiment}_tre.{args.format}",
+            fig_dir / f"experiment_{experiment}_tre.{args.format}",
         )
         plot_metric(
             summary,
             experiment,
             "solved_fraction",
             "Fraction of solved problems",
-            fig_dir / f"{experiment}_solved_fraction.{args.format}",
+            fig_dir / f"experiment_{experiment}_solved_fraction.{args.format}",
         )
 
     print(f"Wrote figures to {fig_dir}")
