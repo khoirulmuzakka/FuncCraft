@@ -42,6 +42,23 @@ mechanisms without assuming either interface.
    python/index
    cpp/index
 
+2D Plots
+========
+
+The figure below shows the 34 primitive base functions in two dimensions,
+without rotation, using the default domain and no scaling.
+
+.. figure:: figs/base_functions.pdf
+   :alt: 2D plots of the 34 primitive base functions
+   :width: 100%
+
+The next figure shows the first 500 functions from the FuncCraft Benchmark
+Suite 2026 v1 in two dimensions.
+
+.. figure:: figs/2D_plot_log.pdf
+   :alt: 2D plots of the first 500 functions from FuncCraft Benchmark Suite 2026 v1
+   :width: 100%
+
 
 .. toctree::
    :maxdepth: 1
