@@ -214,7 +214,7 @@ biases, assigned optima, scale factors, labels, and metadata.
 
 Warning: the packaged `2026_v1` suite contains 1,000,000 functions. Exporting
 the full shipped suite manifest will write every generated function record and
-is usually a mistake. To export a smaller reproducible subset, copy the
+is usually unnecessary. To export a smaller reproducible subset, copy the
 collection configuration dictionary, reduce `requested_number_of_functions`,
 build the smaller suite, and export that suite:
 

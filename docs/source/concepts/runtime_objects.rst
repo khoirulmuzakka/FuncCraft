@@ -134,7 +134,7 @@ include the normalized suite record and every generated function record.
 
    The packaged ``2026_v1`` suite contains 1,000,000 functions. Exporting the
    full packaged suite manifest will write every generated function record and
-   is usually a mistake. If you only need a smaller reproducible subset, copy
+   is usually unnecessary. If you only need a smaller reproducible subset, copy
    the suite configuration, lower ``requested_number_of_functions``, build that
    smaller suite, and export the smaller suite instead.
 

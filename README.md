@@ -161,21 +161,6 @@ print(values)
 For the packaged benchmark suite, use
 `fc.SuiteCollection(year=2026, version=1).benchmark_suite(dimension)`.
 
-Warning: the packaged `2026_v1` suite contains 1,000,000 functions. Exporting
-the full shipped suite manifest will write every generated function record and
-is usually a mistake. To export a smaller reproducible subset, get the
-collection configuration dictionary, reduce `requested_number_of_functions`,
-and export the smaller suite:
-
-```python
-collection = fc.SuiteCollection(year=2026, version=1)
-subset_config = collection.config
-subset_config["requested_number_of_functions"] = 500
-
-subset_suite = fc.BenchmarkSuite(subset_config, dimension=2)
-subset_suite.export_manifest("suite_2026_v1_first_500.yaml")
-```
-
 More Python examples are in `docs/source/python/examples.rst` and the
 `examples/` folder.
 
