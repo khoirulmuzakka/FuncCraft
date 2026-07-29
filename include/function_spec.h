@@ -109,6 +109,7 @@ struct ComponentSpec {
     std::shared_ptr<FunctionSpec> composed_function;
     CoordinateTransformSpec coordinate_transform;
     ValueTransformSpec value_transform;
+    std::optional<double> scale_factor = std::nullopt;
     std::uint64_t seed = 0;
 };
 

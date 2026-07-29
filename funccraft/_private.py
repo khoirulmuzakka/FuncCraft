@@ -173,6 +173,7 @@ def _make_component(
     composed_function=None,
     coordinate_transform=None,
     value_transform=None,
+    scale_factor=None,
     seed=0,
 ):
     """Create a native ``ComponentSpec``.
@@ -233,6 +234,7 @@ def _make_component(
         spec.base_function = basic_function_id(base_function)
     spec.coordinate_transform = coordinate_transform_spec(coordinate_transform or {})
     spec.value_transform = value_transform_spec(value_transform or {})
+    spec.scale_factor = scale_factor
     spec.seed = int(seed)
     return spec
 
@@ -735,6 +737,7 @@ def component_spec(data):
         spec.base_function = basic_function_id(data["base_function"])
     spec.coordinate_transform = coordinate_transform_spec(data.get("coordinate_transform", {}))
     spec.value_transform = value_transform_spec(data.get("value_transform", {}))
+    spec.scale_factor = data.get("scale_factor", None)
     spec.seed = int(data.get("seed", 0))
     return spec
 
@@ -886,6 +889,7 @@ def _spec_to_dict(spec):
         result = {
             "coordinate_transform": _spec_to_dict(spec.coordinate_transform),
             "value_transform": _spec_to_dict(spec.value_transform),
+            "scale_factor": spec.scale_factor,
             "seed": spec.seed,
         }
         if spec.composed_function is not None:

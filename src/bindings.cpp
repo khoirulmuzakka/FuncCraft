@@ -189,6 +189,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("composed_function", &FuncCraft::ComponentSpec::composed_function)
         .def_readwrite("coordinate_transform", &FuncCraft::ComponentSpec::coordinate_transform)
         .def_readwrite("value_transform", &FuncCraft::ComponentSpec::value_transform)
+        .def_readwrite("scale_factor", &FuncCraft::ComponentSpec::scale_factor)
         .def_readwrite("seed", &FuncCraft::ComponentSpec::seed);
 
     py::class_<FuncCraft::CompositionSpec>(m, "CompositionSpec")

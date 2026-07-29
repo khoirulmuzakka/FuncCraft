@@ -514,6 +514,9 @@ void require_same_generated_structure(
             left_component.value_transform.parameters,
             right_component.value_transform.parameters,
             component_path + ": value transform parameters mismatch");
+        require(
+            left_component.scale_factor.has_value() == right_component.scale_factor.has_value(),
+            component_path + ": component scale factor presence mismatch");
         if (left_component.composed_function) {
             require_same_generated_structure(
                 *left_component.composed_function,

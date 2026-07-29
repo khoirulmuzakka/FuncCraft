@@ -60,6 +60,7 @@ public:
         Domain child_domain,
         std::vector<double> child_xopt,
         double child_fopt,
+        double component_scale_factor,
         std::shared_ptr<CoordinateTransform> coordinate_transform,
         std::shared_ptr<ValueTransform> value_transform);
     /**
@@ -84,6 +85,7 @@ private:
         std::vector<double> target_xopt;
         std::vector<double> child_xopt;
         double child_fopt = 0.0;
+        double scale_factor = 1.0;
     };
     std::vector<RuntimeComponent> runtime_components_;
 };

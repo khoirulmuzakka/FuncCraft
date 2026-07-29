@@ -81,6 +81,7 @@ FunctionBuilder& FunctionBuilder::add_component(
         primitive->default_domain(),
         primitive->x_opt,
         primitive->f_opt,
+        1.0,
         std::move(coordinate_transform),
         std::move(value_transform));
 }
@@ -90,11 +91,14 @@ FunctionBuilder& FunctionBuilder::add_component(
     Domain child_domain,
     std::vector<double> child_xopt,
     double child_fopt,
+    double component_scale_factor,
     std::shared_ptr<CoordinateTransform> coordinate_transform,
     std::shared_ptr<ValueTransform> value_transform) {
     require(static_cast<bool>(evaluator), "component evaluator is empty");
     require(static_cast<bool>(coordinate_transform), "coordinate transform is null");
     require(static_cast<bool>(value_transform), "value transform is null");
+    require(std::isfinite(component_scale_factor), "component scale_factor must be finite");
+    require(component_scale_factor > 0.0, "component scale_factor must be positive");
     require(coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
     Domain transform_domain = transform_output_domain(domain_, *coordinate_transform);
     require(coordinate_transform->output_dimension() == transform_domain.dimension(), "component transform domain dimension mismatch");
@@ -110,6 +114,7 @@ FunctionBuilder& FunctionBuilder::add_component(
         coordinate_transform->target_xopt(),
         std::move(child_xopt),
         child_fopt,
+        component_scale_factor,
     });
     return *this;
 }
@@ -169,7 +174,12 @@ ComposedFunction FunctionBuilder::build() const {
                     invalid = true;
                     break;
                 }
-                component_values[component_index] = detail::stable_numeric_value(transformed_value);
+                double scaled_value = component.scale_factor * transformed_value;
+                if (!std::isfinite(scaled_value)) {
+                    invalid = true;
+                    break;
+                }
+                component_values[component_index] = detail::stable_numeric_value(scaled_value);
             }
             if (invalid) {
                 values.push_back(penalty);

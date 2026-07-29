@@ -17,7 +17,7 @@ where each component value is
 
 .. math::
 
-   z_i(x) = \phi_i\left(g_i(T_i(x)) - g_i(x_i^*)\right).
+   z_i(x) = \lambda_i\,\phi_i\left(g_i(T_i(x)) - g_i(x_i^*)\right).
 
 The pieces are:
 
@@ -30,6 +30,11 @@ The pieces are:
 
 ``phi_i``
    A value transform applied to the nonnegative shifted component value.
+
+``lambda_i``
+   The component ``scale_factor`` applied after the value transform. If
+   omitted, FuncCraft estimates it from transformed component values before
+   composition.
 
 ``psi``
    A composition function combining all component values.
@@ -54,6 +59,9 @@ Each component owns one coordinate transform and one value transform. The
 coordinate transform has an ``input_dimension`` equal to the parent/search
 dimension and an ``output_dimension`` equal to the component input dimension.
 Subspace rotation can therefore make a component live on a selected subspace.
+Each component also owns an optional ``scale_factor``. If omitted, it is
+materialized at construction time from deterministic samples of that component
+after the component value transform is applied.
 
 Nested composed components must have ``assigned_fopt = 0``. Component values
 are expected to be zero at their assigned optimum; the final nonzero optimum
@@ -151,11 +159,16 @@ statistically rather than requiring every sampled point to match.
 Final scaling
 -------------
 
-If ``scale_factor`` is omitted, FuncCraft estimates it from the raw unscaled
-function. It samples 128 deterministic centered stratified points in the
-active domain, computes raw values, applies the same relative numeric
-quantization used for component stabilization, takes the 25th percentile
-:math:`q`, and uses
+FuncCraft has two scaling levels. Component ``scale_factor`` values normalize
+transformed component values before composition. The top-level
+``FunctionSpec.scale_factor`` normalizes the already-composed raw function
+before ``assigned_fopt`` is added.
+
+If a component ``scale_factor`` or top-level ``scale_factor`` is omitted,
+FuncCraft estimates it from 128 deterministic centered stratified points in
+the active domain. It computes the relevant raw nonnegative values, applies the
+same relative numeric quantization used for component stabilization, takes the
+25th percentile :math:`q`, and uses
 
 .. math::
 
@@ -166,9 +179,11 @@ quantization used for component stabilization, takes the 25th percentile
    \end{cases}
 
 This keeps typical values comparable while preserving the assigned optimum
-value. The estimator is deterministic for a fixed materialized function YAML:
-the sample points are generated from the function seed without random jitter,
-and the raw values are computed before the final scale and bias are applied.
+value. Component scaling is estimated after the component value transform;
+final scaling is estimated after component transforms and composition but
+before the final scale and bias are applied. The estimator is deterministic
+for a fixed materialized function YAML: the sample points are generated from
+the relevant seed without random jitter.
 
 For the exact formulas of each transform and composition mode, see
 :doc:`mechanisms`.

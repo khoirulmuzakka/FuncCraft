@@ -657,6 +657,9 @@ ComponentSpec component_spec_from_yaml(const YAML::Node& node) {
     }
     spec.coordinate_transform = coordinate_transform_spec_from_yaml(node["coordinate_transform"]);
     spec.value_transform = value_transform_spec_from_yaml(node["value_transform"]);
+    if (node["scale_factor"] && !node["scale_factor"].IsNull()) {
+        spec.scale_factor = node["scale_factor"].as<double>();
+    }
     spec.seed = node["seed"] ? node["seed"].as<std::uint64_t>() : 0;
     return spec;
 }
@@ -742,6 +745,9 @@ YAML::Node function_spec_to_yaml(const FunctionSpec& spec) {
         }
         node["coordinate_transform"] = transform_spec(component.coordinate_transform);
         node["value_transform"] = value_transform_spec(component.value_transform);
+        if (component.scale_factor.has_value()) {
+            node["scale_factor"] = *component.scale_factor;
+        }
         node["seed"] = component.seed;
         components.push_back(node);
     }

@@ -36,7 +36,7 @@ FuncCraft builds benchmark functions by composing smaller ingredients. The gener
 
 .. code-block:: text
 
-   f(x) = assigned_fopt + scale_factor * psi(phi_1(g_1(T_1(x))), ..., phi_m(g_m(T_m(x))))
+   f(x) = assigned_fopt + scale_factor * psi(component_scale_1 * phi_1(g_1(T_1(x)) - f_1^*), ..., component_scale_m * phi_m(g_m(T_m(x)) - f_m^*))
 
 The main runtime objects are:
 

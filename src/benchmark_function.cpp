@@ -451,6 +451,73 @@ double estimate_lambda(const ComposedFunction& raw_function, const Domain& domai
     return std::min(kTargetScale / q, kMaxLambda);
 }
 
+double estimate_component_lambda(
+    const ComponentEvaluator& evaluator,
+    const Domain& input_domain,
+    const Domain& transform_domain,
+    const Domain& child_domain,
+    const CoordinateTransform& coordinate_transform,
+    const ValueTransform& value_transform,
+    const std::vector<double>& child_xopt,
+    double child_fopt,
+    std::uint64_t seed) {
+    constexpr int kSampleCount = 128;
+    constexpr double kTargetScale = 1.0e5;
+    constexpr double kMinRepresentativeScale = 1.0e-12;
+    constexpr double kMaxLambda = 1.0e8;
+
+    const std::vector<std::vector<double>> batch = detail::deterministic_stratified_points_in_domain(
+        seed,
+        0xC04F05CA1EULL,
+        input_domain,
+        kSampleCount);
+        
+    std::vector<std::vector<double>> child_batch;
+    child_batch.reserve(batch.size());
+    std::vector<double> transformed;
+    std::vector<double> child_input;
+    for (const auto& x : batch) {
+        coordinate_transform.apply(x, transformed);
+        if (detail::squared_distance(transformed, coordinate_transform.target_xopt()) <= 1.0e-24) {
+            child_input = child_xopt;
+        } else {
+            detail::map_point_between_domains(transformed, transform_domain, child_domain, child_input);
+        }
+        child_batch.push_back(child_input);
+    }
+
+    const std::vector<double> child_values = evaluator(child_batch);
+    if (child_values.size() != child_batch.size()) {
+        return 1.0;
+    }
+
+    std::vector<double> values;
+    values.reserve(child_values.size());
+    for (double child_value : child_values) {
+        if (!std::isfinite(child_value)) {
+            continue;
+        }
+        double shifted_value = child_value - child_fopt;
+        if (shifted_value < 0.0 && shifted_value >= -1.0e-12) {
+            shifted_value = 0.0;
+        }
+        if (shifted_value < 0.0) {
+            continue;
+        }
+        const double transformed_value = value_transform.apply(shifted_value);
+        if (!std::isfinite(transformed_value)) {
+            continue;
+        }
+        values.push_back(detail::stable_numeric_value(transformed_value));
+    }
+
+    const double q = percentile(std::move(values), 0.25);
+    if (!std::isfinite(q) || q <= kMinRepresentativeScale) {
+        return 1.0;
+    }
+    return std::min(kTargetScale / q, kMaxLambda);
+}
+
 double saturating_apply_scale_and_bias(double raw_value, double lambda, double bias) {
     constexpr double kCap = 1.0e300;
     if (!std::isfinite(raw_value)) {
@@ -482,6 +549,12 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
     if (resolved_spec.scale_factor.has_value()) {
         detail::require(std::isfinite(*resolved_spec.scale_factor), "scale_factor must be finite");
         detail::require(*resolved_spec.scale_factor > 0.0, "scale_factor must be positive");
+    }
+    for (const ComponentSpec& component_spec : resolved_spec.components) {
+        if (component_spec.scale_factor.has_value()) {
+            detail::require(std::isfinite(*component_spec.scale_factor), "component scale_factor must be finite");
+            detail::require(*component_spec.scale_factor > 0.0, "component scale_factor must be positive");
+        }
     }
 
     resolved_spec.assigned_xopt = detail::complete_prefix_stable_point(
@@ -656,18 +729,32 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             transform_domain);
         auto coordinate_transform = make_coordinate_transform(component_spec.coordinate_transform, target_xopt);
         auto value_transform = make_value_transform(component_spec.value_transform);
+        const double component_scale_factor = component_spec.scale_factor.has_value()
+            ? *component_spec.scale_factor
+            : detail::stable_numeric_value(estimate_component_lambda(
+                child_eval,
+                input_domain,
+                transform_domain,
+                child_domain,
+                *coordinate_transform,
+                *value_transform,
+                child_xopt,
+                child_fopt,
+                component_spec.seed != 0 ? component_spec.seed : component_spec.coordinate_transform.seed));
         const CoordinateTransformClass t_class = coordinate_transform->transform_class();
         const ValueTransformClass v_class = value_transform->transform_class();
         component_spec.coordinate_transform = materialized_coordinate_transform_spec(
             component_spec.coordinate_transform,
             *coordinate_transform);
         component_spec.value_transform = materialized_value_transform_spec(component_spec.value_transform);
+        component_spec.scale_factor = component_scale_factor;
 
         builder.add_component(
             std::move(child_eval),
             std::move(child_domain),
             std::move(child_xopt),
             child_fopt,
+            component_scale_factor,
             std::move(coordinate_transform),
             std::move(value_transform));
 

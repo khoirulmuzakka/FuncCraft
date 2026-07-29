@@ -57,14 +57,14 @@ coordinate_transforms:
     parameters: []
 value_transforms:
   - kind: none
-    probability: 0.5
+    probability: 0.25
     parameters: []
   - kind: power
     probability: 0.25
     parameters: []
   - kind: osc
-    probability: 0.25
-    parameters: []
+    probability: 0.5
+    parameters: [0.99, 0.01]
   - kind: cosine-zero
     probability: 0.0
     parameters: []
@@ -80,7 +80,7 @@ compositions:
     parameters: [0.1]
   - kind: cpmlwell
     probability: 0.2
-    parameters: []
+    parameters: [0.99, 0.001]
   - kind: dpmsoftmax
     probability: 0.25
     # parameters = [sharpness]
