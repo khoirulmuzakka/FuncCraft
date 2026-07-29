@@ -124,6 +124,9 @@ Exported YAML is a materialized record of what FuncCraft built. Function
 exports include generated matrices, centers, optima, seeds, scale factors, and
 metadata needed to reproduce the already-built function. Suite manifests
 include the normalized suite record and every generated function record.
+For composed functions, each exported component may include its own
+``scale_factor``; this is the multiplier applied after that component's value
+transform and before composition.
 
 .. code-block:: python
 

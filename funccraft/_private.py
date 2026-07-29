@@ -184,6 +184,9 @@ def _make_component(
     a ``spec`` attribute such as ``BenchmarkFunction``.
     ``coordinate_transform`` and ``value_transform`` may be native specs or
     dictionaries with the same field names.
+    ``scale_factor`` is an optional positive multiplier applied after the
+    component value transform and before composition. Use ``None`` for
+    construction-time estimation.
 
     Available primitive base functions
     ----------------------------------
@@ -302,7 +305,10 @@ def _make_function_spec(
     """Create a native ``FunctionSpec``.
 
     ``components`` may contain native ``ComponentSpec`` objects or dictionaries.
-    ``scale_factor=None`` lets FuncCraft choose the scale internally.
+    Component dictionaries may include ``scale_factor`` to control the
+    multiplier applied after the component value transform. Top-level
+    ``scale_factor=None`` lets FuncCraft choose the final post-composition
+    scale internally.
 
     Available fields
     ----------------
@@ -311,7 +317,7 @@ def _make_function_spec(
       ``lower_bound``, and ``upper_bound``.
     - ``components``: list of ``ComponentSpec`` objects or dicts. Each
       component can use a primitive ``base_function`` or a nested
-      ``composed_function``.
+      ``composed_function``. Components may include ``scale_factor``.
     - ``composition``: ``CompositionSpec`` or dict with ``kind``,
       ``parameters``, optional ``biases``, and optional ``centers``.
     - ``assigned_xopt``, ``assigned_fopt``, ``scale_factor``, ``seed``,
@@ -326,8 +332,8 @@ def _make_function_spec(
     ``assigned_fopt``
         Desired objective value at the assigned global minimizer.
     ``scale_factor``
-        Multiplicative value scale. Use ``None`` for internal estimation, or a
-        positive value when you want exact control.
+        Final post-composition multiplicative value scale. Use ``None`` for
+        internal estimation, or a positive value when you want exact control.
     ``seed``
         Function-level seed used for generated runtime details such as missing
         assigned optima and transform parameters.

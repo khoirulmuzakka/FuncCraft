@@ -102,7 +102,9 @@ struct ValueTransformSpec {
  *
  * A component uses `composed_function` when it is set; otherwise it uses
  * `base_function` as a primitive component. The component input dimension is
- * inferred from the coordinate transform output dimension.
+ * inferred from the coordinate transform output dimension. `scale_factor =
+ * std::nullopt` means the builder should estimate a component multiplier from
+ * transformed component values before composition.
  */
 struct ComponentSpec {
     std::optional<BasicFunctionId> base_function;
@@ -160,8 +162,8 @@ struct CompositionSpec {
  * materialized specs include them.
  *
  * `assigned_xopt` and `assigned_fopt` control the constructed optimum location
- * and value. `scale_factor = std::nullopt` means the builder should determine
- * a scale factor internally.
+ * and value. Top-level `scale_factor = std::nullopt` means the builder should
+ * determine a final post-composition scale factor internally.
  */
 struct FunctionSpec {
     int dimension = 0;

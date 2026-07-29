@@ -67,6 +67,9 @@ class BenchmarkFunction:
         Scalar value transform dictionary. Available ``kind`` values are
         ``none``, ``power``, ``osc``/``oscillatory``, and ``cosine-zero``.
         Optional ``parameters`` control the transform family.
+    component ``scale_factor``
+        Optional positive multiplier applied to the transformed component
+        value before composition. Omit it to let FuncCraft estimate one.
     ``composition``
         Composition dictionary. Available ``kind`` values are ``none``,
         ``cpmsum``/``cpm-wsum``, ``cpmpmean``/``cpm-power-mean``,

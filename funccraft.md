@@ -184,6 +184,9 @@ f(x) = assigned_fopt + scale_factor * psi(x, z_1(x), ..., z_m(x))
 z_i(x) = component_scale_i * phi_i(g_i(T_i(x)) - f_i*)
 ```
 
+Omitted component scales and the final `scale_factor` are estimated
+deterministically at construction time and materialized in exported specs.
+
 Implemented mechanism families include:
 
 - 34 primitive base functions, including Sphere, Rosenbrock, Ackley,

@@ -30,6 +30,9 @@ BenchmarkFunction
 This example creates one composed ``BenchmarkFunction`` from explicit C++
 ``FunctionSpec`` structs. One outer component is itself a nested composed
 function.
+The component ``scale_factor`` fields are omitted in this example, so
+FuncCraft estimates and materializes them during construction before the
+components are composed.
 
 .. code-block:: cpp
 

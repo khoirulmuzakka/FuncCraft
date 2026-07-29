@@ -52,6 +52,8 @@ BenchmarkFunction
 -----------------
 
 This section creates one composed ``BenchmarkFunction`` from an inline Python dictionary. The dictionary mirrors a function YAML file: it defines the dimension, domain, components, coordinate transforms, value transforms, composition rule, assigned optimum, and label. One component is itself a nested composed function.
+Component ``scale_factor`` fields are omitted here, so FuncCraft estimates and
+materializes them during construction before the components are composed.
 
 A ``BenchmarkFunction`` evaluates batches: pass a list of points and receive one value per point.
 
