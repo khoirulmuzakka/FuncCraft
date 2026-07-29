@@ -1,9 +1,11 @@
 #include "builder.h"
 #include "basicf.h"
+#include "runtime_profile.h"
 #include "support.h"
 
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <utility>
 
@@ -45,87 +47,6 @@ double positive_power_fast(double value, double exponent) {
         return std::sqrt(value);
     }
     return std::pow(value, exponent);
-}
-
-double apply_value_transform_fast(
-    ValueTransformClass value_transform_class,
-    double value_alpha,
-    double value_p,
-    double value_epsilon,
-    double u) {
-    double value = u;
-    switch (value_transform_class) {
-    case ValueTransformClass::None:
-        value = u;
-        break;
-    case ValueTransformClass::Power:
-        value = value_alpha * positive_power_fast(u, value_p);
-        break;
-    case ValueTransformClass::Oscillatory:
-        value = u * (1.0 + value_epsilon * std::sin(value_alpha * u));
-        break;
-    case ValueTransformClass::CosineZero:
-        value = 1.0 - std::cos(value_alpha * u);
-        break;
-    case ValueTransformClass::Mixed:
-        throw std::logic_error("mixed value transform is not a concrete runtime transform");
-    }
-    if (!std::isfinite(value)) {
-        return std::numeric_limits<double>::max();
-    }
-    if (value < 0.0 && value >= -1.0e-12) {
-        return 0.0;
-    }
-    return value;
-}
-
-bool finalize_component_value(
-    double child_value,
-    double child_fopt,
-    double scale_factor,
-    ValueTransformClass value_transform_class,
-    double value_alpha,
-    double value_p,
-    double value_epsilon,
-    double& out) {
-    if (!std::isfinite(child_value)) {
-        return false;
-    }
-    double shifted_value = child_value - child_fopt;
-    if (shifted_value < 0.0 && shifted_value >= -1.0e-12) {
-        shifted_value = 0.0;
-    }
-    if (shifted_value < 0.0) {
-        return false;
-    }
-    const double transformed_value = apply_value_transform_fast(
-        value_transform_class,
-        value_alpha,
-        value_p,
-        value_epsilon,
-        shifted_value);
-    if (transformed_value < 0.0 || !std::isfinite(transformed_value)) {
-        return false;
-    }
-    const double scaled_value = scale_factor * transformed_value;
-    if (!std::isfinite(scaled_value)) {
-        return false;
-    }
-    out = detail::stable_numeric_value(scaled_value);
-    return true;
-}
-
-void map_component_domain(
-    const std::vector<double>& domain_scale,
-    const std::vector<double>& domain_offset,
-    const std::vector<double>& point,
-    std::vector<double>& out) {
-    if (out.size() != point.size()) {
-        out.resize(point.size());
-    }
-    for (std::size_t i = 0; i < point.size(); ++i) {
-        out[i] = domain_scale[i] * point[i] + domain_offset[i];
-    }
 }
 
 } // namespace
@@ -175,6 +96,7 @@ FunctionBuilder& FunctionBuilder::add_component(
     };
     return add_component(
         std::move(evaluator),
+        {},
         primitive,
         primitive->default_domain(),
         primitive->x_opt,
@@ -195,6 +117,7 @@ FunctionBuilder& FunctionBuilder::add_component(
     return add_component(
         std::move(evaluator),
         {},
+        {},
         std::move(child_domain),
         std::move(child_xopt),
         child_fopt,
@@ -203,8 +126,168 @@ FunctionBuilder& FunctionBuilder::add_component(
         std::move(value_transform));
 }
 
+FunctionBuilder::RuntimeDomainMap FunctionBuilder::make_runtime_domain_map(
+    const Domain& source_domain,
+    const Domain& target_domain) {
+    require(source_domain.dimension() == target_domain.dimension(), "runtime domain map dimension mismatch");
+    RuntimeDomainMap map;
+    map.source_lower.resize(static_cast<std::size_t>(source_domain.dimension()));
+    map.source_range.resize(static_cast<std::size_t>(source_domain.dimension()));
+    map.target_lower.resize(static_cast<std::size_t>(source_domain.dimension()));
+    map.target_range.resize(static_cast<std::size_t>(source_domain.dimension()));
+
+    for (int i = 0; i < source_domain.dimension(); ++i) {
+        const auto idx = static_cast<std::size_t>(i);
+        map.source_lower[idx] = source_domain.lower[idx];
+        map.source_range[idx] = source_domain.upper[idx] - source_domain.lower[idx];
+        map.target_lower[idx] = target_domain.lower[idx];
+        map.target_range[idx] = target_domain.upper[idx] - target_domain.lower[idx];
+    }
+    return map;
+}
+
+FunctionBuilder::RuntimeValueTransform FunctionBuilder::make_runtime_value_transform(
+    const ValueTransform& value_transform) {
+    RuntimeValueTransform runtime;
+    runtime.kind = value_transform.transform_class();
+
+    if (runtime.kind == ValueTransformClass::Power) {
+        const auto* typed = dynamic_cast<const PowerValueTransform*>(&value_transform);
+        require(typed != nullptr, "power value transform type mismatch");
+        runtime.alpha = typed->alpha();
+        runtime.p = typed->p();
+    } else if (runtime.kind == ValueTransformClass::Oscillatory) {
+        const auto* typed = dynamic_cast<const OscillatoryValueTransform*>(&value_transform);
+        require(typed != nullptr, "oscillatory value transform type mismatch");
+        runtime.alpha = typed->alpha();
+        runtime.epsilon = typed->epsilon();
+    } else if (runtime.kind == ValueTransformClass::CosineZero) {
+        const auto* typed = dynamic_cast<const CosineZeroValueTransform*>(&value_transform);
+        require(typed != nullptr, "cosine-zero value transform type mismatch");
+        runtime.alpha = typed->alpha();
+    } else if (runtime.kind == ValueTransformClass::Mixed) {
+        throw std::logic_error("mixed value transform is not a concrete runtime transform");
+    }
+    return runtime;
+}
+
+void FunctionBuilder::map_component_domain(
+    const RuntimeDomainMap& map,
+    const std::vector<double>& point,
+    std::vector<double>& out) {
+    if (out.size() != point.size()) {
+        out.resize(point.size());
+    }
+    for (std::size_t i = 0; i < point.size(); ++i) {
+        if (map.source_range[i] == 0.0) {
+            out[i] = map.target_lower[i] + 0.5 * map.target_range[i];
+            continue;
+        }
+        const double t = (point[i] - map.source_lower[i]) / map.source_range[i];
+        out[i] = map.target_lower[i] + t * map.target_range[i];
+    }
+}
+
+double FunctionBuilder::apply_runtime_value_transform(const RuntimeValueTransform& transform, double u) {
+    double value = u;
+    switch (transform.kind) {
+    case ValueTransformClass::None:
+        value = u;
+        break;
+    case ValueTransformClass::Power:
+        value = transform.alpha * positive_power_fast(u, transform.p);
+        break;
+    case ValueTransformClass::Oscillatory:
+        value = u * (1.0 + transform.epsilon * std::sin(transform.alpha * u));
+        break;
+    case ValueTransformClass::CosineZero:
+        value = 1.0 - std::cos(transform.alpha * u);
+        break;
+    case ValueTransformClass::Mixed:
+        throw std::logic_error("mixed value transform is not a concrete runtime transform");
+    }
+    if (!std::isfinite(value)) {
+        return std::numeric_limits<double>::max();
+    }
+    if (value < 0.0 && value >= -1.0e-12) {
+        return 0.0;
+    }
+    return value;
+}
+
+bool FunctionBuilder::finalize_component_value(
+    const RuntimeComponent& component,
+    double child_value,
+    double& out) {
+    FUNCCRAFT_PROFILE_SCOPE(FinalizeValue);
+    if (!std::isfinite(child_value)) {
+        return false;
+    }
+
+    double shifted_value = child_value - component.child_fopt;
+    if (shifted_value < 0.0 && shifted_value >= -1.0e-12) {
+        shifted_value = 0.0;
+    }
+    if (shifted_value < 0.0) {
+        return false;
+    }
+
+    const double transformed_value = apply_runtime_value_transform(component.value_transform, shifted_value);
+    if (transformed_value < 0.0 || !std::isfinite(transformed_value)) {
+        return false;
+    }
+
+    const double scaled_value = component.scale_factor * transformed_value;
+    if (!std::isfinite(scaled_value)) {
+        return false;
+    }
+    out = detail::stable_numeric_value(scaled_value);
+    return true;
+}
+
+bool FunctionBuilder::evaluate_component(
+    const RuntimeComponent& component,
+    const std::vector<double>& x,
+    std::vector<double>& transformed,
+    std::vector<double>& child_input,
+    double& out) {
+    FUNCCRAFT_PROFILE_SCOPE(ComponentTotal);
+    {
+        FUNCCRAFT_PROFILE_SCOPE(CoordinateTransform);
+        component.coordinate_transform->apply(x, transformed);
+    }
+    if (detail::squared_distance(transformed, component.target_xopt) <= 1.0e-24) {
+        child_input = component.child_xopt;
+    } else {
+        FUNCCRAFT_PROFILE_SCOPE(DomainMap);
+        map_component_domain(component.domain_map, transformed, child_input);
+    }
+
+    double child_value = 0.0;
+    if (component.primitive) {
+        FUNCCRAFT_PROFILE_SCOPE(PrimitiveEvaluate);
+        child_value = component.primitive->evaluate(child_input.data());
+    } else {
+        FUNCCRAFT_PROFILE_SCOPE(NestedEvaluate);
+        if (component.evaluate_scalar) {
+            child_value = component.evaluate_scalar(child_input);
+        } else {
+            const std::vector<double> child_values = component.evaluate({child_input});
+            if (child_values.size() != 1) {
+                return false;
+            }
+            child_value = child_values.front();
+        }
+        if (!std::isfinite(child_value)) {
+            return false;
+        }
+    }
+    return finalize_component_value(component, child_value, out);
+}
+
 FunctionBuilder& FunctionBuilder::add_component(
     ComponentEvaluator evaluator,
+    ComponentScalarEvaluator scalar_evaluator,
     std::shared_ptr<BasicF> primitive,
     Domain child_domain,
     std::vector<double> child_xopt,
@@ -223,57 +306,17 @@ FunctionBuilder& FunctionBuilder::add_component(
     require(coordinate_transform->output_dimension() == child_domain.dimension(), "component transform output dimension mismatch");
     require_dimension(child_xopt, child_domain.dimension(), "component child_xopt");
 
-    const ValueTransformClass value_transform_class = value_transform->transform_class();
-    double value_alpha = 1.0;
-    double value_p = 1.0;
-    double value_epsilon = 0.1;
-    if (value_transform_class == ValueTransformClass::Power) {
-        const auto* typed = dynamic_cast<const PowerValueTransform*>(value_transform.get());
-        require(typed != nullptr, "power value transform type mismatch");
-        value_alpha = typed->alpha();
-        value_p = typed->p();
-    } else if (value_transform_class == ValueTransformClass::Oscillatory) {
-        const auto* typed = dynamic_cast<const OscillatoryValueTransform*>(value_transform.get());
-        require(typed != nullptr, "oscillatory value transform type mismatch");
-        value_alpha = typed->alpha();
-        value_epsilon = typed->epsilon();
-    } else if (value_transform_class == ValueTransformClass::CosineZero) {
-        const auto* typed = dynamic_cast<const CosineZeroValueTransform*>(value_transform.get());
-        require(typed != nullptr, "cosine-zero value transform type mismatch");
-        value_alpha = typed->alpha();
-    }
-
-    std::vector<double> domain_scale(static_cast<std::size_t>(transform_domain.dimension()), 1.0);
-    std::vector<double> domain_offset(static_cast<std::size_t>(transform_domain.dimension()), 0.0);
-    for (int i = 0; i < transform_domain.dimension(); ++i) {
-        const auto idx = static_cast<std::size_t>(i);
-        const double source_lo = transform_domain.lower[idx];
-        const double source_hi = transform_domain.upper[idx];
-        const double target_lo = child_domain.lower[idx];
-        const double target_hi = child_domain.upper[idx];
-        if (source_hi == source_lo) {
-            domain_scale[idx] = 0.0;
-            domain_offset[idx] = 0.5 * (target_lo + target_hi);
-            continue;
-        }
-        domain_scale[idx] = (target_hi - target_lo) / (source_hi - source_lo);
-        domain_offset[idx] = target_lo - domain_scale[idx] * source_lo;
-    }
-
     runtime_components_.push_back(RuntimeComponent{
         std::move(evaluator),
+        std::move(scalar_evaluator),
         std::move(primitive),
         coordinate_transform,
-        value_transform_class,
+        make_runtime_value_transform(*value_transform),
+        make_runtime_domain_map(transform_domain, child_domain),
         coordinate_transform->target_xopt(),
         std::move(child_xopt),
-        std::move(domain_scale),
-        std::move(domain_offset),
         child_fopt,
         component_scale_factor,
-        value_alpha,
-        value_p,
-        value_epsilon,
     });
     return *this;
 }
@@ -284,7 +327,7 @@ FunctionBuilder& FunctionBuilder::composition(std::shared_ptr<CompositionFunctio
     return *this;
 }
 
-ComposedFunction FunctionBuilder::build() const {
+ScalarFunction FunctionBuilder::build_scalar() const {
     require(!runtime_components_.empty(), "cannot build function without components");
     auto components = std::make_shared<std::vector<RuntimeComponent>>(runtime_components_);
     std::shared_ptr<CompositionFunction> composition = composition_
@@ -294,65 +337,49 @@ ComposedFunction FunctionBuilder::build() const {
             : make_weighted_sum(runtime_components_.size()));
     const int dimension = domain_.dimension();
     const double penalty = std::numeric_limits<double>::infinity();
-    const Domain domain = domain_;
+    struct Scratch {
+        std::vector<double> component_values;
+        std::vector<double> transformed;
+        std::vector<double> child_input;
+    };
+    auto scratch = std::make_shared<Scratch>();
+    scratch->component_values.assign(components->size(), 0.0);
+    scratch->transformed.assign(static_cast<std::size_t>(dimension), 0.0);
 
-    return [components, composition, dimension, penalty, domain](const std::vector<std::vector<double>>& X) {
+    return [components, composition, dimension, penalty, scratch](const std::vector<double>& x) {
+        require_dimension(x, dimension, "benchmark function input");
+        bool invalid = false;
+        for (std::size_t component_index = 0; component_index < components->size(); ++component_index) {
+            const auto& component = (*components)[component_index];
+            if (!evaluate_component(
+                    component,
+                    x,
+                    scratch->transformed,
+                    scratch->child_input,
+                    scratch->component_values[component_index])) {
+                invalid = true;
+                break;
+            }
+        }
+        if (invalid) {
+            return penalty;
+        }
+        double composed = 0.0;
+        {
+            FUNCCRAFT_PROFILE_SCOPE(Composition);
+            composed = composition->apply(x, scratch->component_values);
+        }
+        return std::isfinite(composed) ? composed : penalty;
+    };
+}
+
+ComposedFunction FunctionBuilder::build() const {
+    ScalarFunction scalar = build_scalar();
+    return [scalar = std::move(scalar)](const std::vector<std::vector<double>>& X) {
         std::vector<double> values;
         values.reserve(X.size());
-        std::vector<double> component_values(components->size(), 0.0);
-        std::vector<double> transformed(static_cast<std::size_t>(dimension), 0.0);
-        std::vector<double> child_input;
-        std::vector<std::vector<double>> child_batch(1);
         for (const auto& x : X) {
-            require_dimension(x, dimension, "benchmark function input");
-            bool invalid = false;
-            for (std::size_t component_index = 0; component_index < components->size(); ++component_index) {
-                const auto& component = (*components)[component_index];
-                component.coordinate_transform->apply(x, transformed);
-                if (detail::squared_distance(transformed, component.target_xopt) <= 1.0e-24) {
-                    child_input = component.child_xopt;
-                } else {
-                    map_component_domain(component.domain_scale, component.domain_offset, transformed, child_input);
-                }
-
-                double child_value = 0.0;
-                if (component.primitive) {
-                    child_value = component.primitive->evaluate(child_input.data());
-                } else {
-                    child_batch.front() = child_input;
-                    const std::vector<double> child_values = component.evaluate(child_batch);
-                    if (child_values.size() != 1 || !std::isfinite(child_values.front())) {
-                        invalid = true;
-                        break;
-                    }
-                    child_value = child_values.front();
-                }
-
-                double component_value = 0.0;
-                if (!finalize_component_value(
-                        child_value,
-                        component.child_fopt,
-                        component.scale_factor,
-                        component.value_transform_class,
-                        component.value_alpha,
-                        component.value_p,
-                        component.value_epsilon,
-                        component_value)) {
-                    invalid = true;
-                    break;
-                }
-                component_values[component_index] = component_value;
-            }
-            if (invalid) {
-                values.push_back(penalty);
-                continue;
-            }
-            const double composed = composition->apply(x, component_values);
-            if (!std::isfinite(composed)) {
-                values.push_back(penalty);
-                continue;
-            }
-            values.push_back(composed);
+            values.push_back(scalar(x));
         }
         return values;
     };

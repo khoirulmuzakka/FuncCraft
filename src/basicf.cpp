@@ -1,5 +1,6 @@
 #include "basicf.h"
 #include "core.h"
+#include "runtime_profile.h"
 
 #include <algorithm>
 #include <cmath>
@@ -907,6 +908,7 @@ double BasicF::evaluate(const std::vector<double>& x) const {
 }
 
 double BasicF::evaluate(const double* x) const {
+    FUNCCRAFT_PROFILE_BASIC_SCOPE(id_);
     return evaluate_impl(x);
 }
 

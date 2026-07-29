@@ -30,6 +30,8 @@ namespace FuncCraft {
  */
 using ComposedFunction = std::function<std::vector<double>(const std::vector<std::vector<double>>& X)>;
 using ComponentEvaluator = std::function<std::vector<double>(const std::vector<std::vector<double>>& X)>;
+using ScalarFunction = std::function<double(const std::vector<double>& x)>;
+using ComponentScalarEvaluator = std::function<double(const std::vector<double>& x)>;
 
 /**
  * @brief Low-level builder that stores runtime components.
@@ -63,6 +65,16 @@ public:
         double component_scale_factor,
         std::shared_ptr<CoordinateTransform> coordinate_transform,
         std::shared_ptr<ValueTransform> value_transform);
+    FunctionBuilder& add_component(
+        ComponentEvaluator evaluator,
+        ComponentScalarEvaluator scalar_evaluator,
+        std::shared_ptr<BasicF> primitive,
+        Domain child_domain,
+        std::vector<double> child_xopt,
+        double child_fopt,
+        double component_scale_factor,
+        std::shared_ptr<CoordinateTransform> coordinate_transform,
+        std::shared_ptr<ValueTransform> value_transform);
     /**
      * @brief Set the composition rule for all accumulated components.
      */
@@ -71,36 +83,57 @@ public:
      * @brief Materialize the final composed runtime callable.
      */
     ComposedFunction build() const;
+    /**
+     * @brief Materialize a scalar callable for internal composed-component evaluation.
+     */
+    ScalarFunction build_scalar() const;
 
 private:
     Domain domain_;
     std::shared_ptr<CompositionFunction> composition_;
 
-    FunctionBuilder& add_component(
-        ComponentEvaluator evaluator,
-        std::shared_ptr<BasicF> primitive,
-        Domain child_domain,
-        std::vector<double> child_xopt,
-        double child_fopt,
-        double component_scale_factor,
-        std::shared_ptr<CoordinateTransform> coordinate_transform,
-        std::shared_ptr<ValueTransform> value_transform);
+    struct RuntimeDomainMap {
+        std::vector<double> source_lower;
+        std::vector<double> source_range;
+        std::vector<double> target_lower;
+        std::vector<double> target_range;
+    };
+
+    struct RuntimeValueTransform {
+        ValueTransformClass kind = ValueTransformClass::None;
+        double alpha = 1.0;
+        double p = 1.0;
+        double epsilon = 0.1;
+    };
 
     struct RuntimeComponent {
         ComponentEvaluator evaluate;
+        ComponentScalarEvaluator evaluate_scalar;
         std::shared_ptr<BasicF> primitive;
         std::shared_ptr<CoordinateTransform> coordinate_transform;
-        ValueTransformClass value_transform_class = ValueTransformClass::None;
+        RuntimeValueTransform value_transform;
+        RuntimeDomainMap domain_map;
         std::vector<double> target_xopt;
         std::vector<double> child_xopt;
-        std::vector<double> domain_scale;
-        std::vector<double> domain_offset;
         double child_fopt = 0.0;
         double scale_factor = 1.0;
-        double value_alpha = 1.0;
-        double value_p = 1.0;
-        double value_epsilon = 0.1;
     };
+
+    static RuntimeDomainMap make_runtime_domain_map(const Domain& source_domain, const Domain& target_domain);
+    static RuntimeValueTransform make_runtime_value_transform(const ValueTransform& value_transform);
+    static void map_component_domain(
+        const RuntimeDomainMap& map,
+        const std::vector<double>& point,
+        std::vector<double>& out);
+    static double apply_runtime_value_transform(const RuntimeValueTransform& transform, double u);
+    static bool finalize_component_value(const RuntimeComponent& component, double child_value, double& out);
+    static bool evaluate_component(
+        const RuntimeComponent& component,
+        const std::vector<double>& x,
+        std::vector<double>& transformed,
+        std::vector<double>& child_input,
+        double& out);
+
     std::vector<RuntimeComponent> runtime_components_;
 };
 

@@ -23,6 +23,7 @@ option(BUILD_EXAMPLES "Build FuncCraft C++ examples, including Minion-dependent 
 option(BUILD_PYTHON "Build the Python funccraft interface" ON)
 option(BUILD_TEST "Build FuncCraft C++ test targets" OFF)
 option(FUNCCRAFT_INSTALL "Install FuncCraft targets and package metadata" OFF)
+option(FUNCCRAFT_ENABLE_PROFILE "Enable optional FuncCraft runtime profiling counters" OFF)
 
 if((BUILD_EXAMPLES OR BUILD_PYTHON OR BUILD_TEST OR FUNCCRAFT_INSTALL) AND NOT BUILD_LIBRARY)
     message(FATAL_ERROR "BUILD_LIBRARY must be ON when BUILD_EXAMPLES, BUILD_PYTHON, BUILD_TEST, or FUNCCRAFT_INSTALL is ON.")
@@ -112,6 +113,9 @@ if(BUILD_LIBRARY)
         FUNCCRAFT_DEFAULT_SUITE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/suites"
         FUNCCRAFT_INSTALLED_SUITE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/FuncCraft/suites"
     )
+    if(FUNCCRAFT_ENABLE_PROFILE)
+        target_compile_definitions(funccraft PUBLIC FUNCCRAFT_ENABLE_PROFILE)
+    endif()
 endif()
 
 if(BUILD_EXAMPLES)

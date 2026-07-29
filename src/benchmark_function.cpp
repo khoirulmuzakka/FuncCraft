@@ -1,4 +1,5 @@
 #include "benchmark_function.h"
+#include "runtime_profile.h"
 #include "support.h"
 
 #include <cstddef>
@@ -688,6 +689,8 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
         std::vector<double> child_xopt;
         double child_fopt = 0.0;
         std::function<std::vector<double>(const std::vector<std::vector<double>>&)> child_eval;
+        ComponentScalarEvaluator child_scalar_eval;
+        std::shared_ptr<BasicF> child_primitive;
 
         if (component_spec.composed_function) {
             auto child = std::make_shared<BenchmarkFunction>(*component_spec.composed_function);
@@ -708,10 +711,14 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
             child_eval = [child](const std::vector<std::vector<double>>& X) {
                 return (*child)(X);
             };
+            child_scalar_eval = [child](const std::vector<double>& x) {
+                return child->evaluate_scalar(x);
+            };
         } else {
             detail::require(component_spec.base_function.has_value(), "basic component requires base_function");
             const int component_dimension = component_spec.coordinate_transform.output_dimension;
             auto primitive = std::make_shared<BasicF>(*component_spec.base_function, component_dimension);
+            child_primitive = primitive;
             child_domain = primitive->default_domain();
             child_xopt = primitive->x_opt;
             child_fopt = primitive->f_opt;
@@ -751,6 +758,8 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
 
         builder.add_component(
             std::move(child_eval),
+            std::move(child_scalar_eval),
+            std::move(child_primitive),
             std::move(child_domain),
             std::move(child_xopt),
             child_fopt,
@@ -772,7 +781,15 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
         append_leaf_base_functions(component_spec, function_class.base_functions);
     }
 
-    const ComposedFunction raw_function = builder.build();
+    const ScalarFunction raw_scalar = builder.build_scalar();
+    const ComposedFunction raw_function = [raw_scalar](const std::vector<std::vector<double>>& X) {
+        std::vector<double> values;
+        values.reserve(X.size());
+        for (const auto& x : X) {
+            values.push_back(raw_scalar(x));
+        }
+        return values;
+    };
     if (resolved_spec.label.empty()) {
         resolved_spec.label = class_label(function_class);
     }
@@ -787,16 +804,41 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
     spec_.scale_factor = scale_factor_;
     spec_.assigned_fopt = assigned_fopt_;
     function_ = [raw_function, scale_factor = scale_factor_, assigned_fopt = assigned_fopt_](const std::vector<std::vector<double>>& X) {
-        std::vector<double> values = raw_function(X);
-        for (double& value : values) {
-            value = saturating_apply_scale_and_bias(value, scale_factor, assigned_fopt);
+        std::vector<double> values;
+        {
+            FUNCCRAFT_PROFILE_SCOPE(RawFunction);
+            values = raw_function(X);
+        }
+        {
+            FUNCCRAFT_PROFILE_SCOPE(GlobalScale);
+            for (double& value : values) {
+                value = saturating_apply_scale_and_bias(value, scale_factor, assigned_fopt);
+            }
         }
         return values;
+    };
+    scalar_function_ = [raw_scalar, scale_factor = scale_factor_, assigned_fopt = assigned_fopt_](const std::vector<double>& x) {
+        double value = 0.0;
+        {
+            FUNCCRAFT_PROFILE_SCOPE(RawFunction);
+            value = raw_scalar(x);
+        }
+        {
+            FUNCCRAFT_PROFILE_SCOPE(GlobalScale);
+            value = saturating_apply_scale_and_bias(value, scale_factor, assigned_fopt);
+        }
+        return value;
     };
 }
 
 std::vector<double> BenchmarkFunction::operator()(const std::vector<std::vector<double>>& X) const {
+    FUNCCRAFT_PROFILE_SCOPE(BenchmarkTotal);
     return function_(X);
+}
+
+double BenchmarkFunction::evaluate_scalar(const std::vector<double>& x) const {
+    FUNCCRAFT_PROFILE_SCOPE(BenchmarkTotal);
+    return scalar_function_(x);
 }
 
 const Domain& BenchmarkFunction::domain() const {

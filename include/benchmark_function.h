@@ -96,6 +96,9 @@ private:
     double assigned_fopt_ = 0.0;
     std::string component_types_;
     ComposedFunction function_;
+    ScalarFunction scalar_function_;
+
+    double evaluate_scalar(const std::vector<double>& x) const;
 };
 
 /**
