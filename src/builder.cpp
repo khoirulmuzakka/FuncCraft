@@ -81,51 +81,6 @@ FunctionBuilder& FunctionBuilder::domain(Domain domain) {
     return *this;
 }
 
-FunctionBuilder& FunctionBuilder::add_component(
-    BasicFunctionId id,
-    std::shared_ptr<CoordinateTransform> coordinate_transform,
-    std::shared_ptr<ValueTransform> value_transform) {
-    require(static_cast<bool>(coordinate_transform), "coordinate transform is null");
-    require(static_cast<bool>(value_transform), "value transform is null");
-    require(coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
-    require(coordinate_transform->output_dimension() > 0, "component dimension must be positive");
-
-    const auto primitive = make_basicf_ptr(id, coordinate_transform->output_dimension());
-    ComponentEvaluator evaluator = [primitive](const std::vector<std::vector<double>>& X) {
-        return (*primitive)(X);
-    };
-    return add_component(
-        std::move(evaluator),
-        {},
-        primitive,
-        primitive->default_domain(),
-        primitive->x_opt,
-        primitive->f_opt,
-        1.0,
-        std::move(coordinate_transform),
-        std::move(value_transform));
-}
-
-FunctionBuilder& FunctionBuilder::add_component(
-    ComponentEvaluator evaluator,
-    Domain child_domain,
-    std::vector<double> child_xopt,
-    double child_fopt,
-    double component_scale_factor,
-    std::shared_ptr<CoordinateTransform> coordinate_transform,
-    std::shared_ptr<ValueTransform> value_transform) {
-    return add_component(
-        std::move(evaluator),
-        {},
-        {},
-        std::move(child_domain),
-        std::move(child_xopt),
-        child_fopt,
-        component_scale_factor,
-        std::move(coordinate_transform),
-        std::move(value_transform));
-}
-
 FunctionBuilder::RuntimeDomainMap FunctionBuilder::make_runtime_domain_map(
     const Domain& source_domain,
     const Domain& target_domain) {
@@ -216,7 +171,7 @@ double FunctionBuilder::apply_runtime_value_transform(const RuntimeValueTransfor
 }
 
 bool FunctionBuilder::finalize_component_value(
-    const RuntimeComponent& component,
+    const EvaluableComponent& component,
     double child_value,
     double& out) {
     FUNCCRAFT_PROFILE_SCOPE(FinalizeValue);
@@ -246,7 +201,7 @@ bool FunctionBuilder::finalize_component_value(
 }
 
 bool FunctionBuilder::evaluate_component(
-    const RuntimeComponent& component,
+    const EvaluableComponent& component,
     const std::vector<double>& x,
     std::vector<double>& transformed,
     std::vector<double>& child_input,
@@ -285,38 +240,39 @@ bool FunctionBuilder::evaluate_component(
     return finalize_component_value(component, child_value, out);
 }
 
-FunctionBuilder& FunctionBuilder::add_component(
-    ComponentEvaluator evaluator,
-    ComponentScalarEvaluator scalar_evaluator,
-    std::shared_ptr<BasicF> primitive,
-    Domain child_domain,
-    std::vector<double> child_xopt,
-    double child_fopt,
-    double component_scale_factor,
-    std::shared_ptr<CoordinateTransform> coordinate_transform,
-    std::shared_ptr<ValueTransform> value_transform) {
-    require(static_cast<bool>(evaluator), "component evaluator is empty");
-    require(static_cast<bool>(coordinate_transform), "coordinate transform is null");
-    require(static_cast<bool>(value_transform), "value transform is null");
-    require(std::isfinite(component_scale_factor), "component scale_factor must be finite");
-    require(component_scale_factor > 0.0, "component scale_factor must be positive");
-    require(coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
-    Domain transform_domain = transform_output_domain(domain_, *coordinate_transform);
-    require(coordinate_transform->output_dimension() == transform_domain.dimension(), "component transform domain dimension mismatch");
-    require(coordinate_transform->output_dimension() == child_domain.dimension(), "component transform output dimension mismatch");
-    require_dimension(child_xopt, child_domain.dimension(), "component child_xopt");
+FunctionBuilder& FunctionBuilder::add_component(ResolvedComponent component) {
+    require(
+        static_cast<bool>(component.primitive)
+            || static_cast<bool>(component.scalar_evaluator)
+            || static_cast<bool>(component.evaluator),
+        "component needs a primitive, scalar evaluator, or batch evaluator");
+    require(static_cast<bool>(component.coordinate_transform), "coordinate transform is null");
+    require(static_cast<bool>(component.value_transform), "value transform is null");
+    require(std::isfinite(component.child_fopt), "component child_fopt must be finite");
+    require(std::isfinite(component.scale_factor), "component scale_factor must be finite");
+    require(component.scale_factor > 0.0, "component scale_factor must be positive");
+    require(component.coordinate_transform->input_dimension() == domain_.dimension(), "component transform input dimension mismatch");
+    require(component.coordinate_transform->output_dimension() > 0, "component dimension must be positive");
+    Domain transform_domain = transform_output_domain(domain_, *component.coordinate_transform);
+    require(
+        component.coordinate_transform->output_dimension() == transform_domain.dimension(),
+        "component transform domain dimension mismatch");
+    require(
+        component.coordinate_transform->output_dimension() == component.child_domain.dimension(),
+        "component transform output dimension mismatch");
+    require_dimension(component.child_xopt, component.child_domain.dimension(), "component child_xopt");
 
-    runtime_components_.push_back(RuntimeComponent{
-        std::move(evaluator),
-        std::move(scalar_evaluator),
-        std::move(primitive),
-        coordinate_transform,
-        make_runtime_value_transform(*value_transform),
-        make_runtime_domain_map(transform_domain, child_domain),
-        coordinate_transform->target_xopt(),
-        std::move(child_xopt),
-        child_fopt,
-        component_scale_factor,
+    evaluable_components_.push_back(EvaluableComponent{
+        std::move(component.evaluator),
+        std::move(component.scalar_evaluator),
+        std::move(component.primitive),
+        component.coordinate_transform,
+        make_runtime_value_transform(*component.value_transform),
+        make_runtime_domain_map(transform_domain, component.child_domain),
+        component.coordinate_transform->target_xopt(),
+        std::move(component.child_xopt),
+        component.child_fopt,
+        component.scale_factor,
     });
     return *this;
 }
@@ -328,13 +284,13 @@ FunctionBuilder& FunctionBuilder::composition(std::shared_ptr<CompositionFunctio
 }
 
 ScalarFunction FunctionBuilder::build_scalar() const {
-    require(!runtime_components_.empty(), "cannot build function without components");
-    auto components = std::make_shared<std::vector<RuntimeComponent>>(runtime_components_);
+    require(!evaluable_components_.empty(), "cannot build function without components");
+    auto components = std::make_shared<std::vector<EvaluableComponent>>(evaluable_components_);
     std::shared_ptr<CompositionFunction> composition = composition_
         ? composition_
-        : (runtime_components_.size() == 1
+        : (evaluable_components_.size() == 1
             ? std::shared_ptr<CompositionFunction>(std::make_shared<NoneComposition>())
-            : make_weighted_sum(runtime_components_.size()));
+            : make_weighted_sum(evaluable_components_.size()));
     const int dimension = domain_.dimension();
     const double penalty = std::numeric_limits<double>::infinity();
     struct Scratch {

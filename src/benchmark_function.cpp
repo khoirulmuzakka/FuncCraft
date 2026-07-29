@@ -756,16 +756,17 @@ BenchmarkFunction::BenchmarkFunction(FunctionSpec spec) {
         component_spec.value_transform = materialized_value_transform_spec(component_spec.value_transform);
         component_spec.scale_factor = component_scale_factor;
 
-        builder.add_component(
-            std::move(child_eval),
-            std::move(child_scalar_eval),
-            std::move(child_primitive),
-            std::move(child_domain),
-            std::move(child_xopt),
-            child_fopt,
-            component_scale_factor,
-            std::move(coordinate_transform),
-            std::move(value_transform));
+        ResolvedComponent resolved_component;
+        resolved_component.evaluator = std::move(child_eval);
+        resolved_component.scalar_evaluator = std::move(child_scalar_eval);
+        resolved_component.primitive = std::move(child_primitive);
+        resolved_component.child_domain = std::move(child_domain);
+        resolved_component.child_xopt = std::move(child_xopt);
+        resolved_component.child_fopt = child_fopt;
+        resolved_component.scale_factor = component_scale_factor;
+        resolved_component.coordinate_transform = std::move(coordinate_transform);
+        resolved_component.value_transform = std::move(value_transform);
+        builder.add_component(std::move(resolved_component));
 
         if (function_class.base_functions.empty()) {
             function_class.coordinate_transform = t_class;
