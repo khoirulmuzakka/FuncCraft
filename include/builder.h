@@ -76,16 +76,30 @@ private:
     Domain domain_;
     std::shared_ptr<CompositionFunction> composition_;
 
+    FunctionBuilder& add_component(
+        ComponentEvaluator evaluator,
+        std::shared_ptr<BasicF> primitive,
+        Domain child_domain,
+        std::vector<double> child_xopt,
+        double child_fopt,
+        double component_scale_factor,
+        std::shared_ptr<CoordinateTransform> coordinate_transform,
+        std::shared_ptr<ValueTransform> value_transform);
+
     struct RuntimeComponent {
         ComponentEvaluator evaluate;
+        std::shared_ptr<BasicF> primitive;
         std::shared_ptr<CoordinateTransform> coordinate_transform;
-        std::shared_ptr<ValueTransform> value_transform;
-        Domain domain;
-        Domain child_domain;
+        ValueTransformClass value_transform_class = ValueTransformClass::None;
         std::vector<double> target_xopt;
         std::vector<double> child_xopt;
+        std::vector<double> domain_scale;
+        std::vector<double> domain_offset;
         double child_fopt = 0.0;
         double scale_factor = 1.0;
+        double value_alpha = 1.0;
+        double value_p = 1.0;
+        double value_epsilon = 0.1;
     };
     std::vector<RuntimeComponent> runtime_components_;
 };

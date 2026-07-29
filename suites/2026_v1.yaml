@@ -60,17 +60,17 @@ value_transforms:
     probability: 0.4
     parameters: []
   - kind: power
-    probability: 0.4
+    probability: 0.3
     parameters: []
   - kind: osc
-    probability: 0.1
+    probability: 0.3
     parameters: [0.99, 0.00001]
   - kind: cosine-zero
     probability: 0.0
     parameters: []
 compositions:
   - kind: cpmsum
-    probability: 0.25
+    probability: 0.2
     parameters: []
   - kind: cpmpmean
     probability: 0.1
@@ -79,7 +79,7 @@ compositions:
     probability: 0.1
     parameters: [0.1]
   - kind: cpmlwell
-    probability: 0.05
+    probability: 0.1
     parameters: [0.99, 0.00001]
   - kind: dpmsoftmax
     probability: 0.25
