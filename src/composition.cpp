@@ -367,9 +367,10 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
     require(z.size() == centers_.size(), "deceptive component size mismatch");
     require(x.size() == centers_.front().size(), "deceptive point dimension mismatch");
 
+    const double effective_sharpness = sharpness_ / static_cast<double>(x.size());
     double max_logit = -std::numeric_limits<double>::infinity();
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        max_logit = std::max(max_logit, -sharpness_ * squared_distance(x, centers_[i]));
+        max_logit = std::max(max_logit, -effective_sharpness * squared_distance(x, centers_[i]));
     }
 
     const double optimum_distance_sq = squared_distance(x, centers_.front());
@@ -378,7 +379,7 @@ double DeceptiveSoftmaxComposition::deceptive_raw_apply(const std::vector<double
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp((-sharpness_ * squared_distance(x, centers_[i])) - max_logit);
+        double w = std::exp((-effective_sharpness * squared_distance(x, centers_[i])) - max_logit);
         if (i > 0) {
             w *= selective_mask;
         }
@@ -425,11 +426,12 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
     require(z.size() == centers_.size(), "deceptive bg component size mismatch");
     require(x.size() == centers_.front().size(), "deceptive bg point dimension mismatch");
 
+    const double effective_sharpness = sharpness_ / static_cast<double>(x.size());
     double max_logit = -std::numeric_limits<double>::infinity();
     double min_distance = std::numeric_limits<double>::infinity();
     for (std::size_t i = 0; i < centers_.size(); ++i) {
         const double distance_sq = squared_distance(x, centers_[i]);
-        max_logit = std::max(max_logit, -sharpness_ * distance_sq);
+        max_logit = std::max(max_logit, -effective_sharpness * distance_sq);
         min_distance = std::min(min_distance, std::sqrt(distance_sq));
     }
     const double background = background_strength_ * one_minus_exp_neg(background_sharpness_ * min_distance);
@@ -439,7 +441,7 @@ double DeceptiveBgSoftmaxComposition::deceptive_raw_apply(const std::vector<doub
     double numerator = 0.0;
     double denominator = 0.0;
     for (std::size_t i = 0; i < centers_.size(); ++i) {
-        double w = std::exp((-sharpness_ * squared_distance(x, centers_[i])) - max_logit);
+        double w = std::exp((-effective_sharpness * squared_distance(x, centers_[i])) - max_logit);
         if (i > 0) {
             w *= selective_mask;
         }

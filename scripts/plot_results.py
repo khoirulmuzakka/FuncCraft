@@ -20,8 +20,14 @@ import pandas as pd
 
 TREATMENT_ORDER = {
     "coord": ["NONE", "ROT", "AFF"],
-    "value": ["NONE", "COSZERO", "OSC", "POWER_P01", "POWER_P10"],
-    "composition": ["CPM_SUM", "CPM_PMEAN", "CPM_LWELL", "DPM_SOFTMAX"],
+    "value": ["NONE", "POWER_P01", "POWER_P3", "HUBER", "OSC", "SPTHRESH"],
+    "composition": ["CPM_SUM", "CPM_PMEAN", "CPM_LWELL", "CPM_LEX", "DPM_SOFTMAX", "DPM_BGSOFTMAX"],
+}
+
+EXPECTED_FUNCTION_COUNTS = {
+    "coord": 34,
+    "value": 34,
+    "composition": 50,
 }
 
 RESULT_RE = re.compile(
@@ -52,6 +58,15 @@ def load_result_matrix(path: Path) -> np.ndarray:
     return data
 
 
+def select_expected_functions(data: np.ndarray, experiment: str, path: Path) -> np.ndarray:
+    expected = EXPECTED_FUNCTION_COUNTS[experiment]
+    if data.shape[1] < expected:
+        raise SystemExit(
+            f"{path} has {data.shape[1]} function columns, but {experiment} plots require {expected}."
+        )
+    return data[:, :expected]
+
+
 def load_raw_summary(result_dir: Path, fstar: float, tol: float) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for path in sorted(result_dir.glob("*.txt")):
@@ -62,6 +77,8 @@ def load_raw_summary(result_dir: Path, fstar: float, tol: float) -> pd.DataFrame
             continue
 
         data = load_result_matrix(path)
+        experiment = match.group("experiment")
+        data = select_expected_functions(data, experiment, path)
         relative_error = np.abs(data - fstar) / abs(fstar)
         tre = relative_error / (1.0 + relative_error)
         run_solved = relative_error < tol
@@ -73,7 +90,7 @@ def load_raw_summary(result_dir: Path, fstar: float, tol: float) -> pd.DataFrame
                 "algo": match.group("algo"),
                 "dimension": int(match.group("dim")),
                 "maxevals": int(match.group("maxevals")),
-                "experiment": match.group("experiment"),
+                "experiment": experiment,
                 "treatment": match.group("treatment").replace("-", "_"),
                 "avg_tre": float(np.mean(tre)),
                 "solved_fraction": float(np.mean(function_solved)),

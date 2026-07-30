@@ -27,11 +27,11 @@ struct Config {
     int dimension = 10;
     int runs = 21;
     int base_function_count = 34;
-    int composition_instances = 30;
+    int composition_instances = 50;
     std::string algo = "ARRDE";
     int population_size = 0;
     unsigned long long seed = 1;
-    int nthreads = 8;
+    int nthreads = 128;
 };
 
 struct Treatment {
@@ -98,6 +98,7 @@ std::vector<std::pair<int, std::size_t>> budgets(int dimension) {
         {100, static_cast<std::size_t>(100 * dimension)},
         {1000, static_cast<std::size_t>(1000 * dimension)},
         {3000, static_cast<std::size_t>(3000 * dimension)},
+        {7000, static_cast<std::size_t>(7000 * dimension)},
         {10000, static_cast<std::size_t>(10000 * dimension)},
     };
 }
