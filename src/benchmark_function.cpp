@@ -169,6 +169,40 @@ std::shared_ptr<ValueTransform> make_value_transform(const ValueTransformSpec& s
         const double alpha = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
         return std::make_shared<CosineZeroValueTransform>(alpha);
     }
+    if (spec.kind == ValueTransformKind::Huber) {
+        const double delta = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        return std::make_shared<HuberValueTransform>(delta);
+    }
+    if (spec.kind == ValueTransformKind::Log) {
+        const double alpha = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        return std::make_shared<LogValueTransform>(alpha);
+    }
+    if (spec.kind == ValueTransformKind::SoftplusThreshold) {
+        const double tau = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        return std::make_shared<SoftplusThresholdValueTransform>(tau, alpha);
+    }
+    if (spec.kind == ValueTransformKind::DeadZone) {
+        const double tau = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double p = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        return std::make_shared<DeadZoneValueTransform>(tau, p);
+    }
+    if (spec.kind == ValueTransformKind::Saturating) {
+        const double cap = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double c = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        return std::make_shared<SaturatingValueTransform>(cap, c);
+    }
+    if (spec.kind == ValueTransformKind::PiecewisePower) {
+        const double tau = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double p1 = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        const double p2 = spec.parameters.size() > 2 ? spec.parameters[2] : 2.0;
+        return std::make_shared<PiecewisePowerValueTransform>(tau, p1, p2);
+    }
+    if (spec.kind == ValueTransformKind::NoisySmooth) {
+        const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.05;
+        const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        return std::make_shared<NoisySmoothValueTransform>(epsilon, alpha);
+    }
     throw std::logic_error("unhandled value transform kind");
 }
 
@@ -229,6 +263,47 @@ ValueTransformSpec materialized_value_transform_spec(const ValueTransformSpec& r
         spec.parameters = {alpha};
         return spec;
     }
+    if (spec.kind == ValueTransformKind::Huber) {
+        const double delta = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        spec.parameters = {delta};
+        return spec;
+    }
+    if (spec.kind == ValueTransformKind::Log) {
+        const double alpha = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        spec.parameters = {alpha};
+        return spec;
+    }
+    if (spec.kind == ValueTransformKind::SoftplusThreshold) {
+        const double tau = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        spec.parameters = {tau, alpha};
+        return spec;
+    }
+    if (spec.kind == ValueTransformKind::DeadZone) {
+        const double tau = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double p = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        spec.parameters = {tau, p};
+        return spec;
+    }
+    if (spec.kind == ValueTransformKind::Saturating) {
+        const double cap = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double c = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        spec.parameters = {cap, c};
+        return spec;
+    }
+    if (spec.kind == ValueTransformKind::PiecewisePower) {
+        const double tau = spec.parameters.size() > 0 ? spec.parameters[0] : 1.0;
+        const double p1 = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        const double p2 = spec.parameters.size() > 2 ? spec.parameters[2] : 2.0;
+        spec.parameters = {tau, p1, p2};
+        return spec;
+    }
+    if (spec.kind == ValueTransformKind::NoisySmooth) {
+        const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.05;
+        const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
+        spec.parameters = {epsilon, alpha};
+        return spec;
+    }
     throw std::logic_error("unhandled value transform kind");
 }
 
@@ -260,6 +335,62 @@ CompositionSpec materialized_composition_spec(const CompositionSpec& requested, 
         const double epsilon = spec.parameters.size() > 0 ? spec.parameters[0] : 0.1;
         const double alpha = spec.parameters.size() > 1 ? spec.parameters[1] : 1.0;
         spec.parameters = {epsilon, alpha};
+        return spec;
+    }
+    if (spec.kind == CompositionKind::CpmMax) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        spec.parameters.clear();
+        return spec;
+    }
+    if (spec.kind == CompositionKind::CpmSmoothMax) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        const double beta = spec.parameters.empty() ? 1.0 : spec.parameters[0];
+        spec.parameters = {beta};
+        return spec;
+    }
+    if (spec.kind == CompositionKind::CpmConstraintPenalty) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        const double rho = spec.parameters.size() > 0 ? spec.parameters[0] : 10.0;
+        const double p = spec.parameters.size() > 1 ? spec.parameters[1] : 2.0;
+        spec.parameters = {rho, p};
+        return spec;
+    }
+    if (spec.kind == CompositionKind::CpmLexicographic) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        const double decay = spec.parameters.empty() ? 1.0e-3 : spec.parameters[0];
+        spec.parameters = {decay};
+        return spec;
+    }
+    if (spec.kind == CompositionKind::CpmProduct) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        const double alpha = spec.parameters.empty() ? 1.0e-3 : spec.parameters[0];
+        spec.parameters = {alpha};
+        return spec;
+    }
+    if (spec.kind == CompositionKind::CpmMaxPlusMean) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        const double lambda = spec.parameters.empty() ? 0.5 : spec.parameters[0];
+        spec.parameters = {lambda};
+        return spec;
+    }
+    if (spec.kind == CompositionKind::CpmCvar) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        const double quantile = spec.parameters.empty() ? 0.25 : spec.parameters[0];
+        spec.parameters = {quantile};
+        return spec;
+    }
+    if (spec.kind == CompositionKind::SparseActive) {
+        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
+        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
+        const double frequency = spec.parameters.empty() ? 0.01 : spec.parameters[0];
+        spec.parameters = {frequency};
         return spec;
     }
     if (spec.kind == CompositionKind::DpmSoftmax) {
@@ -298,6 +429,38 @@ std::shared_ptr<CompositionFunction> make_common_point_composition(const Composi
         const double epsilon = composition.parameters.size() > 0 ? composition.parameters[0] : 0.1;
         const double alpha = composition.parameters.size() > 1 ? composition.parameters[1] : 1.0;
         return std::make_shared<LevelWellComposition>(component_count, epsilon, alpha);
+    }
+    if (composition.kind == CompositionKind::CpmMax) {
+        return std::make_shared<MaxComposition>();
+    }
+    if (composition.kind == CompositionKind::CpmSmoothMax) {
+        const double beta = composition.parameters.empty() ? 1.0 : composition.parameters[0];
+        return std::make_shared<SmoothMaxComposition>(beta);
+    }
+    if (composition.kind == CompositionKind::CpmConstraintPenalty) {
+        const double rho = composition.parameters.size() > 0 ? composition.parameters[0] : 10.0;
+        const double p = composition.parameters.size() > 1 ? composition.parameters[1] : 2.0;
+        return std::make_shared<ConstraintPenaltyComposition>(rho, p);
+    }
+    if (composition.kind == CompositionKind::CpmLexicographic) {
+        const double decay = composition.parameters.empty() ? 1.0e-3 : composition.parameters[0];
+        return std::make_shared<LexicographicComposition>(decay);
+    }
+    if (composition.kind == CompositionKind::CpmProduct) {
+        const double alpha = composition.parameters.empty() ? 1.0e-3 : composition.parameters[0];
+        return std::make_shared<ProductComposition>(alpha);
+    }
+    if (composition.kind == CompositionKind::CpmMaxPlusMean) {
+        const double lambda = composition.parameters.empty() ? 0.5 : composition.parameters[0];
+        return std::make_shared<MaxPlusMeanComposition>(lambda);
+    }
+    if (composition.kind == CompositionKind::CpmCvar) {
+        const double quantile = composition.parameters.empty() ? 0.25 : composition.parameters[0];
+        return std::make_shared<CvarComposition>(quantile);
+    }
+    if (composition.kind == CompositionKind::SparseActive) {
+        const double frequency = composition.parameters.empty() ? 0.01 : composition.parameters[0];
+        return std::make_shared<SparseActiveComposition>(frequency);
     }
     throw std::logic_error("unhandled common-point composition kind");
 }

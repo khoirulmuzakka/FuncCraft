@@ -89,6 +89,13 @@ inline std::vector<ValueTransformChoice> all_value_transform_choices() {
         make_choice(ValueTransformKind::Power, 0.25, 1.0, 1.0),
         make_choice(ValueTransformKind::Oscillatory, 0.25, 0.1, 1.0),
         make_choice(ValueTransformKind::CosineZero, 0.0, 1.0),
+        make_choice(ValueTransformKind::Huber, 0.0, 1.0),
+        make_choice(ValueTransformKind::Log, 0.0, 1.0),
+        make_choice(ValueTransformKind::SoftplusThreshold, 0.0, 1.0, 1.0),
+        make_choice(ValueTransformKind::DeadZone, 0.0, 1.0, 1.0),
+        make_choice(ValueTransformKind::Saturating, 0.0, 1.0, 1.0),
+        make_choice(ValueTransformKind::PiecewisePower, 0.0, 1.0, 1.0, 2.0),
+        make_choice(ValueTransformKind::NoisySmooth, 0.0, 0.05, 1.0),
     };
 }
 
@@ -98,6 +105,14 @@ inline std::vector<CompositionChoice> all_composition_choices() {
         make_choice(CompositionKind::CpmPowerMean, 0.1, 3.0),
         make_choice(CompositionKind::CpmPowerMean, 0.1, 0.1),
         make_choice(CompositionKind::CpmLevelWell, 0.2, 0.1, 1.0),
+        make_choice(CompositionKind::CpmMax, 0.0),
+        make_choice(CompositionKind::CpmSmoothMax, 0.0, 1.0),
+        make_choice(CompositionKind::CpmConstraintPenalty, 0.0, 10.0, 2.0),
+        make_choice(CompositionKind::CpmLexicographic, 0.0, 1.0e-3),
+        make_choice(CompositionKind::CpmProduct, 0.0, 1.0e-3),
+        make_choice(CompositionKind::CpmMaxPlusMean, 0.0, 0.5),
+        make_choice(CompositionKind::CpmCvar, 0.0, 0.25),
+        make_choice(CompositionKind::SparseActive, 0.0, 0.01),
         make_choice(CompositionKind::DpmSoftmax, 0.25, 0.01),
         make_choice(CompositionKind::DpmBgSoftmax, 0.25, 0.01, 1.0, 0.01),
     };

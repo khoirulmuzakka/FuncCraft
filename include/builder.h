@@ -98,9 +98,9 @@ private:
 
     struct RuntimeValueTransform {
         ValueTransformClass kind = ValueTransformClass::None;
-        double alpha = 1.0;
-        double p = 1.0;
-        double epsilon = 0.1;
+        double a = 1.0;
+        double b = 1.0;
+        double c = 1.0;
     };
 
     struct EvaluableComponent {

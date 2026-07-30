@@ -3,6 +3,7 @@
 #include "runtime_profile.h"
 #include "support.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -109,17 +110,51 @@ FunctionBuilder::RuntimeValueTransform FunctionBuilder::make_runtime_value_trans
     if (runtime.kind == ValueTransformClass::Power) {
         const auto* typed = dynamic_cast<const PowerValueTransform*>(&value_transform);
         require(typed != nullptr, "power value transform type mismatch");
-        runtime.alpha = typed->alpha();
-        runtime.p = typed->p();
+        runtime.a = typed->alpha();
+        runtime.b = typed->p();
     } else if (runtime.kind == ValueTransformClass::Oscillatory) {
         const auto* typed = dynamic_cast<const OscillatoryValueTransform*>(&value_transform);
         require(typed != nullptr, "oscillatory value transform type mismatch");
-        runtime.alpha = typed->alpha();
-        runtime.epsilon = typed->epsilon();
+        runtime.a = typed->epsilon();
+        runtime.b = typed->alpha();
     } else if (runtime.kind == ValueTransformClass::CosineZero) {
         const auto* typed = dynamic_cast<const CosineZeroValueTransform*>(&value_transform);
         require(typed != nullptr, "cosine-zero value transform type mismatch");
-        runtime.alpha = typed->alpha();
+        runtime.a = typed->alpha();
+    } else if (runtime.kind == ValueTransformClass::Huber) {
+        const auto* typed = dynamic_cast<const HuberValueTransform*>(&value_transform);
+        require(typed != nullptr, "huber value transform type mismatch");
+        runtime.a = typed->delta();
+    } else if (runtime.kind == ValueTransformClass::Log) {
+        const auto* typed = dynamic_cast<const LogValueTransform*>(&value_transform);
+        require(typed != nullptr, "log value transform type mismatch");
+        runtime.a = typed->alpha();
+    } else if (runtime.kind == ValueTransformClass::SoftplusThreshold) {
+        const auto* typed = dynamic_cast<const SoftplusThresholdValueTransform*>(&value_transform);
+        require(typed != nullptr, "softplus-threshold value transform type mismatch");
+        runtime.a = typed->tau();
+        runtime.b = typed->alpha();
+    } else if (runtime.kind == ValueTransformClass::DeadZone) {
+        const auto* typed = dynamic_cast<const DeadZoneValueTransform*>(&value_transform);
+        require(typed != nullptr, "dead-zone value transform type mismatch");
+        runtime.a = typed->tau();
+        runtime.b = typed->p();
+    } else if (runtime.kind == ValueTransformClass::Saturating) {
+        const auto* typed = dynamic_cast<const SaturatingValueTransform*>(&value_transform);
+        require(typed != nullptr, "saturating value transform type mismatch");
+        runtime.a = typed->cap();
+        runtime.b = typed->c();
+    } else if (runtime.kind == ValueTransformClass::PiecewisePower) {
+        const auto* typed = dynamic_cast<const PiecewisePowerValueTransform*>(&value_transform);
+        require(typed != nullptr, "piecewise-power value transform type mismatch");
+        runtime.a = typed->tau();
+        runtime.b = typed->p1();
+        runtime.c = typed->p2();
+    } else if (runtime.kind == ValueTransformClass::NoisySmooth) {
+        const auto* typed = dynamic_cast<const NoisySmoothValueTransform*>(&value_transform);
+        require(typed != nullptr, "noisy-smooth value transform type mismatch");
+        runtime.a = typed->epsilon();
+        runtime.b = typed->alpha();
     } else if (runtime.kind == ValueTransformClass::Mixed) {
         throw std::logic_error("mixed value transform is not a concrete runtime transform");
     }
@@ -150,13 +185,46 @@ double FunctionBuilder::apply_runtime_value_transform(const RuntimeValueTransfor
         value = u;
         break;
     case ValueTransformClass::Power:
-        value = transform.alpha * positive_power_fast(u, transform.p);
+        value = transform.a * positive_power_fast(u, transform.b);
         break;
     case ValueTransformClass::Oscillatory:
-        value = u * (1.0 + transform.epsilon * std::sin(transform.alpha * u));
+        value = u * (1.0 + transform.a * std::sin(transform.b * u));
         break;
     case ValueTransformClass::CosineZero:
-        value = 1.0 - std::cos(transform.alpha * u);
+        value = 1.0 - std::cos(transform.a * u);
+        break;
+    case ValueTransformClass::Huber:
+        value = u <= transform.a ? 0.5 * u * u / transform.a : u - 0.5 * transform.a;
+        break;
+    case ValueTransformClass::Log:
+        value = std::log1p(transform.a * u) / transform.a;
+        break;
+    case ValueTransformClass::SoftplusThreshold: {
+        auto softplus = [](double x) {
+            if (x > 40.0) {
+                return x;
+            }
+            if (x < -40.0) {
+                return std::exp(x);
+            }
+            return std::log1p(std::exp(x));
+        };
+        value = (softplus(transform.b * (u - transform.a)) - softplus(-transform.b * transform.a)) / transform.b;
+        break;
+    }
+    case ValueTransformClass::DeadZone:
+        value = positive_power_fast(std::max(0.0, u - transform.a), transform.b);
+        break;
+    case ValueTransformClass::Saturating:
+        value = transform.a * u / (u + transform.b);
+        break;
+    case ValueTransformClass::PiecewisePower:
+        value = u <= transform.a
+            ? positive_power_fast(u, transform.b)
+            : positive_power_fast(transform.a, transform.b) + positive_power_fast(u - transform.a, transform.c);
+        break;
+    case ValueTransformClass::NoisySmooth:
+        value = u * (1.0 + transform.a * std::sin(transform.b * u) * std::sin(0.371 * transform.b * u + 1.2345));
         break;
     case ValueTransformClass::Mixed:
         throw std::logic_error("mixed value transform is not a concrete runtime transform");

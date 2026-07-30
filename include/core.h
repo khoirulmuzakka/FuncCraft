@@ -26,6 +26,22 @@ enum class CompositionClass {
     CommonPointPowerMean,
     /// Level-well aggregation of components evaluated at a common point.
     CommonPointLevelWell,
+    /// Maximum over component values.
+    CommonPointMax,
+    /// Smooth maximum over component values.
+    CommonPointSmoothMax,
+    /// Objective plus constraint-violation penalties.
+    CommonPointConstraintPenalty,
+    /// Lexicographic weighted component priority.
+    CommonPointLexicographic,
+    /// Multiplicative reliability-style aggregation.
+    CommonPointProduct,
+    /// Blend of worst component and mean component.
+    CommonPointMaxPlusMean,
+    /// Average over the worst quantile of components.
+    CommonPointCvar,
+    /// Region-dependent active component selection.
+    SparseActive,
     /// Deceptive softmax selection over multiple component centers.
     DeceptivePointSoftmax,
     /// Deceptive softmax with a smooth background weight.
@@ -41,6 +57,20 @@ enum class ValueTransformClass {
     Oscillatory,
     /// Power-law transform.
     Power,
+    /// Robust Huber-style value transform.
+    Huber,
+    /// Logarithmic compression transform.
+    Log,
+    /// Smooth threshold transform.
+    SoftplusThreshold,
+    /// Hard tolerance dead-zone transform.
+    DeadZone,
+    /// Saturating bounded-penalty transform.
+    Saturating,
+    /// Piecewise power transform.
+    PiecewisePower,
+    /// Deterministic smooth roughness transform.
+    NoisySmooth,
     /// Mixed value transforms across components.
     Mixed,
 };
@@ -76,6 +106,13 @@ enum class ValueTransformKind {
     Power,
     Oscillatory,
     CosineZero,
+    Huber,
+    Log,
+    SoftplusThreshold,
+    DeadZone,
+    Saturating,
+    PiecewisePower,
+    NoisySmooth,
 };
 
 /**
@@ -101,6 +138,14 @@ enum class CompositionKind {
     CpmWeightedSum,
     CpmPowerMean,
     CpmLevelWell,
+    CpmMax,
+    CpmSmoothMax,
+    CpmConstraintPenalty,
+    CpmLexicographic,
+    CpmProduct,
+    CpmMaxPlusMean,
+    CpmCvar,
+    SparseActive,
     DpmSoftmax,
     DpmBgSoftmax,
 };

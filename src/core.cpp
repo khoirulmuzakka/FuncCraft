@@ -41,6 +41,22 @@ std::string to_string(CompositionClass cls) {
         return "CPM-PMEAN";
     case CompositionClass::CommonPointLevelWell:
         return "CPM-LWELL";
+    case CompositionClass::CommonPointMax:
+        return "CPM-MAX";
+    case CompositionClass::CommonPointSmoothMax:
+        return "CPM-SMOOTHMAX";
+    case CompositionClass::CommonPointConstraintPenalty:
+        return "CPM-CONSTR";
+    case CompositionClass::CommonPointLexicographic:
+        return "CPM-LEX";
+    case CompositionClass::CommonPointProduct:
+        return "CPM-PROD";
+    case CompositionClass::CommonPointMaxPlusMean:
+        return "CPM-MAXMEAN";
+    case CompositionClass::CommonPointCvar:
+        return "CPM-CVAR";
+    case CompositionClass::SparseActive:
+        return "SPARSE-ACTIVE";
     case CompositionClass::DeceptivePointSoftmax:
         return "DPM-SOFTMAX";
     case CompositionClass::DeceptivePointBgSoftmax:
@@ -60,6 +76,20 @@ std::string to_string(ValueTransformClass cls) {
         return "OSC";
     case ValueTransformClass::Power:
         return "POWER";
+    case ValueTransformClass::Huber:
+        return "HUBER";
+    case ValueTransformClass::Log:
+        return "LOG";
+    case ValueTransformClass::SoftplusThreshold:
+        return "SPTHRESH";
+    case ValueTransformClass::DeadZone:
+        return "DEADZONE";
+    case ValueTransformClass::Saturating:
+        return "SAT";
+    case ValueTransformClass::PiecewisePower:
+        return "PWP";
+    case ValueTransformClass::NoisySmooth:
+        return "NOISY";
     case ValueTransformClass::Mixed:
         return "MIXED";
     default:

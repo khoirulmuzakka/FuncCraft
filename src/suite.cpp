@@ -536,6 +536,34 @@ ValueTransformSpec make_value_transform_spec(const ValueTransformChoice& choice)
         spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0, 1.0} : choice.parameters;
         return spec;
     }
+    if (choice.kind == ValueTransformKind::Huber) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == ValueTransformKind::Log) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == ValueTransformKind::SoftplusThreshold) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0, 1.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == ValueTransformKind::DeadZone) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0, 1.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == ValueTransformKind::Saturating) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0, 1.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == ValueTransformKind::PiecewisePower) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0, 1.0, 2.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == ValueTransformKind::NoisySmooth) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{0.05, 1.0} : choice.parameters;
+        return spec;
+    }
     throw std::logic_error("unhandled value transform kind in suite spec");
 }
 
@@ -552,6 +580,37 @@ CompositionSpec make_composition_spec(
     }
     if (choice.kind == CompositionKind::CpmPowerMean) {
         spec.parameters = choice.parameters.empty() ? std::vector<double>{2.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == CompositionKind::CpmMax) {
+        return spec;
+    }
+    if (choice.kind == CompositionKind::CpmSmoothMax) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == CompositionKind::CpmConstraintPenalty) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{10.0, 2.0} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == CompositionKind::CpmLexicographic) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0e-3} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == CompositionKind::CpmProduct) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{1.0e-3} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == CompositionKind::CpmMaxPlusMean) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{0.5} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == CompositionKind::CpmCvar) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{0.25} : choice.parameters;
+        return spec;
+    }
+    if (choice.kind == CompositionKind::SparseActive) {
+        spec.parameters = choice.parameters.empty() ? std::vector<double>{0.01} : choice.parameters;
         return spec;
     }
     if (choice.kind == CompositionKind::DpmSoftmax) {

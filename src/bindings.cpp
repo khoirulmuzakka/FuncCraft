@@ -120,6 +120,13 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("Power", FuncCraft::ValueTransformKind::Power)
         .value("Oscillatory", FuncCraft::ValueTransformKind::Oscillatory)
         .value("CosineZero", FuncCraft::ValueTransformKind::CosineZero)
+        .value("Huber", FuncCraft::ValueTransformKind::Huber)
+        .value("Log", FuncCraft::ValueTransformKind::Log)
+        .value("SoftplusThreshold", FuncCraft::ValueTransformKind::SoftplusThreshold)
+        .value("DeadZone", FuncCraft::ValueTransformKind::DeadZone)
+        .value("Saturating", FuncCraft::ValueTransformKind::Saturating)
+        .value("PiecewisePower", FuncCraft::ValueTransformKind::PiecewisePower)
+        .value("NoisySmooth", FuncCraft::ValueTransformKind::NoisySmooth)
         .export_values();
 
     py::enum_<FuncCraft::CompositionKind>(m, "CompositionKind")
@@ -127,6 +134,14 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("CpmWeightedSum", FuncCraft::CompositionKind::CpmWeightedSum)
         .value("CpmPowerMean", FuncCraft::CompositionKind::CpmPowerMean)
         .value("CpmLevelWell", FuncCraft::CompositionKind::CpmLevelWell)
+        .value("CpmMax", FuncCraft::CompositionKind::CpmMax)
+        .value("CpmSmoothMax", FuncCraft::CompositionKind::CpmSmoothMax)
+        .value("CpmConstraintPenalty", FuncCraft::CompositionKind::CpmConstraintPenalty)
+        .value("CpmLexicographic", FuncCraft::CompositionKind::CpmLexicographic)
+        .value("CpmProduct", FuncCraft::CompositionKind::CpmProduct)
+        .value("CpmMaxPlusMean", FuncCraft::CompositionKind::CpmMaxPlusMean)
+        .value("CpmCvar", FuncCraft::CompositionKind::CpmCvar)
+        .value("SparseActive", FuncCraft::CompositionKind::SparseActive)
         .value("DpmSoftmax", FuncCraft::CompositionKind::DpmSoftmax)
         .value("DpmBgSoftmax", FuncCraft::CompositionKind::DpmBgSoftmax)
         .export_values();

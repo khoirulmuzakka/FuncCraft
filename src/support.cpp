@@ -221,6 +221,27 @@ ValueTransformKind parse_value_transform_kind(const std::string& kind) {
     if (normalized == "cosinezero" || normalized == "coszero") {
         return ValueTransformKind::CosineZero;
     }
+    if (normalized == "huber") {
+        return ValueTransformKind::Huber;
+    }
+    if (normalized == "log" || normalized == "log1p") {
+        return ValueTransformKind::Log;
+    }
+    if (normalized == "softplusthreshold" || normalized == "softplus") {
+        return ValueTransformKind::SoftplusThreshold;
+    }
+    if (normalized == "deadzone" || normalized == "tolerance") {
+        return ValueTransformKind::DeadZone;
+    }
+    if (normalized == "saturating" || normalized == "saturation") {
+        return ValueTransformKind::Saturating;
+    }
+    if (normalized == "piecewisepower" || normalized == "pwpower") {
+        return ValueTransformKind::PiecewisePower;
+    }
+    if (normalized == "noisysmooth" || normalized == "smoothnoise") {
+        return ValueTransformKind::NoisySmooth;
+    }
     throw std::invalid_argument("unknown value transform kind: " + kind);
 }
 
@@ -238,6 +259,30 @@ CompositionKind parse_composition_kind(const std::string& kind) {
     if (normalized == "cpmlevelwell" || normalized == "levelwell" || normalized == "lwell" || normalized == "cpmlwell") {
         return CompositionKind::CpmLevelWell;
     }
+    if (normalized == "cpmmax" || normalized == "max" || normalized == "worstcase") {
+        return CompositionKind::CpmMax;
+    }
+    if (normalized == "cpmsmoothmax" || normalized == "smoothmax" || normalized == "cpmsoftmax" || normalized == "commonsoftmax" || normalized == "logsumexp") {
+        return CompositionKind::CpmSmoothMax;
+    }
+    if (normalized == "cpmconstraintpenalty" || normalized == "constraintpenalty" || normalized == "penalty") {
+        return CompositionKind::CpmConstraintPenalty;
+    }
+    if (normalized == "cpmlexicographic" || normalized == "lexicographic" || normalized == "lex") {
+        return CompositionKind::CpmLexicographic;
+    }
+    if (normalized == "cpmproduct" || normalized == "product") {
+        return CompositionKind::CpmProduct;
+    }
+    if (normalized == "cpmmaxplusmean" || normalized == "maxplusmean" || normalized == "maxmean") {
+        return CompositionKind::CpmMaxPlusMean;
+    }
+    if (normalized == "cpmcvar" || normalized == "cvar" || normalized == "worstquantile") {
+        return CompositionKind::CpmCvar;
+    }
+    if (normalized == "sparseactive" || normalized == "activecomponent") {
+        return CompositionKind::SparseActive;
+    }
     if (normalized == "dpmsoftmax" || normalized == "dpm" || normalized == "softmax") {
         return CompositionKind::DpmSoftmax;
     }
@@ -254,6 +299,14 @@ CompositionMode composition_mode(CompositionKind kind) {
     case CompositionKind::CpmWeightedSum:
     case CompositionKind::CpmPowerMean:
     case CompositionKind::CpmLevelWell:
+    case CompositionKind::CpmMax:
+    case CompositionKind::CpmSmoothMax:
+    case CompositionKind::CpmConstraintPenalty:
+    case CompositionKind::CpmLexicographic:
+    case CompositionKind::CpmProduct:
+    case CompositionKind::CpmMaxPlusMean:
+    case CompositionKind::CpmCvar:
+    case CompositionKind::SparseActive:
         return CompositionMode::CPM;
     case CompositionKind::DpmSoftmax:
     case CompositionKind::DpmBgSoftmax:
@@ -286,6 +339,20 @@ std::string to_spec_name(ValueTransformKind kind) {
         return spec_name::ValueOscillatory;
     case ValueTransformKind::CosineZero:
         return spec_name::ValueCosineZero;
+    case ValueTransformKind::Huber:
+        return spec_name::ValueHuber;
+    case ValueTransformKind::Log:
+        return spec_name::ValueLog;
+    case ValueTransformKind::SoftplusThreshold:
+        return spec_name::ValueSoftplusThreshold;
+    case ValueTransformKind::DeadZone:
+        return spec_name::ValueDeadZone;
+    case ValueTransformKind::Saturating:
+        return spec_name::ValueSaturating;
+    case ValueTransformKind::PiecewisePower:
+        return spec_name::ValuePiecewisePower;
+    case ValueTransformKind::NoisySmooth:
+        return spec_name::ValueNoisySmooth;
     }
     throw std::logic_error("unhandled value transform kind");
 }
@@ -300,6 +367,22 @@ std::string to_spec_name(CompositionKind kind) {
         return spec_name::CpmPowerMean;
     case CompositionKind::CpmLevelWell:
         return spec_name::CpmLevelWell;
+    case CompositionKind::CpmMax:
+        return spec_name::CpmMax;
+    case CompositionKind::CpmSmoothMax:
+        return spec_name::CpmSmoothMax;
+    case CompositionKind::CpmConstraintPenalty:
+        return spec_name::CpmConstraintPenalty;
+    case CompositionKind::CpmLexicographic:
+        return spec_name::CpmLexicographic;
+    case CompositionKind::CpmProduct:
+        return spec_name::CpmProduct;
+    case CompositionKind::CpmMaxPlusMean:
+        return spec_name::CpmMaxPlusMean;
+    case CompositionKind::CpmCvar:
+        return spec_name::CpmCvar;
+    case CompositionKind::SparseActive:
+        return spec_name::SparseActive;
     case CompositionKind::DpmSoftmax:
         return spec_name::DpmSoftmax;
     case CompositionKind::DpmBgSoftmax:

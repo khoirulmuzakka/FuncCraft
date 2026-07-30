@@ -107,6 +107,85 @@ private:
     double alpha_ = 1.0;
 };
 
+class MaxComposition final : public CommonPointComposition {
+public:
+    CompositionClass composition_class() const override;
+
+private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+};
+
+class SmoothMaxComposition final : public CommonPointComposition {
+public:
+    explicit SmoothMaxComposition(double beta = 1.0);
+    CompositionClass composition_class() const override;
+
+private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    double beta_ = 1.0;
+};
+
+class ConstraintPenaltyComposition final : public CommonPointComposition {
+public:
+    ConstraintPenaltyComposition(double rho = 10.0, double p = 2.0);
+    CompositionClass composition_class() const override;
+
+private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    double rho_ = 10.0;
+    double p_ = 2.0;
+};
+
+class LexicographicComposition final : public CommonPointComposition {
+public:
+    explicit LexicographicComposition(double decay = 1.0e-3);
+    CompositionClass composition_class() const override;
+
+private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    double decay_ = 1.0e-3;
+};
+
+class ProductComposition final : public CommonPointComposition {
+public:
+    explicit ProductComposition(double alpha = 1.0e-3);
+    CompositionClass composition_class() const override;
+
+private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    double alpha_ = 1.0e-3;
+};
+
+class MaxPlusMeanComposition final : public CommonPointComposition {
+public:
+    explicit MaxPlusMeanComposition(double lambda = 0.5);
+    CompositionClass composition_class() const override;
+
+private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    double lambda_ = 0.5;
+};
+
+class CvarComposition final : public CommonPointComposition {
+public:
+    explicit CvarComposition(double quantile = 0.25);
+    CompositionClass composition_class() const override;
+
+private:
+    double common_raw_apply(const std::vector<double>& z) const override;
+    double quantile_ = 0.25;
+};
+
+class SparseActiveComposition final : public CompositionFunction {
+public:
+    explicit SparseActiveComposition(double frequency = 0.01);
+    CompositionClass composition_class() const override;
+
+private:
+    double raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
+    double frequency_ = 0.01;
+};
+
 /**
  * @brief Softmax-based deceptive composition.
  *

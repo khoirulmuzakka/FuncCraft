@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -188,6 +190,156 @@ double LevelWellComposition::common_raw_apply(const std::vector<double>& z) cons
 
 CompositionClass LevelWellComposition::composition_class() const {
     return CompositionClass::CommonPointLevelWell;
+}
+
+double MaxComposition::common_raw_apply(const std::vector<double>& z) const {
+    return *std::max_element(z.begin(), z.end());
+}
+
+CompositionClass MaxComposition::composition_class() const {
+    return CompositionClass::CommonPointMax;
+}
+
+SmoothMaxComposition::SmoothMaxComposition(double beta)
+    : beta_(beta) {
+    require(std::isfinite(beta), "smoothmax beta must be finite");
+    require(beta > 0.0, "smoothmax beta must be positive");
+}
+
+double SmoothMaxComposition::common_raw_apply(const std::vector<double>& z) const {
+    const double max_z = *std::max_element(z.begin(), z.end());
+    double sum = 0.0;
+    for (double value : z) {
+        sum += std::exp(beta_ * (value - max_z));
+    }
+    return max_z + (std::log(sum) - std::log(static_cast<double>(z.size()))) / beta_;
+}
+
+CompositionClass SmoothMaxComposition::composition_class() const {
+    return CompositionClass::CommonPointSmoothMax;
+}
+
+ConstraintPenaltyComposition::ConstraintPenaltyComposition(double rho, double p)
+    : rho_(rho),
+      p_(p) {
+    require(std::isfinite(rho), "constraint-penalty rho must be finite");
+    require(std::isfinite(p), "constraint-penalty exponent must be finite");
+    require(rho >= 0.0, "constraint-penalty rho must be nonnegative");
+    require(p > 0.0, "constraint-penalty exponent must be positive");
+}
+
+double ConstraintPenaltyComposition::common_raw_apply(const std::vector<double>& z) const {
+    double result = z.front();
+    for (std::size_t i = 1; i < z.size(); ++i) {
+        result += rho_ * positive_power(z[i], p_);
+    }
+    return result;
+}
+
+CompositionClass ConstraintPenaltyComposition::composition_class() const {
+    return CompositionClass::CommonPointConstraintPenalty;
+}
+
+LexicographicComposition::LexicographicComposition(double decay)
+    : decay_(decay) {
+    require(std::isfinite(decay), "lexicographic decay must be finite");
+    require(decay >= 0.0 && decay <= 1.0, "lexicographic decay must be in [0, 1]");
+}
+
+double LexicographicComposition::common_raw_apply(const std::vector<double>& z) const {
+    double result = 0.0;
+    double weight = 1.0;
+    for (double value : z) {
+        result += weight * value;
+        weight *= decay_;
+    }
+    return result;
+}
+
+CompositionClass LexicographicComposition::composition_class() const {
+    return CompositionClass::CommonPointLexicographic;
+}
+
+ProductComposition::ProductComposition(double alpha)
+    : alpha_(alpha) {
+    require(std::isfinite(alpha), "product alpha must be finite");
+    require(alpha > 0.0, "product alpha must be positive");
+}
+
+double ProductComposition::common_raw_apply(const std::vector<double>& z) const {
+    double product = 1.0;
+    for (double value : z) {
+        product *= 1.0 + alpha_ * value;
+        if (!std::isfinite(product)) {
+            return std::numeric_limits<double>::max();
+        }
+    }
+    return (product - 1.0) / alpha_;
+}
+
+CompositionClass ProductComposition::composition_class() const {
+    return CompositionClass::CommonPointProduct;
+}
+
+MaxPlusMeanComposition::MaxPlusMeanComposition(double lambda)
+    : lambda_(lambda) {
+    require(std::isfinite(lambda), "max-plus-mean lambda must be finite");
+    require(lambda >= 0.0 && lambda <= 1.0, "max-plus-mean lambda must be in [0, 1]");
+}
+
+double MaxPlusMeanComposition::common_raw_apply(const std::vector<double>& z) const {
+    const double max_value = *std::max_element(z.begin(), z.end());
+    double sum = 0.0;
+    for (double value : z) {
+        sum += value;
+    }
+    const double mean = sum / static_cast<double>(z.size());
+    return lambda_ * max_value + (1.0 - lambda_) * mean;
+}
+
+CompositionClass MaxPlusMeanComposition::composition_class() const {
+    return CompositionClass::CommonPointMaxPlusMean;
+}
+
+CvarComposition::CvarComposition(double quantile)
+    : quantile_(quantile) {
+    require(std::isfinite(quantile), "CVaR quantile must be finite");
+    require(quantile > 0.0 && quantile <= 1.0, "CVaR quantile must be in (0, 1]");
+}
+
+double CvarComposition::common_raw_apply(const std::vector<double>& z) const {
+    std::vector<double> sorted = z;
+    std::sort(sorted.begin(), sorted.end(), std::greater<double>());
+    const std::size_t count = std::max<std::size_t>(
+        1,
+        static_cast<std::size_t>(std::ceil(quantile_ * static_cast<double>(sorted.size()))));
+    double sum = 0.0;
+    for (std::size_t i = 0; i < count; ++i) {
+        sum += sorted[i];
+    }
+    return sum / static_cast<double>(count);
+}
+
+CompositionClass CvarComposition::composition_class() const {
+    return CompositionClass::CommonPointCvar;
+}
+
+SparseActiveComposition::SparseActiveComposition(double frequency)
+    : frequency_(frequency) {
+    require(std::isfinite(frequency), "sparse-active frequency must be finite");
+    require(frequency >= 0.0, "sparse-active frequency must be nonnegative");
+}
+
+double SparseActiveComposition::raw_apply(const std::vector<double>& x, const std::vector<double>& z) const {
+    require(!x.empty(), "sparse-active composition point must not be empty");
+    require(!z.empty(), "sparse-active composition requires at least one component");
+    const double coordinate = std::abs(x.front());
+    const auto bucket = static_cast<std::uint64_t>(std::floor(frequency_ * coordinate));
+    return z[static_cast<std::size_t>(bucket % z.size())];
+}
+
+CompositionClass SparseActiveComposition::composition_class() const {
+    return CompositionClass::SparseActive;
 }
 
 DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(

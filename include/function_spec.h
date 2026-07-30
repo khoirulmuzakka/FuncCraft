@@ -42,10 +42,25 @@ inline constexpr const char* CoordinateSubspaceRotation = "subspace-rotation";
 inline constexpr const char* ValuePower = "power";
 inline constexpr const char* ValueOscillatory = "oscillatory";
 inline constexpr const char* ValueCosineZero = "cosine-zero";
+inline constexpr const char* ValueHuber = "huber";
+inline constexpr const char* ValueLog = "log";
+inline constexpr const char* ValueSoftplusThreshold = "softplus-threshold";
+inline constexpr const char* ValueDeadZone = "dead-zone";
+inline constexpr const char* ValueSaturating = "saturating";
+inline constexpr const char* ValuePiecewisePower = "piecewise-power";
+inline constexpr const char* ValueNoisySmooth = "noisy-smooth";
 
 inline constexpr const char* CpmWeightedSum = "cpm-wsum";
 inline constexpr const char* CpmPowerMean = "cpm-power-mean";
 inline constexpr const char* CpmLevelWell = "cpm-level-well";
+inline constexpr const char* CpmMax = "cpm-max";
+inline constexpr const char* CpmSmoothMax = "cpm-smoothmax";
+inline constexpr const char* CpmConstraintPenalty = "cpm-constraint-penalty";
+inline constexpr const char* CpmLexicographic = "cpm-lexicographic";
+inline constexpr const char* CpmProduct = "cpm-product";
+inline constexpr const char* CpmMaxPlusMean = "cpm-max-plus-mean";
+inline constexpr const char* CpmCvar = "cpm-cvar";
+inline constexpr const char* SparseActive = "sparse-active";
 inline constexpr const char* DpmSoftmax = "dpm-softmax";
 inline constexpr const char* DpmBgSoftmax = "dpm-bgsoftmax";
 } // namespace spec_name
@@ -91,6 +106,14 @@ struct CoordinateTransformSpec {
  * - `Power`: `parameters[0] = alpha`, `parameters[1] = p`.
  * - `Oscillatory`: `parameters[0] = epsilon`, `parameters[1] = alpha`.
  * - `CosineZero`: `parameters[0] = alpha`.
+ * - `Huber`: `parameters[0] = delta`.
+ * - `Log`: `parameters[0] = alpha`.
+ * - `SoftplusThreshold`: `parameters[0] = tau`, `parameters[1] = alpha`.
+ * - `DeadZone`: `parameters[0] = tau`, `parameters[1] = p`.
+ * - `Saturating`: `parameters[0] = cap`, `parameters[1] = c`.
+ * - `PiecewisePower`: `parameters[0] = tau`, `parameters[1] = p1`,
+ *   `parameters[2] = p2`.
+ * - `NoisySmooth`: `parameters[0] = epsilon`, `parameters[1] = alpha`.
  */
 struct ValueTransformSpec {
     ValueTransformKind kind = ValueTransformKind::None;
@@ -123,6 +146,14 @@ struct ComponentSpec {
  * - `CpmWeightedSum`: common-point weighted-sum composition.
  * - `CpmPowerMean`: common-point weighted power mean.
  * - `CpmLevelWell`: common-point level-well composition.
+ * - `CpmMax`: common-point worst-component maximum.
+ * - `CpmSmoothMax`: common-point smooth maximum.
+ * - `CpmConstraintPenalty`: first component plus penalties from the rest.
+ * - `CpmLexicographic`: priority-weighted component sum.
+ * - `CpmProduct`: multiplicative component aggregation.
+ * - `CpmMaxPlusMean`: blend of worst component and average component.
+ * - `CpmCvar`: average of the worst quantile of components.
+ * - `SparseActive`: point-dependent active component selection.
  * - `DpmSoftmax`: deceptive-point softmax composition.
  * - `DpmBgSoftmax`: deceptive-point softmax with a smooth background term.
  *
@@ -134,6 +165,13 @@ struct ComponentSpec {
  * Parameter conventions:
  * - `CpmPowerMean`: `parameters[0] = p`.
  * - `CpmLevelWell`: `parameters[0] = epsilon`, `parameters[1] = alpha`.
+ * - `CpmSmoothMax`: `parameters[0] = beta`.
+ * - `CpmConstraintPenalty`: `parameters[0] = rho`, `parameters[1] = p`.
+ * - `CpmLexicographic`: `parameters[0] = decay`.
+ * - `CpmProduct`: `parameters[0] = alpha`.
+ * - `CpmMaxPlusMean`: `parameters[0] = lambda`.
+ * - `CpmCvar`: `parameters[0] = quantile`.
+ * - `SparseActive`: `parameters[0] = frequency`.
  * - `DpmSoftmax`: `parameters[0] = sharpness`.
  * - `DpmBgSoftmax`: `parameters[0] = sharpness`,
  *   `parameters[1] = background_strength`,
