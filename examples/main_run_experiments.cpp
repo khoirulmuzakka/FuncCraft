@@ -166,6 +166,8 @@ double minimize_function(
 FuncCraft::SuiteSpec base_suite_spec() {
     FuncCraft::SuiteSpec spec = FuncCraft::suite_collection_spec(2026, 1);
     spec.requested_number_of_functions = 100;
+    spec.max_nested_composition_depth = 0;
+    spec.nested_probability = 0.0;
     return spec;
 }
 
@@ -209,7 +211,7 @@ void write_manifest(
     out << "runs " << config.runs << '\n';
     out << "assigned_fopt 100\n";
     out << "base_function_indices F1-F" << config.base_function_count << '\n';
-    out << "composition_source_indices F41-F" << (40 + config.composition_instances) << '\n';
+    out << "composition_source_indices F35-F" << (34 + config.composition_instances) << '\n';
     out << "treatments\n";
     for (const Treatment& treatment : treatments) {
         out << treatment.experiment << ' ' << treatment.name << '\n';
@@ -248,14 +250,17 @@ std::vector<Treatment> experiment_treatments() {
         {"coord", "ROT"},
         {"coord", "AFF"},
         {"value", "NONE"},
-        {"value", "COSZERO"},
-        {"value", "OSC"},
         {"value", "POWER_P01"},
-        {"value", "POWER_P10"},
+        {"value", "POWER_P3"},
+        {"value", "HUBER"},
+        {"value", "OSC"},
+        {"value", "SPTHRESH"},
         {"composition", "CPM_SUM"},
         {"composition", "CPM_PMEAN"},
         {"composition", "CPM_LWELL"},
+        {"composition", "CPM_LEX"},
         {"composition", "DPM_SOFTMAX"},
+        {"composition", "DPM_BGSOFTMAX"},
     };
 }
 
@@ -272,36 +277,45 @@ FuncCraft::BenchmarkSuite treatment_suite(const Treatment& treatment, int dimens
     if (treatment.experiment == "value" && treatment.name == "NONE") {
         return value_suite(FuncCraft::ValueTransformKind::None, {}, dimension);
     }
-    if (treatment.experiment == "value" && treatment.name == "COSZERO") {
-        return value_suite(FuncCraft::ValueTransformKind::CosineZero, {0.10}, dimension);
-    }
-    if (treatment.experiment == "value" && treatment.name == "OSC") {
-        return value_suite(FuncCraft::ValueTransformKind::Oscillatory, {0.40, 0.03}, dimension);
-    }
     if (treatment.experiment == "value" && treatment.name == "POWER_P01") {
         return value_suite(FuncCraft::ValueTransformKind::Power, {1.0, 0.1}, dimension);
     }
-    if (treatment.experiment == "value" && treatment.name == "POWER_P10") {
-        return value_suite(FuncCraft::ValueTransformKind::Power, {1.0, 10.0}, dimension);
+    if (treatment.experiment == "value" && treatment.name == "POWER_P3") {
+        return value_suite(FuncCraft::ValueTransformKind::Power, {1.0, 3.0}, dimension);
+    }
+    if (treatment.experiment == "value" && treatment.name == "HUBER") {
+        return value_suite(FuncCraft::ValueTransformKind::Huber, {10000.0}, dimension);
+    }
+    if (treatment.experiment == "value" && treatment.name == "OSC") {
+        return value_suite(FuncCraft::ValueTransformKind::Oscillatory, {0.3, 0.00001}, dimension);
+    }
+    if (treatment.experiment == "value" && treatment.name == "SPTHRESH") {
+        return value_suite(FuncCraft::ValueTransformKind::SoftplusThreshold, {10000.0, 0.0002}, dimension);
     }
     if (treatment.experiment == "composition" && treatment.name == "CPM_SUM") {
         return composition_suite(FuncCraft::CompositionKind::CpmWeightedSum, {}, dimension);
     }
     if (treatment.experiment == "composition" && treatment.name == "CPM_PMEAN") {
-        return composition_suite(FuncCraft::CompositionKind::CpmPowerMean, {2.0}, dimension);
+        return composition_suite(FuncCraft::CompositionKind::CpmPowerMean, {3.0}, dimension);
     }
     if (treatment.experiment == "composition" && treatment.name == "CPM_LWELL") {
-        return composition_suite(FuncCraft::CompositionKind::CpmLevelWell, {0.40, 0.03}, dimension);
+        return composition_suite(FuncCraft::CompositionKind::CpmLevelWell, {0.3, 0.00001}, dimension);
+    }
+    if (treatment.experiment == "composition" && treatment.name == "CPM_LEX") {
+        return composition_suite(FuncCraft::CompositionKind::CpmLexicographic, {0.1}, dimension);
     }
     if (treatment.experiment == "composition" && treatment.name == "DPM_SOFTMAX") {
-        return composition_suite(FuncCraft::CompositionKind::DpmSoftmax, {0.03}, dimension);
+        return composition_suite(FuncCraft::CompositionKind::DpmSoftmax, {0.005}, dimension);
+    }
+    if (treatment.experiment == "composition" && treatment.name == "DPM_BGSOFTMAX") {
+        return composition_suite(FuncCraft::CompositionKind::DpmBgSoftmax, {0.005, 1.0, 0.01}, dimension);
     }
     throw std::logic_error("unknown treatment");
 }
 
 std::vector<int> treatment_indices(const Treatment& treatment, const Config& config) {
     return treatment.experiment == "composition"
-        ? one_based_range(41, config.composition_instances)
+        ? one_based_range(35, config.composition_instances)
         : one_based_range(1, config.base_function_count);
 }
 
@@ -390,7 +404,7 @@ int main(int argc, char* argv[]) {
                   << ", dimension: " << config.dimension
                   << ", runs: " << config.runs
                   << ", base functions: F1-F" << config.base_function_count
-                  << ", composition functions: F41-F" << (40 + config.composition_instances)
+                  << ", composition functions: F35-F" << (34 + config.composition_instances)
                   << ", algo: " << config.algo
                   << ", population_size: " << config.population_size
                   << ", seed: " << config.seed
