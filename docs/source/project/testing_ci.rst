@@ -57,7 +57,7 @@ directory instead of the installed wheel.
 C++ test coverage
 -----------------
 
-The C++ binary prints a named report with 18 checks and finishes with
+The C++ binary prints a named report with 19 checks and finishes with
 ``Overall status: PASS`` on success. The checks are:
 
 ``Basic function registry ids``
@@ -88,9 +88,10 @@ The C++ binary prints a named report with 18 checks and finishes with
    ``assigned_fopt = 0`` because only the outermost function owns the final
    optimum value.
 
-``Suite YAML accepts base-function names`` and ``Composition kind aliases``
-   Check YAML parsing for base-function names and canonical handling of DPM
-   composition aliases.
+``Suite YAML accepts base-function names``, ``Coordinate transform aliases``,
+and ``Composition kind aliases``
+   Check YAML parsing for base-function names, the ``srot`` coordinate
+   transform alias, and canonical handling of DPM composition aliases.
 
 ``Composition family materialization``
    Forces each CPM and DPM composition kind through generated

@@ -298,7 +298,7 @@ Examples of accepted aliases:
    * - ``affine``
      - ``aff``
    * - ``subspace-rotation``
-     - none
+     - ``srot``
    * - ``cpm-wsum``
      - ``cpmsum``, ``weighted_sum``
    * - ``cpm-power-mean``

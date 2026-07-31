@@ -373,6 +373,25 @@ void check_suite_yaml_accepts_base_function_names(const std::filesystem::path& p
     require(suite.size() == 2, "suite YAML name-based suite size mismatch");
 }
 
+void check_coordinate_transform_aliases(const std::filesystem::path& path) {
+    {
+        std::ofstream out(path);
+        out << "supported_dimensions: 2\n";
+        out << "base_functions: [Sphere]\n";
+        out << "coordinate_transforms:\n";
+        out << "  - kind: srot\n";
+        out << "    probability: 1.0\n";
+        out << "    parameters: []\n";
+        out << "requested_number_of_functions: 1\n";
+        out << "master_seed: 11\n";
+    }
+
+    const FuncCraft::SuiteSpec spec = FuncCraft::load_suite_spec(path.string());
+    require(
+        spec.coordinate_transforms.front().kind == FuncCraft::CoordinateTransformKind::SubspaceRotation,
+        "suite YAML did not parse srot as subspace rotation");
+}
+
 FuncCraft::BenchmarkSuite make_roundtrip_suite() {
     FuncCraft::SuiteSpec spec;
     spec.requested_number_of_functions = 100;
@@ -878,6 +897,7 @@ int run_tests() {
         {"Composed function component", [&] { check_composed_function_component(temp / "composed_function.yaml"); }},
         {"Reject nonzero nested assigned_fopt", check_composed_component_requires_zero_assigned_fopt},
         {"Suite YAML accepts base-function names", [&] { check_suite_yaml_accepts_base_function_names(temp / "suite_names.yaml"); }},
+        {"Coordinate transform aliases", [&] { check_coordinate_transform_aliases(temp / "coordinate_aliases.yaml"); }},
         {"Composition kind aliases", check_composition_kind_aliases},
         {"Composition family materialization", check_composition_family_materialization},
         {"Suite structure stable across dimensions", check_suite_structure_stable_across_dimensions},

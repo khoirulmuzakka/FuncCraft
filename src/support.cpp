@@ -201,7 +201,7 @@ CoordinateTransformKind parse_coordinate_transform_kind(const std::string& kind)
     if (normalized == "affine" || normalized == "aff") {
         return CoordinateTransformKind::Affine;
     }
-    if (normalized == "subspacerotation") {
+    if (normalized == "subspacerotation" || normalized == "srot") {
         return CoordinateTransformKind::SubspaceRotation;
     }
     throw std::invalid_argument("unknown coordinate transform kind: " + kind);
