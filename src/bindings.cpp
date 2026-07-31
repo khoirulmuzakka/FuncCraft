@@ -141,7 +141,6 @@ PYBIND11_MODULE(_funccraft, m) {
         .value("CpmProduct", FuncCraft::CompositionKind::CpmProduct)
         .value("CpmMaxPlusMean", FuncCraft::CompositionKind::CpmMaxPlusMean)
         .value("CpmCvar", FuncCraft::CompositionKind::CpmCvar)
-        .value("SparseActive", FuncCraft::CompositionKind::SparseActive)
         .value("DpmSoftmax", FuncCraft::CompositionKind::DpmSoftmax)
         .value("DpmBgSoftmax", FuncCraft::CompositionKind::DpmBgSoftmax)
         .export_values();

@@ -280,9 +280,6 @@ CompositionKind parse_composition_kind(const std::string& kind) {
     if (normalized == "cpmcvar" || normalized == "cvar" || normalized == "worstquantile") {
         return CompositionKind::CpmCvar;
     }
-    if (normalized == "sparseactive" || normalized == "activecomponent") {
-        return CompositionKind::SparseActive;
-    }
     if (normalized == "dpmsoftmax" || normalized == "dpm" || normalized == "softmax") {
         return CompositionKind::DpmSoftmax;
     }
@@ -306,7 +303,6 @@ CompositionMode composition_mode(CompositionKind kind) {
     case CompositionKind::CpmProduct:
     case CompositionKind::CpmMaxPlusMean:
     case CompositionKind::CpmCvar:
-    case CompositionKind::SparseActive:
         return CompositionMode::CPM;
     case CompositionKind::DpmSoftmax:
     case CompositionKind::DpmBgSoftmax:
@@ -381,8 +377,6 @@ std::string to_spec_name(CompositionKind kind) {
         return spec_name::CpmMaxPlusMean;
     case CompositionKind::CpmCvar:
         return spec_name::CpmCvar;
-    case CompositionKind::SparseActive:
-        return spec_name::SparseActive;
     case CompositionKind::DpmSoftmax:
         return spec_name::DpmSoftmax;
     case CompositionKind::DpmBgSoftmax:

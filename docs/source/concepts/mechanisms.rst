@@ -35,7 +35,9 @@ optimum. The transform maps parent coordinates into child coordinates.
       T(x) = t + R(x-a).
 
 ``affine``
-   Full-dimensional shifted affine transform with matrix :math:`A`:
+   Full-dimensional shifted affine transform with matrix :math:`A`. The
+   generated matrix starts from a random rotation and scales each output row
+   independently by a geometric factor between ``1`` and ``100``:
 
    .. math::
 
@@ -82,6 +84,68 @@ Let :math:`u \ge 0` be the shifted component value before the value transform.
 
       \phi(u) = 1 - \cos(\alpha u).
 
+``huber``
+   Parameter is ``[delta]``:
+
+   .. math::
+
+      \phi(u) =
+      \begin{cases}
+      u^2/(2\delta), & u \le \delta,\\
+      u-\delta/2, & u > \delta.
+      \end{cases}
+
+``log``
+   Parameter is ``[alpha]``:
+
+   .. math::
+
+      \phi(u) = \log(1+\alpha u)/\alpha.
+
+``softplus-threshold``
+   Parameters are ``[tau, alpha]``. With
+   :math:`\operatorname{sp}(v)=\log(1+\exp(v))`,
+
+   .. math::
+
+      \phi(u) =
+      \frac{\operatorname{sp}(\alpha(u-\tau))
+      -\operatorname{sp}(-\alpha\tau)}{\alpha}.
+
+``dead-zone``
+   Parameters are ``[tau, p]``:
+
+   .. math::
+
+      \phi(u) = \max(0,u-\tau)^p.
+
+``saturating``
+   Parameters are ``[cap, c]``:
+
+   .. math::
+
+      \phi(u) = \frac{\mathrm{cap}\,u}{u+c}.
+
+``piecewise-power``
+   Parameters are ``[tau, p1, p2]``:
+
+   .. math::
+
+      \phi(u) =
+      \begin{cases}
+      u^{p_1}, & u \le \tau,\\
+      \tau^{p_1} + (u-\tau)^{p_2}, & u > \tau.
+      \end{cases}
+
+``noisy-smooth``
+   Parameters are ``[epsilon, alpha]``:
+
+   .. math::
+
+      \phi(u) =
+      u\left(1+\epsilon\sin(\alpha u)
+      \sin(0.371\alpha u+1.2345)\right).
+
 Trigonometric value transforms reduce the phase modulo :math:`2\pi` internally
 for more stable cross-platform numerical behavior.
 
@@ -118,6 +182,58 @@ Let :math:`z_i` be transformed component values.
    .. math::
 
       \psi(z) = s\left(1 + \epsilon\sin(\alpha s)\right).
+
+``cpm-max``
+   Maximum component value:
+
+   .. math::
+
+      \psi(z)=\max_i z_i.
+
+``cpm-smoothmax``
+   Parameter is ``[beta]``. With :math:`z_{\max}=\max_i z_i`,
+
+   .. math::
+
+      \psi(z)=z_{\max}+
+      \frac{\log\sum_i \exp(\beta(z_i-z_{\max}))-\log m}{\beta}.
+
+``cpm-constraint-penalty``
+   Parameters are ``[rho, p]``:
+
+   .. math::
+
+      \psi(z)=z_1+\rho\sum_{i=2}^m z_i^p.
+
+``cpm-lexicographic``
+   Parameter is ``[decay]``:
+
+   .. math::
+
+      \psi(z)=\sum_{i=1}^m \mathrm{decay}^{i-1}z_i.
+
+``cpm-product``
+   Parameter is ``[alpha]``:
+
+   .. math::
+
+      \psi(z)=\frac{\prod_i(1+\alpha z_i)-1}{\alpha}.
+
+``cpm-max-plus-mean``
+   Parameter is ``[lambda]``:
+
+   .. math::
+
+      \psi(z)=\lambda\max_i z_i+
+      (1-\lambda)\frac{1}{m}\sum_i z_i.
+
+``cpm-cvar``
+   Parameter is ``[quantile]``. Let :math:`z_{(1)}\ge\cdots\ge z_{(m)}`
+   and :math:`k=\lceil \mathrm{quantile}\,m\rceil`:
+
+   .. math::
+
+      \psi(z)=\frac{1}{k}\sum_{i=1}^k z_{(i)}.
 
 ``dpm-softmax``
    Parameter is ``[sharpness]``. Let :math:`c_i` be full-dimensional DPM
@@ -189,6 +305,20 @@ Examples of accepted aliases:
      - ``cpmpmean``, ``power_mean``
    * - ``cpm-level-well``
      - ``cpmlwell``, ``level_well``
+   * - ``cpm-max``
+     - ``max``, ``worstcase``
+   * - ``cpm-smoothmax``
+     - ``smoothmax``, ``logsumexp``
+   * - ``cpm-constraint-penalty``
+     - ``constraintpenalty``, ``penalty``
+   * - ``cpm-lexicographic``
+     - ``lexicographic``, ``lex``
+   * - ``cpm-product``
+     - ``product``
+   * - ``cpm-max-plus-mean``
+     - ``maxplusmean``, ``maxmean``
+   * - ``cpm-cvar``
+     - ``cvar``, ``worstquantile``
    * - ``dpm-softmax``
      - ``dpmsoftmax``, ``dpm``
    * - ``dpm-bgsoftmax``

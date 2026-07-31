@@ -255,30 +255,30 @@ The packaged suite is defined by this YAML file:
      - kind: power
        probability: 0.25
        parameters: []
-     - kind: osc
+     - kind: oscillatory
        probability: 0.25
        parameters: []
      - kind: cosine-zero
        probability: 0.0
        parameters: []
    compositions:
-     - kind: cpmsum
+     - kind: cpm-wsum
        probability: 0.1
        parameters: []
-     - kind: cpmpmean
+     - kind: cpm-power-mean
        probability: 0.1
        parameters: [3.0]
-     - kind: cpmpmean
+     - kind: cpm-power-mean
        probability: 0.1
        parameters: [0.1]
-     - kind: cpmlwell
+     - kind: cpm-level-well
        probability: 0.2
        parameters: []
-     - kind: dpmsoftmax
+     - kind: dpm-softmax
        probability: 0.25
        # parameters = [sharpness]
        parameters: [0.005]
-     - kind: dpmbgsoftmax
+     - kind: dpm-bgsoftmax
        probability: 0.25
        #parameters = [sharpness, background_strength, background_sharpness]
        parameters : [0.005, 1.0, 0.01]
@@ -316,13 +316,13 @@ What the suite contains
 
 ``value_transforms``
    Component values use ``none`` with probability ``0.5``, ``power`` with
-   probability ``0.25``, and ``osc`` with probability ``0.25``.
+   probability ``0.25``, and ``oscillatory`` with probability ``0.25``.
    ``cosine-zero`` is listed but disabled.
 
 ``compositions``
-   Composed functions use ``cpmsum``, two ``cpmpmean`` variants,
-   ``cpmlwell``, ``dpmsoftmax``, and ``dpmbgsoftmax`` with the probabilities
-   and parameters shown in the YAML.
+   Composed functions use ``cpm-wsum``, two ``cpm-power-mean`` variants,
+   ``cpm-level-well``, ``dpm-softmax``, and ``dpm-bgsoftmax`` with the
+   probabilities and parameters shown in the YAML.
 
 ``min_components`` and ``max_components``
    Each generated composed function has between 2 and 5 immediate components.

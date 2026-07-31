@@ -324,24 +324,6 @@ CompositionClass CvarComposition::composition_class() const {
     return CompositionClass::CommonPointCvar;
 }
 
-SparseActiveComposition::SparseActiveComposition(double frequency)
-    : frequency_(frequency) {
-    require(std::isfinite(frequency), "sparse-active frequency must be finite");
-    require(frequency >= 0.0, "sparse-active frequency must be nonnegative");
-}
-
-double SparseActiveComposition::raw_apply(const std::vector<double>& x, const std::vector<double>& z) const {
-    require(!x.empty(), "sparse-active composition point must not be empty");
-    require(!z.empty(), "sparse-active composition requires at least one component");
-    const double coordinate = std::abs(x.front());
-    const auto bucket = static_cast<std::uint64_t>(std::floor(frequency_ * coordinate));
-    return z[static_cast<std::size_t>(bucket % z.size())];
-}
-
-CompositionClass SparseActiveComposition::composition_class() const {
-    return CompositionClass::SparseActive;
-}
-
 DeceptiveSoftmaxComposition::DeceptiveSoftmaxComposition(
     std::vector<std::vector<double>> centers,
     double sharpness,

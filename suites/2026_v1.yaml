@@ -134,9 +134,6 @@ compositions:
   # - kind: cpm-product
   #   probability: 0.0
   #   parameters: [0.00001]
-  # - kind: sparse-active
-  #   probability: 0.0
-  #   parameters: [0.01]
   # - kind: cpm-max
   #   probability: 0.0
   #   parameters: []

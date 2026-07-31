@@ -60,7 +60,6 @@ inline constexpr const char* CpmLexicographic = "cpm-lexicographic";
 inline constexpr const char* CpmProduct = "cpm-product";
 inline constexpr const char* CpmMaxPlusMean = "cpm-max-plus-mean";
 inline constexpr const char* CpmCvar = "cpm-cvar";
-inline constexpr const char* SparseActive = "sparse-active";
 inline constexpr const char* DpmSoftmax = "dpm-softmax";
 inline constexpr const char* DpmBgSoftmax = "dpm-bgsoftmax";
 } // namespace spec_name
@@ -153,7 +152,6 @@ struct ComponentSpec {
  * - `CpmProduct`: multiplicative component aggregation.
  * - `CpmMaxPlusMean`: blend of worst component and average component.
  * - `CpmCvar`: average of the worst quantile of components.
- * - `SparseActive`: point-dependent active component selection.
  * - `DpmSoftmax`: deceptive-point softmax composition.
  * - `DpmBgSoftmax`: deceptive-point softmax with a smooth background term.
  *
@@ -171,7 +169,6 @@ struct ComponentSpec {
  * - `CpmProduct`: `parameters[0] = alpha`.
  * - `CpmMaxPlusMean`: `parameters[0] = lambda`.
  * - `CpmCvar`: `parameters[0] = quantile`.
- * - `SparseActive`: `parameters[0] = frequency`.
  * - `DpmSoftmax`: `parameters[0] = sharpness`.
  * - `DpmBgSoftmax`: `parameters[0] = sharpness`,
  *   `parameters[1] = background_strength`,

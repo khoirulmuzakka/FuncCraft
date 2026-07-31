@@ -176,16 +176,6 @@ private:
     double quantile_ = 0.25;
 };
 
-class SparseActiveComposition final : public CompositionFunction {
-public:
-    explicit SparseActiveComposition(double frequency = 0.01);
-    CompositionClass composition_class() const override;
-
-private:
-    double raw_apply(const std::vector<double>& x, const std::vector<double>& z) const override;
-    double frequency_ = 0.01;
-};
-
 /**
  * @brief Softmax-based deceptive composition.
  *

@@ -59,8 +59,12 @@ Implemented mechanism families include:
   Rastrigin, Griewank, Schwefel, Katsuura, Levy, BentCigar, HappyCat,
   HGBat, and StyblinskiTang.
 - coordinate transforms: `none`, `rotation`, `affine`, `subspace-rotation`.
-- value transforms: `none`, `power`, `oscillatory`, `cosine-zero`.
+- value transforms: `none`, `power`, `oscillatory`, `cosine-zero`, `huber`,
+  `log`, `softplus-threshold`, `dead-zone`, `saturating`,
+  `piecewise-power`, `noisy-smooth`.
 - compositions: `none`, `cpm-wsum`, `cpm-power-mean`, `cpm-level-well`,
+  `cpm-max`, `cpm-smoothmax`, `cpm-constraint-penalty`,
+  `cpm-lexicographic`, `cpm-product`, `cpm-max-plus-mean`, `cpm-cvar`,
   `dpm-softmax`, `dpm-bgsoftmax`.
 
 Components can also be nested composed functions, up to the configured
@@ -126,16 +130,16 @@ suite_config = {
     "value_transforms": [
         {"kind": "none", "probability": 0.5, "parameters": []},
         {"kind": "power", "probability": 0.25, "parameters": []},
-        {"kind": "osc", "probability": 0.25, "parameters": []},
+        {"kind": "oscillatory", "probability": 0.25, "parameters": []},
         {"kind": "cosine-zero", "probability": 0.0, "parameters": []},
     ],
     "compositions": [
-        {"kind": "cpmsum", "probability": 0.1, "parameters": []},
-        {"kind": "cpmpmean", "probability": 0.1, "parameters": [3.0]},
-        {"kind": "cpmpmean", "probability": 0.1, "parameters": [0.1]},
-        {"kind": "cpmlwell", "probability": 0.2, "parameters": []},
-        {"kind": "dpmsoftmax", "probability": 0.25, "parameters": [0.005]},
-        {"kind": "dpmbgsoftmax", "probability": 0.25, "parameters": [0.005, 1.0, 0.01]},
+        {"kind": "cpm-wsum", "probability": 0.1, "parameters": []},
+        {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [3.0]},
+        {"kind": "cpm-power-mean", "probability": 0.1, "parameters": [0.1]},
+        {"kind": "cpm-level-well", "probability": 0.2, "parameters": []},
+        {"kind": "dpm-softmax", "probability": 0.25, "parameters": [0.005]},
+        {"kind": "dpm-bgsoftmax", "probability": 0.25, "parameters": [0.005, 1.0, 0.01]},
     ],
     "min_components": 2,
     "max_components": 5,
@@ -200,29 +204,29 @@ value_transforms:
   - kind: power
     probability: 0.25
     parameters: []
-  - kind: osc
+  - kind: oscillatory
     probability: 0.25
     parameters: []
   - kind: cosine-zero
     probability: 0.0
     parameters: []
 compositions:
-  - kind: cpmsum
+  - kind: cpm-wsum
     probability: 0.1
     parameters: []
-  - kind: cpmpmean
+  - kind: cpm-power-mean
     probability: 0.1
     parameters: [3.0]
-  - kind: cpmpmean
+  - kind: cpm-power-mean
     probability: 0.1
     parameters: [0.1]
-  - kind: cpmlwell
+  - kind: cpm-level-well
     probability: 0.2
     parameters: []
-  - kind: dpmsoftmax
+  - kind: dpm-softmax
     probability: 0.25
     parameters: [0.005]
-  - kind: dpmbgsoftmax
+  - kind: dpm-bgsoftmax
     probability: 0.25
     parameters: [0.005, 1.0, 0.01]
 min_components: 2

@@ -112,7 +112,6 @@ inline std::vector<CompositionChoice> all_composition_choices() {
         make_choice(CompositionKind::CpmProduct, 0.0, 1.0e-3),
         make_choice(CompositionKind::CpmMaxPlusMean, 0.0, 0.5),
         make_choice(CompositionKind::CpmCvar, 0.0, 0.25),
-        make_choice(CompositionKind::SparseActive, 0.0, 0.01),
         make_choice(CompositionKind::DpmSoftmax, 0.25, 0.01),
         make_choice(CompositionKind::DpmBgSoftmax, 0.25, 0.01, 1.0, 0.01),
     };

@@ -386,13 +386,6 @@ CompositionSpec materialized_composition_spec(const CompositionSpec& requested, 
         spec.parameters = {quantile};
         return spec;
     }
-    if (spec.kind == CompositionKind::SparseActive) {
-        detail::require(spec.biases.empty(), "composition biases are only valid for DPM compositions");
-        detail::require(spec.centers.empty(), "composition centers are only valid for DPM compositions");
-        const double frequency = spec.parameters.empty() ? 0.01 : spec.parameters[0];
-        spec.parameters = {frequency};
-        return spec;
-    }
     if (spec.kind == CompositionKind::DpmSoftmax) {
         detail::require(spec.biases.empty() || spec.biases.size() == component_count, "DPM composition bias/component size mismatch");
         detail::require(spec.centers.empty() || spec.centers.size() == component_count, "DPM composition center/component size mismatch");
@@ -457,10 +450,6 @@ std::shared_ptr<CompositionFunction> make_common_point_composition(const Composi
     if (composition.kind == CompositionKind::CpmCvar) {
         const double quantile = composition.parameters.empty() ? 0.25 : composition.parameters[0];
         return std::make_shared<CvarComposition>(quantile);
-    }
-    if (composition.kind == CompositionKind::SparseActive) {
-        const double frequency = composition.parameters.empty() ? 0.01 : composition.parameters[0];
-        return std::make_shared<SparseActiveComposition>(frequency);
     }
     throw std::logic_error("unhandled common-point composition kind");
 }

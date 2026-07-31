@@ -40,8 +40,6 @@ enum class CompositionClass {
     CommonPointMaxPlusMean,
     /// Average over the worst quantile of components.
     CommonPointCvar,
-    /// Region-dependent active component selection.
-    SparseActive,
     /// Deceptive softmax selection over multiple component centers.
     DeceptivePointSoftmax,
     /// Deceptive softmax with a smooth background weight.
@@ -145,7 +143,6 @@ enum class CompositionKind {
     CpmProduct,
     CpmMaxPlusMean,
     CpmCvar,
-    SparseActive,
     DpmSoftmax,
     DpmBgSoftmax,
 };

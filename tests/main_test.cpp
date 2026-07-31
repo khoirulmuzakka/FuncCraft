@@ -451,6 +451,67 @@ void check_composition_kind_aliases() {
     require(found_composed_function, "suite composition choice did not generate DPM bg softmax functions");
 }
 
+void check_composition_family_materialization() {
+    const std::vector<FuncCraft::CompositionKind> cpm_kinds = {
+        FuncCraft::CompositionKind::CpmWeightedSum,
+        FuncCraft::CompositionKind::CpmPowerMean,
+        FuncCraft::CompositionKind::CpmLevelWell,
+        FuncCraft::CompositionKind::CpmMax,
+        FuncCraft::CompositionKind::CpmSmoothMax,
+        FuncCraft::CompositionKind::CpmConstraintPenalty,
+        FuncCraft::CompositionKind::CpmLexicographic,
+        FuncCraft::CompositionKind::CpmProduct,
+        FuncCraft::CompositionKind::CpmMaxPlusMean,
+        FuncCraft::CompositionKind::CpmCvar,
+    };
+    const std::vector<FuncCraft::CompositionKind> dpm_kinds = {
+        FuncCraft::CompositionKind::DpmSoftmax,
+        FuncCraft::CompositionKind::DpmBgSoftmax,
+    };
+
+    auto make_choice = [](FuncCraft::CompositionKind kind) {
+        FuncCraft::CompositionChoice choice;
+        choice.kind = kind;
+        choice.probability = 1.0;
+        choice.parameters = {0.01, 1.0, 0.01};
+        return choice;
+    };
+
+    auto make_suite = [&](FuncCraft::CompositionKind kind) {
+        FuncCraft::SuiteSpec suite_spec;
+        suite_spec.compositions = {make_choice(kind)};
+        suite_spec.coordinate_transforms = {
+            FuncCraft::make_choice(FuncCraft::CoordinateTransformKind::Rotation, 1.0),
+        };
+        suite_spec.value_transforms = {
+            FuncCraft::make_choice(FuncCraft::ValueTransformKind::None, 1.0),
+        };
+        suite_spec.requested_number_of_functions = first_composed_function_index();
+        suite_spec.min_components = 3;
+        suite_spec.max_components = 3;
+        suite_spec.max_nested_composition_depth = 0;
+        suite_spec.nested_probability = 0.0;
+        suite_spec.master_seed = 20260731;
+        return FuncCraft::BenchmarkSuite(suite_spec, 4);
+    };
+
+    for (FuncCraft::CompositionKind kind : cpm_kinds) {
+        const FuncCraft::BenchmarkSuite suite = make_suite(kind);
+        const FuncCraft::FunctionSpec& spec = suite.function(first_composed_function_index()).spec();
+        require(spec.composition.kind == kind, "CPM composition kind changed during materialization");
+        require(spec.composition.biases.empty(), "CPM composition materialized DPM biases");
+        require(spec.composition.centers.empty(), "CPM composition materialized DPM centers");
+    }
+
+    for (FuncCraft::CompositionKind kind : dpm_kinds) {
+        const FuncCraft::BenchmarkSuite suite = make_suite(kind);
+        const FuncCraft::FunctionSpec& spec = suite.function(first_composed_function_index()).spec();
+        require(spec.composition.kind == kind, "DPM composition kind changed during materialization");
+        require(spec.composition.biases.size() == spec.components.size(), "DPM composition did not materialize biases");
+        require(spec.composition.centers.size() == spec.components.size(), "DPM composition did not materialize centers");
+    }
+}
+
 void require_same_double_vector(
     const std::vector<double>& lhs,
     const std::vector<double>& rhs,
@@ -818,6 +879,7 @@ int run_tests() {
         {"Reject nonzero nested assigned_fopt", check_composed_component_requires_zero_assigned_fopt},
         {"Suite YAML accepts base-function names", [&] { check_suite_yaml_accepts_base_function_names(temp / "suite_names.yaml"); }},
         {"Composition kind aliases", check_composition_kind_aliases},
+        {"Composition family materialization", check_composition_family_materialization},
         {"Suite structure stable across dimensions", check_suite_structure_stable_across_dimensions},
         {"Suite geometry prefix-stable across dimensions", check_suite_geometry_prefix_stable_across_dimensions},
         {"Direct function geometry prefix-stable", check_direct_function_geometry_prefix_stable_across_dimensions},

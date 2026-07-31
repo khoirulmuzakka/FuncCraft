@@ -57,7 +57,7 @@ directory instead of the installed wheel.
 C++ test coverage
 -----------------
 
-The C++ binary prints a named report with 17 checks and finishes with
+The C++ binary prints a named report with 18 checks and finishes with
 ``Overall status: PASS`` on success. The checks are:
 
 ``Basic function registry ids``
@@ -91,6 +91,13 @@ The C++ binary prints a named report with 17 checks and finishes with
 ``Suite YAML accepts base-function names`` and ``Composition kind aliases``
    Check YAML parsing for base-function names and canonical handling of DPM
    composition aliases.
+
+``Composition family materialization``
+   Forces each CPM and DPM composition kind through generated
+   ``BenchmarkSuite`` materialization. CPM compositions must not materialize
+   DPM-only ``centers`` or ``biases``; DPM compositions must materialize both.
+   This guards against regressions where CPM kinds are accidentally classified
+   as DPM.
 
 ``Suite structure stable across dimensions``
    Builds the same generated suite at dimensions 2 and 5 and checks that every

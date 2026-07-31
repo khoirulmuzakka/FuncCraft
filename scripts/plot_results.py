@@ -24,6 +24,23 @@ TREATMENT_ORDER = {
     "composition": ["CPM_SUM", "CPM_PMEAN", "CPM_LWELL", "CPM_LEX", "DPM_SOFTMAX", "DPM_BGSOFTMAX"],
 }
 
+DISPLAY_LABELS = {
+    "NONE": "none",
+    "ROT": "rotation",
+    "AFF": "affine",
+    "POWER_P01": "power, p=0.1",
+    "POWER_P3": "power, p=3",
+    "HUBER": "huber",
+    "OSC": "relative-modulation",
+    "SPTHRESH": "softplus-threshold",
+    "CPM_SUM": "cpm-wsum",
+    "CPM_PMEAN": "cpm-power-mean",
+    "CPM_LWELL": "cpm-level-well",
+    "CPM_LEX": "cpm-lexicographic",
+    "DPM_SOFTMAX": "dpm-softmax",
+    "DPM_BGSOFTMAX": "dpm-bgsoftmax",
+}
+
 EXPECTED_FUNCTION_COUNTS = {
     "coord": 34,
     "value": 34,
@@ -121,7 +138,7 @@ def plot_metric(
             marker="o",
             linewidth=1.8,
             markersize=4.5,
-            label=treatment,
+            label=DISPLAY_LABELS.get(treatment, treatment),
         )
 
     ax.set_xscale("log")

@@ -609,10 +609,6 @@ CompositionSpec make_composition_spec(
         spec.parameters = choice.parameters.empty() ? std::vector<double>{0.25} : choice.parameters;
         return spec;
     }
-    if (choice.kind == CompositionKind::SparseActive) {
-        spec.parameters = choice.parameters.empty() ? std::vector<double>{0.01} : choice.parameters;
-        return spec;
-    }
     if (choice.kind == CompositionKind::DpmSoftmax) {
         spec.parameters = choice.parameters.empty()
             ? std::vector<double>{0.01}

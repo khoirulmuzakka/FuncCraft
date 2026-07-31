@@ -55,8 +55,6 @@ std::string to_string(CompositionClass cls) {
         return "CPM-MAXMEAN";
     case CompositionClass::CommonPointCvar:
         return "CPM-CVAR";
-    case CompositionClass::SparseActive:
-        return "SPARSE-ACTIVE";
     case CompositionClass::DeceptivePointSoftmax:
         return "DPM-SOFTMAX";
     case CompositionClass::DeceptivePointBgSoftmax:

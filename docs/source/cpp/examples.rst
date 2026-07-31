@@ -415,22 +415,22 @@ Put this in ``my_suite.yaml``:
        probability: 0.0
        parameters: [1.0]
    compositions:
-     - kind: cpmsum
+     - kind: cpm-wsum
        probability: 0.1
        parameters: []
-     - kind: cpmpmean
+     - kind: cpm-power-mean
        probability: 0.1
        parameters: [3.0]
-     - kind: cpmpmean
+     - kind: cpm-power-mean
        probability: 0.1
        parameters: [0.1]
-     - kind: cpmlwell
+     - kind: cpm-level-well
        probability: 0.2
        parameters: [0.1, 1.0]
-     - kind: dpmsoftmax
+     - kind: dpm-softmax
        probability: 0.25
        parameters: [0.01]
-     - kind: dpmbgsoftmax
+     - kind: dpm-bgsoftmax
        probability: 0.25
        parameters: [0.01, 1.0, 0.01]
    min_components: 2
