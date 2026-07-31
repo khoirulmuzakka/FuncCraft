@@ -41,9 +41,9 @@ struct Treatment {
 
 struct ExperimentBlock {
     Treatment treatment;
+    std::size_t suite_index = 0;
     std::size_t max_evals = 0;
     std::vector<int> indices;
-    std::vector<const FuncCraft::BenchmarkFunction*> functions;
     std::vector<std::vector<double>> matrix;
     std::filesystem::path output_path;
 };
@@ -323,7 +323,8 @@ std::vector<int> treatment_indices(const Treatment& treatment, const Config& con
 void run_jobs(
     std::vector<ExperimentBlock>& blocks,
     const std::vector<Job>& jobs,
-    const Config& config) {
+    const Config& config,
+    const std::vector<Treatment>& treatments) {
     std::atomic<std::size_t> next_job{0};
     std::atomic<std::size_t> completed_jobs{0};
     std::mutex output_mutex;
@@ -337,6 +338,8 @@ void run_jobs(
 
     for (int worker = 0; worker < worker_count; ++worker) {
         workers.emplace_back([&]() {
+            std::vector<std::unique_ptr<FuncCraft::BenchmarkSuite>> local_suites(treatments.size());
+
             while (true) {
                 const std::size_t job_index = next_job.fetch_add(1);
                 if (job_index >= jobs.size()) {
@@ -346,10 +349,16 @@ void run_jobs(
                 const Job& job = jobs[job_index];
                 ExperimentBlock& block = blocks[job.block_index];
                 try {
-                    for (std::size_t column = 0; column < block.functions.size(); ++column) {
+                    if (!local_suites[block.suite_index]) {
+                        local_suites[block.suite_index] = std::make_unique<FuncCraft::BenchmarkSuite>(
+                            treatment_suite(treatments[block.suite_index], config.dimension));
+                    }
+                    const FuncCraft::BenchmarkSuite& suite = *local_suites[block.suite_index];
+
+                    for (std::size_t column = 0; column < block.indices.size(); ++column) {
                         block.matrix[static_cast<std::size_t>(job.run_index)][column] =
                             minimize_function(
-                                *block.functions[column],
+                                suite.function(block.indices[column]),
                                 config,
                                 block.max_evals,
                                 job.run_index,
@@ -392,7 +401,6 @@ int main(int argc, char* argv[]) {
 
         const std::vector<Treatment> treatments = experiment_treatments();
         const std::vector<std::pair<int, std::size_t>> eval_budgets = budgets(config.dimension);
-        std::vector<std::unique_ptr<FuncCraft::BenchmarkSuite>> suites;
         std::vector<ExperimentBlock> blocks;
         std::vector<Job> jobs;
 
@@ -411,23 +419,17 @@ int main(int argc, char* argv[]) {
                   << ", seed: " << config.seed
                   << ", Nthreads: " << config.nthreads << "\n\n";
 
-        for (const Treatment& treatment : treatments) {
-            suites.push_back(std::make_unique<FuncCraft::BenchmarkSuite>(treatment_suite(treatment, config.dimension)));
-            const FuncCraft::BenchmarkSuite& suite = *suites.back();
+        for (std::size_t treatment_index = 0; treatment_index < treatments.size(); ++treatment_index) {
+            const Treatment& treatment = treatments[treatment_index];
             const std::vector<int> indices = treatment_indices(treatment, config);
-            std::vector<const FuncCraft::BenchmarkFunction*> functions;
-            functions.reserve(indices.size());
-            for (int index : indices) {
-                functions.push_back(&suite.function(index));
-            }
 
             for (const auto& budget : eval_budgets) {
                 const std::size_t max_evals = budget.second;
                 ExperimentBlock block;
                 block.treatment = treatment;
+                block.suite_index = treatment_index;
                 block.max_evals = max_evals;
                 block.indices = indices;
-                block.functions = functions;
                 block.matrix.assign(
                     static_cast<std::size_t>(config.runs),
                     std::vector<double>(indices.size(), std::numeric_limits<double>::quiet_NaN()));
@@ -445,7 +447,7 @@ int main(int argc, char* argv[]) {
                   << std::min(config.nthreads, static_cast<int>(jobs.size()))
                   << "\n";
 
-        run_jobs(blocks, jobs, config);
+        run_jobs(blocks, jobs, config, treatments);
 
         for (const ExperimentBlock& block : blocks) {
             write_matrix(block.output_path, block.matrix);
