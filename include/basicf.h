@@ -101,9 +101,9 @@ enum class BasicFunctionId {
  * - `f_opt` stores the primitive minimum value;
  * - `properties` is a human-readable summary of the landscape.
  *
- * For CEC-derived primitives, the implementation follows the unshifted CEC base
- * formula, including any internal scale factor and any intrinsic optimum
- * location implied by that formula.
+ * Primitives are exposed as unshifted, unscaled base formulas. Intrinsic shape
+ * constants remain part of the formula, but coordinate-domain scaling is left
+ * to the caller or to higher-level transforms.
  *
  * BBOB-style "rotated" primitives are also exposed here. At this low level they
  * are stored in canonical coordinates without any implicit random rotation;

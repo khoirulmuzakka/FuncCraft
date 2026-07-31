@@ -14,7 +14,6 @@ namespace FuncCraft {
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
-constexpr double kSchwefelShift = 420.9687462275036;
 
 template <typename Engine>
 double uniform01(Engine& rng) {
@@ -150,21 +149,6 @@ double rosenbrock_original_eval(const double* x, int dimension) {
     return sum;
 }
 
-double rosenbrock_cec_eval(const double* x, int dimension) {
-    if (dimension <= 1) {
-        return 0.0;
-    }
-    constexpr double scale = 2.048 / 100.0;
-    double sum = 0.0;
-    double prev = scale * x[0] + 1.0;
-    for (int i = 0; i < dimension - 1; ++i) {
-        const double next = scale * x[i + 1] + 1.0;
-        sum += 100.0 * sqr(prev * prev - next) + sqr(prev - 1.0);
-        prev = next;
-    }
-    return sum;
-}
-
 double ackley_eval(const double* x, int dimension) {
     double sum_sq = 0.0;
     double sum_cos = 0.0;
@@ -251,10 +235,9 @@ double griewank_eval(const double* x, int dimension) {
 }
 
 double schwefel_eval(const double* x, int dimension) {
-    constexpr double scale = 1000.0 / 100.0;
     double sum = 0.0;
     for (int i = 0; i < dimension; ++i) {
-        double z = scale * x[i] + kSchwefelShift;
+        const double z = x[i];
         if (z > 500.0) {
             sum -= (500.0 - std::fmod(z, 500.0)) * std::sin(std::sqrt(500.0 - std::fmod(z, 500.0)));
             const double tmp = (z - 500.0) / 100.0;
@@ -281,7 +264,7 @@ double sharp_ridge_eval(const double* x, int dimension) {
     return sqr(x[0]) + 100.0 * std::sqrt(tail);
 }
 
-double schaffer_f7_cec_eval(const double* x, int dimension) {
+double schaffer_f7_raw_eval(const double* x, int dimension) {
     if (dimension <= 1) {
         return 0.0;
     }
@@ -338,8 +321,8 @@ double griewank_rosenbrock_eval(const double* x, int dimension) {
     double sum = 0.0;
     for (int i = 0; i < dimension; ++i) {
         const int j = (i + 1) % dimension;
-        const double yi = 0.05 * x[i] + 1.0;
-        const double yj = 0.05 * x[j] + 1.0;
+        const double yi = x[i] + 1.0;
+        const double yj = x[j] + 1.0;
         const double z = 100.0 * sqr(yi * yi - yj) + sqr(yi - 1.0);
         sum += (z * z) / 4000.0 - std::cos(z) + 1.0;
     }
@@ -583,6 +566,8 @@ std::vector<double> x_opt_for(BasicFunctionId id, int dimension) {
     case BasicFunctionId::Rosenbrock:
     case BasicFunctionId::GriewankRosenbrock:
         return std::vector<double>(static_cast<std::size_t>(dimension), 0.0);
+    case BasicFunctionId::Schwefel:
+        return std::vector<double>(static_cast<std::size_t>(dimension), 420.9687462275036);
     case BasicFunctionId::DixonPrice: {
         std::vector<double> x(static_cast<std::size_t>(dimension), 0.0);
         if (dimension > 0) {
@@ -634,11 +619,13 @@ Domain default_domain_for(BasicFunctionId id, int dimension) {
         return Domain(dimension, -100.0, 100.0);
     }
     if (id == BasicFunctionId::BuecheRastrigin
-        || id == BasicFunctionId::Schwefel
         || id == BasicFunctionId::Weierstrass
         || id == BasicFunctionId::SharpRidge
         || id == BasicFunctionId::Katsuura) {
         return Domain(dimension, -50.0, 50.0);
+    }
+    if (id == BasicFunctionId::Schwefel) {
+        return Domain(dimension, -500.0, 500.0);
     }
     if (id == BasicFunctionId::Griewank
         || id == BasicFunctionId::GriewankRosenbrock
@@ -687,7 +674,7 @@ std::string properties_for(BasicFunctionId id) {
     case BasicFunctionId::Sphere:
         return "Basic function, Sphere, unimodal, separable, convex.";
     case BasicFunctionId::SumDifferentPowers:
-        return "Basic function, CEC Sum Different Powers, unimodal, separable, heterogeneous coordinate exponents.";
+        return "Basic function, Sum Different Powers, unimodal, separable, heterogeneous coordinate exponents.";
     case BasicFunctionId::Ellipsoidal:
         return "Basic function, Ellipsoidal, unimodal, separable, ill-conditioned.";
     case BasicFunctionId::BuecheRastrigin:
@@ -699,7 +686,7 @@ std::string properties_for(BasicFunctionId id) {
     case BasicFunctionId::StepEllipsoidal:
         return "Basic function, Step Ellipsoidal, unimodal, non-smooth, ill-conditioned.";
     case BasicFunctionId::StepRastrigin:
-        return "Basic function, CEC step Rastrigin, multimodal, separable, non-continuous.";
+        return "Basic function, Step Rastrigin, multimodal, separable, non-continuous.";
     case BasicFunctionId::Rosenbrock:
         return "Basic function, Rosenbrock, unimodal, non-separable, narrow curved valley.";
     case BasicFunctionId::Ackley:
@@ -715,7 +702,7 @@ std::string properties_for(BasicFunctionId id) {
     case BasicFunctionId::Weierstrass:
         return "Basic function, Weierstrass, multimodal, non-separable when externally rotated, fractal ruggedness.";
     case BasicFunctionId::SchafferF7:
-        return "Basic function, CEC Schaffer F7, multimodal, non-separable, pairwise radial coupling.";
+        return "Basic function, Schaffer F7, multimodal, non-separable, pairwise radial coupling.";
     case BasicFunctionId::GriewankRosenbrock:
         return "Basic function, Griewank-Rosenbrock F8F2, multimodal, non-separable, funnel-like composition.";
     case BasicFunctionId::Gallagher21:
@@ -823,7 +810,7 @@ double BasicF::evaluate_impl(const double* x) const {
     case BasicFunctionId::StepRastrigin:
         return step_rastrigin_eval(x, dimension);
     case BasicFunctionId::Rosenbrock:
-        return rosenbrock_cec_eval(x, dimension);
+        return rosenbrock_original_eval(x, dimension);
     case BasicFunctionId::Ackley:
         return ackley_eval(x, dimension);
     case BasicFunctionId::Rastrigin:
@@ -837,7 +824,7 @@ double BasicF::evaluate_impl(const double* x) const {
     case BasicFunctionId::Weierstrass:
         return weierstrass_eval(x, dimension);
     case BasicFunctionId::SchafferF7:
-        return schaffer_f7_cec_eval(x, dimension);
+        return schaffer_f7_raw_eval(x, dimension);
     case BasicFunctionId::SchafferF7Cond1000:
         return schaffer_f7_eval(x, dimension, 1000.0);
     case BasicFunctionId::GriewankRosenbrock:

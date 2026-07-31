@@ -118,6 +118,53 @@ void check_basic_function_registry_ids() {
     require(ids[2] == FuncCraft::BasicFunctionId::SumDifferentPowers, "basic function id 3 must be SumDifferentPowers");
 }
 
+void check_basic_functions_are_unscaled() {
+    for (int dimension : {2, 10, 50}) {
+        for (FuncCraft::BasicFunctionId id : FuncCraft::list_basic_functions()) {
+            const FuncCraft::BasicF function(id, dimension);
+            const double value = function.evaluate(function.x_opt);
+            require_close(
+                value,
+                function.f_opt,
+                1.0e-300,
+                "basic function x_opt does not evaluate to f_opt for "
+                    + function.name + " at dimension " + std::to_string(dimension));
+        }
+    }
+
+    {
+        const FuncCraft::BasicF rosenbrock(FuncCraft::BasicFunctionId::Rosenbrock, 2);
+        const double value = rosenbrock.evaluate({100.0, 100.0});
+        const double expected = 100.0 * std::pow(101.0 - 101.0 * 101.0, 2.0) + std::pow(101.0 - 1.0, 2.0);
+        require_close(value, expected, 1.0e-8, "Rosenbrock must use the unscaled raw formula");
+    }
+    {
+        const FuncCraft::BasicF schwefel(FuncCraft::BasicFunctionId::Schwefel, 2);
+        require_close_vector(
+            schwefel.x_opt,
+            std::vector<double>{420.9687462275036, 420.9687462275036},
+            1.0e-12,
+            "Schwefel optimum must use the unscaled raw coordinates");
+        require_close(
+            schwefel.evaluate(schwefel.x_opt),
+            schwefel.f_opt,
+            1.0e-300,
+            "Schwefel raw optimum mismatch");
+    }
+    {
+        const FuncCraft::BasicF griewank_rosenbrock(FuncCraft::BasicFunctionId::GriewankRosenbrock, 2);
+        const double value = griewank_rosenbrock.evaluate({20.0, 20.0});
+        const auto rosenbrock_pair = [](double xi, double xj) {
+            const double yi = xi + 1.0;
+            const double yj = xj + 1.0;
+            const double z = 100.0 * std::pow(yi * yi - yj, 2.0) + std::pow(yi - 1.0, 2.0);
+            return (z * z) / 4000.0 - std::cos(z) + 1.0;
+        };
+        const double expected = rosenbrock_pair(20.0, 20.0) + rosenbrock_pair(20.0, 20.0);
+        require_close(value, expected, 1.0e-6, "Griewank-Rosenbrock must use raw coordinates");
+    }
+}
+
 void check_suite_collection() {
     const std::vector<FuncCraft::SuiteCollectionId> collections = FuncCraft::list_suite_collections();
     require(!collections.empty(), "suite collection registry is empty");
@@ -888,6 +935,7 @@ int run_tests() {
 
     const std::vector<TestCase> tests = {
         {"Basic function registry ids", check_basic_function_registry_ids},
+        {"Basic function unscaled formulas", check_basic_functions_are_unscaled},
         {"Packaged suite optima", check_optima},
         {"Suite collection API", check_suite_collection},
         {"Identity transform assigned optimum", check_identity_transform_assigned_optimum},

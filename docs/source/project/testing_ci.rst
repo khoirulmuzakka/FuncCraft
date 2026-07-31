@@ -57,12 +57,18 @@ directory instead of the installed wheel.
 C++ test coverage
 -----------------
 
-The C++ binary prints a named report with 19 checks and finishes with
+The C++ binary prints a named report with 20 checks and finishes with
 ``Overall status: PASS`` on success. The checks are:
 
 ``Basic function registry ids``
    Verifies that the primitive base-function registry is nonempty, contiguous
    from ID 1, and starts with the expected leading functions.
+
+``Basic function unscaled formulas``
+   Checks that every primitive's stored ``x_opt`` evaluates to its stored
+   ``f_opt`` at dimensions 2, 10, and 50. It also checks raw-coordinate
+   evaluations for primitives that previously risked CEC-style coordinate
+   rescaling, including Rosenbrock, Schwefel, and Griewank-Rosenbrock.
 
 ``Packaged suite optima``
    Builds the packaged ``2026_v1`` suite at dimension 10 and checks the first
