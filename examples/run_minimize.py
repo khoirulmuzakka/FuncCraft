@@ -15,6 +15,7 @@ import random
 import sys
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 
 try:
@@ -43,6 +44,12 @@ class RunConfig:
     high: int = 32
 
 
+@dataclass(frozen=True)
+class ResultSummary:
+    fun: float
+    nfev: int
+
+
 def is_integer_arg(text: str) -> bool:
     if not text:
         return False
@@ -65,6 +72,24 @@ def parse_nonnegative_int_arg(text: str, name: str) -> int:
     if value < 0:
         raise ValueError(f"{name} must be a non-negative integer")
     return value
+
+
+def normalize_algo_name(algo: str) -> str:
+    return "".join(ch for ch in algo.casefold() if ch.isalnum())
+
+
+def initial_guess_sampler(
+    bounds: list[tuple[float, float]],
+    seed: int,
+    index: int,
+) -> Callable[[], list[float]]:
+    mixed_seed = seed ^ (0x9E3779B97F4A7C15 + index)
+    rng = random.Random(mixed_seed)
+
+    def sample() -> list[float]:
+        return [low + (high - low) * rng.random() for low, high in bounds]
+
+    return sample
 
 
 def parse_cli(argv: list[str]) -> RunConfig:
@@ -119,21 +144,204 @@ def truncate_with_ellipsis(text: str, max_len: int) -> str:
 
 
 def initial_guess(bounds: list[tuple[float, float]], seed: int, index: int) -> list[float]:
-    mixed_seed = seed ^ (0x9E3779B97F4A7C15 + index)
-    rng = random.Random(mixed_seed)
-    return [low + (high - low) * rng.random() for low, high in bounds]
+    return initial_guess_sampler(bounds, seed, index)()
+
+
+def make_result_summary(fun: float, nfev: int) -> ResultSummary:
+    return ResultSummary(fun=float(fun), nfev=int(nfev))
+
+
+def single_point_objective(function) -> Callable[[list[float]], float]:
+    def objective(x: list[float]) -> float:
+        return float(function.evaluate([list(x)])[0])
+
+    return objective
+
+
+def batch_objective(function) -> Callable[[list[list[float]]], list[float]]:
+    def objective(xs: list[list[float]]) -> list[float]:
+        points = [list(x) for x in xs]
+        return function.evaluate(points)
+
+    return objective
+
+
+def run_minionpy(
+    function,
+    bounds: list[tuple[float, float]],
+    config: RunConfig,
+    index: int,
+):
+    try:
+        import minionpy as mpy
+    except ImportError as exc:
+        raise RuntimeError(
+            "MinionPy is not installed. Install it with: python -m pip install minionpy"
+        ) from exc
+
+    x0 = initial_guess(bounds, config.seed, index)
+    optimizer = mpy.Minimizer(
+        func=function.evaluate,
+        bounds=bounds,
+        x0=[x0],
+        algo=config.algo,
+        maxevals=config.max_evals,
+        callback=None,
+        seed=config.seed,
+        options={
+            "convergence_tol": 0.0,
+            "population_size": config.population_size,
+        },
+    )
+    return optimizer.optimize()
+
+
+def run_pycma(
+    function,
+    bounds: list[tuple[float, float]],
+    config: RunConfig,
+    variant: str,
+) -> ResultSummary:
+    try:
+        import cma
+    except ImportError as exc:
+        raise RuntimeError(
+            "pycma is not installed. Install it with: python -m pip install cma"
+        ) from exc
+
+    lower = [low for low, _ in bounds]
+    upper = [high for _, high in bounds]
+    width = [high - low for low, high in bounds if high > low]
+    sigma0 = max((sum(width) / len(width)) / 4.0 if width else 1.0, 1.0e-12)
+    x0 = [0.0] * len(bounds)
+
+    normalized = normalize_algo_name(variant)
+    active = normalized in {"acmaes", "abipop"}
+    use_bipop = normalized == "abipop"
+    restarts = 9 if normalized in {"abipop", "ipop"} else 0
+    parallel_objective = batch_objective(function)
+
+    options = {
+        "bounds": [lower, upper],
+        "seed": config.seed,
+        "verb_time": 0,
+        "verbose": -9,
+        "ftarget": function.get_fopt(),
+        "maxfevals": config.max_evals,
+        "CMA_active": active,
+    }
+    if config.population_size > 0:
+        options["popsize"] = config.population_size
+
+    _, es = cma.fmin2(
+        None,
+        x0,
+        sigma0,
+        options,
+        restarts=restarts,
+        bipop=use_bipop,
+        parallel_objective=parallel_objective,
+    )
+    return make_result_summary(es.result.fbest, es.result.evaluations)
+
+
+def run_scipy(
+    function,
+    bounds: list[tuple[float, float]],
+    config: RunConfig,
+    index: int,
+    variant: str,
+) -> ResultSummary:
+    try:
+        import scipy.optimize as spo
+    except ImportError as exc:
+        raise RuntimeError(
+            "SciPy is not installed. Install it with: python -m pip install scipy"
+        ) from exc
+
+    normalized = normalize_algo_name(variant)
+    x0 = initial_guess(bounds, config.seed, index)
+    objective = single_point_objective(function)
+
+    if normalized == "de":
+        if config.population_size > 0:
+            popsize = max(1, math.ceil(config.population_size / max(1, config.dimension)))
+        else:
+            popsize = 5*config.dimension
+        maxiter = max(0, config.max_evals // (popsize * max(1, config.dimension)) - 1)
+        result = spo.differential_evolution(
+            objective,
+            bounds,
+            x0=x0,
+            seed=config.seed,
+            popsize=popsize,
+            maxiter=maxiter,
+            polish=False,
+            disp=False,
+        )
+        return make_result_summary(result.fun, result.nfev)
+
+    if normalized == "neldermead":
+        result = spo.minimize(
+            objective,
+            x0,
+            method="Nelder-Mead",
+            bounds=bounds,
+            options={
+                "maxiter": config.max_evals,
+                "maxfev": config.max_evals,
+                "xatol": 0.0,
+                "fatol": 0.0,
+                "disp": False,
+            },
+        )
+        return make_result_summary(result.fun, result.nfev)
+
+    if normalized == "lbfgsb":
+        result = spo.minimize(
+            objective,
+            x0,
+            method="L-BFGS-B",
+            bounds=bounds,
+            options={
+                "maxiter": config.max_evals,
+                "maxfun": config.max_evals,
+                "disp": False,
+            },
+        )
+        return make_result_summary(result.fun, result.nfev)
+
+    raise ValueError(
+        "unsupported scipy algorithm variant: "
+        f"{variant!r}; use scipy_DE, scipy_NelderMead, or scipy_L_bfgs_b"
+    )
+
+
+def run_algorithm(
+    function,
+    bounds: list[tuple[float, float]],
+    config: RunConfig,
+    index: int,
+):
+    normalized = normalize_algo_name(config.algo)
+    if normalized.startswith("pycma"):
+        variant = normalized[len("pycma") :]
+        if not variant:
+            variant = "cmaes"
+        return run_pycma(function, bounds, config, variant)
+    if normalized.startswith("scipy"):
+        variant = normalized[len("scipy") :]
+        if not variant:
+            raise ValueError(
+                "scipy algorithms require a suffix: scipy_DE, scipy_NelderMead, or scipy_L_bfgs_b"
+            )
+        return run_scipy(function, bounds, config, index, variant)
+    return run_minionpy(function, bounds, config, index)
 
 
 def main(argv: list[str]) -> int:
     try:
         config = parse_cli(argv)
-
-        try:
-            import minionpy as mpy
-        except ImportError as exc:
-            raise RuntimeError(
-                "MinionPy is not installed. Install it with: python -m pip install minionpy"
-            ) from exc
 
         year = 2026
         version = 1
@@ -173,24 +381,9 @@ def main(argv: list[str]) -> int:
                 fields = split_class_label(function.label)
                 domain = function.domain
                 bounds = list(zip(domain.lower_bound, domain.upper_bound))
-                x0 = initial_guess(bounds, config.seed, index)
-
-                optimizer = mpy.Minimizer(
-                    func=function.evaluate,
-                    bounds=bounds,
-                    x0=[x0],
-                    algo=config.algo,
-                    maxevals=config.max_evals,
-                    callback=None,
-                    seed=config.seed,
-                    options={
-                        "convergence_tol": 0.0,
-                        "population_size": config.population_size,
-                    },
-                )
-                result = optimizer.optimize()
-                error = abs(result.fun - function.get_fopt())
-                ok = math.isfinite(result.fun)
+                result = run_algorithm(function, bounds, config, index)
+                error = abs(float(result.fun) - function.get_fopt())
+                ok = math.isfinite(float(result.fun))
                 failed += 0 if ok else 1
 
                 print(
@@ -199,8 +392,8 @@ def main(argv: list[str]) -> int:
                     f"{fields[1]:<14}"
                     f"{fields[2]:<12}"
                     f"{truncate_with_ellipsis(fields[3], 29):<30}"
-                    f"{result.fun:>16.6e}"
-                    f"{result.nfev:>16}"
+                    f"{float(result.fun):>16.6e}"
+                    f"{int(result.nfev):>16}"
                     f"{error:>16.3e}"
                 )
             except Exception as exc:
