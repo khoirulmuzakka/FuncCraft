@@ -62,9 +62,6 @@
  * - materialize a function with `BenchmarkSuite::function(index)`
  * - evaluate it with `BenchmarkFunction::operator()(std::vector<std::vector<double>>)`
  *
- * `BenchmarkSuite::operator()(index, points)` remains available as a shortcut,
- * but examples should instantiate `BenchmarkFunction` first.
- *
  * Minimal example:
  *
  * @code{.cpp}

@@ -146,13 +146,16 @@ PYBIND11_MODULE(_funccraft, m) {
         .export_values();
 
     py::class_<FuncCraft::BasicF>(m, "BasicF")
-        .def(py::init<FuncCraft::BasicFunctionId, int>(), py::arg("id"), py::arg("dimension"))
+        .def(py::init<FuncCraft::BasicFunctionId, int>(),
+            py::arg("id"),
+            py::arg("dimension"),
+            py::call_guard<py::gil_scoped_release>())
         .def("__call__", [](const FuncCraft::BasicF& self, const std::vector<std::vector<double>>& X) {
             return self(X);
-        }, py::arg("points"))
+        }, py::arg("points"), py::call_guard<py::gil_scoped_release>())
         .def("evaluate", [](const FuncCraft::BasicF& self, const std::vector<double>& x) {
             return self.evaluate(x);
-        }, py::arg("point"))
+        }, py::arg("point"), py::call_guard<py::gil_scoped_release>())
         .def_readonly("name", &FuncCraft::BasicF::name)
         .def_readonly("dimension", &FuncCraft::BasicF::dimension)
         .def_property_readonly("default_domain", &FuncCraft::BasicF::default_domain)
@@ -257,13 +260,15 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_readwrite("name", &FuncCraft::SuiteCollectionId::name);
 
     py::class_<FuncCraft::BenchmarkFunction>(m, "BenchmarkFunction")
-        .def(py::init<FuncCraft::FunctionSpec>(), py::arg("spec"))
+        .def(py::init<FuncCraft::FunctionSpec>(),
+            py::arg("spec"),
+            py::call_guard<py::gil_scoped_release>())
         .def("__call__", [](const FuncCraft::BenchmarkFunction& self, const std::vector<std::vector<double>>& X) {
             return self(X);
-        }, py::arg("points"))
+        }, py::arg("points"), py::call_guard<py::gil_scoped_release>())
         .def("evaluate", [](const FuncCraft::BenchmarkFunction& self, const std::vector<std::vector<double>>& X) {
             return self(X);
-        }, py::arg("points"))
+        }, py::arg("points"), py::call_guard<py::gil_scoped_release>())
         .def_property_readonly("domain", &FuncCraft::BenchmarkFunction::domain, py::return_value_policy::reference_internal)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkFunction::dimension)
         .def_property_readonly("scale_factor", &FuncCraft::BenchmarkFunction::scale_factor)
@@ -277,19 +282,19 @@ PYBIND11_MODULE(_funccraft, m) {
         }, py::arg("path"));
 
     py::class_<FuncCraft::BenchmarkSuite>(m, "BenchmarkSuite")
-        .def(py::init<FuncCraft::SuiteSpec, int>(), py::arg("spec"), py::arg("dimension"))
-        .def(py::init<const std::string&, int>(), py::arg("yaml_path"), py::arg("dimension"))
+        .def(py::init<FuncCraft::SuiteSpec, int>(),
+            py::arg("spec"),
+            py::arg("dimension"),
+            py::call_guard<py::gil_scoped_release>())
+        .def(py::init<const std::string&, int>(),
+            py::arg("yaml_path"),
+            py::arg("dimension"),
+            py::call_guard<py::gil_scoped_release>())
         .def_property_readonly("size", &FuncCraft::BenchmarkSuite::size)
         .def_property_readonly("theoretical_max_number_of_functions", &FuncCraft::BenchmarkSuite::theoretical_max_number_of_functions)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkSuite::dimension)
         .def("__len__", &FuncCraft::BenchmarkSuite::size)
         .def("function", &FuncCraft::BenchmarkSuite::function, py::arg("index"), py::return_value_policy::reference_internal)
-        .def("evaluate", [](const FuncCraft::BenchmarkSuite& self, int index, const std::vector<std::vector<double>>& X) {
-            return self(index, X);
-        }, py::arg("index"), py::arg("points"))
-        .def("__call__", [](const FuncCraft::BenchmarkSuite& self, int index, const std::vector<std::vector<double>>& X) {
-            return self(index, X);
-        }, py::arg("index"), py::arg("points"))
         .def_property_readonly("spec", &FuncCraft::BenchmarkSuite::spec, py::return_value_policy::reference_internal)
         .def("export_manifest", [](const FuncCraft::BenchmarkSuite& self, const std::string& path) {
             self.export_manifest(path);
@@ -309,18 +314,19 @@ PYBIND11_MODULE(_funccraft, m) {
         .def_property_readonly("number_of_functions", &FuncCraft::SuiteCollection::number_of_functions)
         .def("spec", &FuncCraft::SuiteCollection::spec)
         .def("benchmark_suite", &FuncCraft::SuiteCollection::benchmark_suite,
-            py::arg("dimension"));
+            py::arg("dimension"),
+            py::call_guard<py::gil_scoped_release>());
 
     m.def("make_benchmark_function", [](FuncCraft::FunctionSpec spec) {
         return FuncCraft::BenchmarkFunction(std::move(spec));
-    }, py::arg("spec"));
+    }, py::arg("spec"), py::call_guard<py::gil_scoped_release>());
     m.def("make_benchmark_function", [](const std::string& path) {
         return FuncCraft::make_benchmark_function(path);
-    }, py::arg("path"));
+    }, py::arg("path"), py::call_guard<py::gil_scoped_release>());
     m.def("make_benchmark_suite", py::overload_cast<FuncCraft::SuiteSpec, int>(&FuncCraft::make_benchmark_suite),
-        py::arg("spec"), py::arg("dimension"));
+        py::arg("spec"), py::arg("dimension"), py::call_guard<py::gil_scoped_release>());
     m.def("make_benchmark_suite", py::overload_cast<const std::string&, int>(&FuncCraft::make_benchmark_suite),
-        py::arg("path"), py::arg("dimension"));
+        py::arg("path"), py::arg("dimension"), py::call_guard<py::gil_scoped_release>());
     m.def("load_suite_spec", &FuncCraft::load_suite_spec, py::arg("path"));
     m.def("load_function_spec", &FuncCraft::load_function_spec, py::arg("path"));
     m.def("list_suite_collections", []() {

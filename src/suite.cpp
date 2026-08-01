@@ -1148,10 +1148,6 @@ YAML::Node BenchmarkSuite::export_function_spec(int index) const {
     return build_function(blueprints_[pos]).export_spec();
 }
 
-std::vector<double> BenchmarkSuite::operator()(int index, const std::vector<std::vector<double>>& X) const {
-    return function(index)(X);
-}
-
 const SuiteSpec& BenchmarkSuite::spec() const {
     return spec_;
 }

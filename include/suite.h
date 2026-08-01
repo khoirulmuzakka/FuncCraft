@@ -85,13 +85,6 @@ public:
      */
     const BenchmarkFunction& function(int index) const;
     /**
-     * @brief Shortcut for batch-evaluating one generated function by index.
-     *
-     * Prefer `suite.function(index)(points)` in new code when the caller will
-     * inspect, reuse, or export the materialized `BenchmarkFunction`.
-     */
-    std::vector<double> operator()(int index, const std::vector<std::vector<double>>& X) const;
-    /**
      * @brief Return the normalized suite specification used to build this suite.
      */
     const SuiteSpec& spec() const;

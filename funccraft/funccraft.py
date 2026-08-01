@@ -312,18 +312,6 @@ class BenchmarkSuite:
         """
         return BenchmarkFunction(self._suite.function(index))
 
-    def evaluate(self, index, points):
-        """Shortcut for evaluating one generated function by index.
-
-        Prefer ``suite.function(index).evaluate(points)`` in user code when
-        you also need to inspect the function metadata.
-        """
-        return self._suite.evaluate(index, points)
-
-    def __call__(self, index, points):
-        """Alias for :meth:`evaluate`."""
-        return self._suite(index, points)
-
     def export_manifest(self, path):
         """Write the materialized suite YAML manifest."""
         self._suite.export_manifest(str(path))

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import math
+import os
 import sys
 import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +23,7 @@ OPTIMUM_FUNCTION_COUNT = 500
 
 try:
     from funccraft import (
+        BasicF,
         BasicFunctionId,
         BenchmarkFunction,
         BenchmarkSuite,
@@ -27,6 +31,7 @@ try:
     )
 except ModuleNotFoundError:
     from funccraft import (
+        BasicF,
         BasicFunctionId,
         BenchmarkFunction,
         BenchmarkSuite,
@@ -160,10 +165,43 @@ def check_basic_function_ids_start_at_one():
     raise AssertionError("base function id 0 was accepted")
 
 
+def check_native_evaluation_releases_gil():
+    if (os.cpu_count() or 1) < 2:
+        return
+
+    dimension = 80
+    point_count = 6000
+    function = BasicF(BasicFunctionId.Katsuura, dimension)
+    points = [
+        [((row + 3 * col) % 17 - 8) / 8.0 for col in range(dimension)]
+        for row in range(point_count)
+    ]
+
+    expected = function(points)
+
+    start_wall = time.perf_counter()
+    start_cpu = time.process_time()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: function(points), range(2)))
+    wall_seconds = time.perf_counter() - start_wall
+    cpu_seconds = time.process_time() - start_cpu
+
+    for result in results:
+        assert_close_sequence(result, expected)
+
+    effective_cores = cpu_seconds / wall_seconds if wall_seconds > 0 else 0.0
+    if effective_cores < 1.15:
+        raise AssertionError(
+            "native evaluation did not appear to release the GIL: "
+            f"cpu/wall={effective_cores:.2f}"
+        )
+
+
 def main():
     dimension = 3
 
     check_basic_function_ids_start_at_one()
+    check_native_evaluation_releases_gil()
 
     suite_year = 2026
     suite_version = 1
