@@ -172,6 +172,10 @@ class BenchmarkFunction:
         """
         return self._function.evaluate(points)
 
+    def evaluate_unit(self, points):
+        """Evaluate points from the normalized ``[-1, 1]`` domain."""
+        return self._function.evaluate_unit(points)
+
     def export_yaml(self, path):
         """Write the materialized function YAML record."""
         self._function.export_spec(str(path))

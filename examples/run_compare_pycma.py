@@ -12,10 +12,9 @@ from __future__ import annotations
 import math
 import os
 import sys
-import threading
 import time
 import ctypes
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -46,14 +45,20 @@ MAX_EVALS = [500, 1000, 5000, 10000, 20000, 50000, 100000, 500000, 1000000]
 FUNCTION_INDICES = list(range(1, 71))
 RUNS = list(range(1, 12))
 PROGRESS_EVERY_JOBS = 100
-THREAD_LOCAL = threading.local()
 
 
 def thread_workers() -> int:
     override = os.environ.get("FUNCCRAFT_COMPARE_THREADS")
     if override:
         return max(1, int(override))
-    return max(1, os.cpu_count() or 1)
+    return 16
+
+
+def process_workers() -> int:
+    override = os.environ.get("FUNCCRAFT_COMPARE_PROCESSES")
+    if override:
+        return max(1, int(override))
+    return 8
 
 
 def output_path(output_dir: Path, algo: str, dimension: int, max_evals: int) -> Path:
@@ -87,18 +92,17 @@ def flush_c_stdio() -> None:
 
 
 @contextmanager
-def redirect_process_output(log_path: Path, *, restore: bool = True):
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+def silence_process_output():
     sys.stdout.flush()
     sys.stderr.flush()
     flush_c_stdio()
     stdout_fd = os.dup(1)
     stderr_fd = os.dup(2)
-    with log_path.open("ab", buffering=0) as log_file:
+    with open(os.devnull, "wb", buffering=0) as devnull:
         restore_windows_stdout = None
         restore_windows_stderr = None
-        os.dup2(log_file.fileno(), 1)
-        os.dup2(log_file.fileno(), 2)
+        os.dup2(devnull.fileno(), 1)
+        os.dup2(devnull.fileno(), 2)
         if os.name == "nt":
             kernel32 = ctypes.windll.kernel32
             restore_windows_stdout = kernel32.GetStdHandle(-11)
@@ -113,34 +117,23 @@ def redirect_process_output(log_path: Path, *, restore: bool = True):
             sys.stdout.flush()
             sys.stderr.flush()
             flush_c_stdio()
-            if restore:
-                os.dup2(stdout_fd, 1)
-                os.dup2(stderr_fd, 2)
-                if os.name == "nt":
-                    kernel32.SetStdHandle(-11, restore_windows_stdout)
-                    kernel32.SetStdHandle(-12, restore_windows_stderr)
+            os.dup2(stdout_fd, 1)
+            os.dup2(stderr_fd, 2)
+            if os.name == "nt":
+                kernel32.SetStdHandle(-11, restore_windows_stdout)
+                kernel32.SetStdHandle(-12, restore_windows_stderr)
             os.close(stdout_fd)
             os.close(stderr_fd)
 
 
-def thread_local_suite(dimension: int):
-    suites = getattr(THREAD_LOCAL, "suites", None)
-    if suites is None:
-        suites = {}
-        THREAD_LOCAL.suites = suites
-    if dimension not in suites:
-        suites[dimension] = fc.SuiteCollection(2026, 1).benchmark_suite(dimension)
-    return suites[dimension]
-
-
-def run_one(
+def run_one_function(
+    function,
     algo: str,
     dimension: int,
     max_evals: int,
     function_index: int,
     run_number: int,
 ) -> tuple[int, int, float]:
-    function = thread_local_suite(dimension).function(function_index)
     domain = function.domain
     bounds = list(zip(domain.lower_bound, domain.upper_bound))
     config = RunConfig(
@@ -156,58 +149,157 @@ def run_one(
     return function_index, run_number, float(result.fun)
 
 
+def run_function_runs(
+    function,
+    algo: str,
+    dimension: int,
+    max_evals: int,
+    function_index: int,
+    run_numbers: list[int],
+) -> tuple[int, list[tuple[int, float]]]:
+    values = []
+    for run_number in run_numbers:
+        _, _, value = run_one_function(
+            function,
+            algo,
+            dimension,
+            max_evals,
+            function_index,
+            run_number,
+        )
+        values.append((run_number, value))
+    return function_index, values
+
+
+def run_process_shard(
+    algo: str,
+    dimension: int,
+    max_evals: int,
+    function_indices: list[int],
+    run_numbers: list[int],
+    threads: int,
+) -> list[tuple[int, list[tuple[int, float]]]]:
+    with silence_process_output():
+        suite = fc.SuiteCollection(2026, 1).benchmark_suite(dimension)
+        functions = {
+            function_index: suite.function(function_index)
+            for function_index in function_indices
+        }
+
+        results = []
+        with ThreadPoolExecutor(max_workers=min(threads, len(function_indices))) as executor:
+            futures = [
+                executor.submit(
+                    run_function_runs,
+                    functions[function_index],
+                    algo,
+                    dimension,
+                    max_evals,
+                    function_index,
+                    run_numbers,
+                )
+                for function_index in function_indices
+            ]
+            for future in as_completed(futures):
+                results.append(future.result())
+        return results
+
+
 def write_matrix(path: Path, matrix: list[list[float]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for row in matrix:
-            handle.write(" ".join(f"{value:.17g}" for value in row))
+            handle.write(" ".join(f"{value:.9e}" for value in row))
             handle.write("\n")
 
 
-def run_algo(algo: str, output_dir: Path, started: float, total: int, finished: int, console_write) -> int:
+def run_block(
+    algo: str,
+    dimension: int,
+    max_evals: int,
+    output_dir: Path,
+    started: float,
+    total: int,
+    finished: int,
+    console_write,
+) -> int:
     next_report = ((finished // PROGRESS_EVERY_JOBS) + 1) * PROGRESS_EVERY_JOBS
+    matrix = [
+        [math.nan for _ in RUNS]
+        for _ in FUNCTION_INDICES
+    ]
+    workers = min(process_workers(), len(RUNS))
+    threads = thread_workers()
+    run_shards = [RUNS[index::workers] for index in range(workers)]
+    run_shards = [run_shard for run_shard in run_shards if run_shard]
 
-    with ThreadPoolExecutor(max_workers=thread_workers()) as executor:
-        for max_evals in MAX_EVALS:
-            futures = {}
-            results: dict[int, list[list[float]]] = {}
-            for dimension in DIMENSIONS:
-                results[dimension] = [
-                    [math.nan for _ in RUNS]
-                    for _ in FUNCTION_INDICES
-                ]
-
-            for dimension in DIMENSIONS:
-                for function_index in FUNCTION_INDICES:
-                    for run_number in RUNS:
-                        future = executor.submit(
-                            run_one,
-                            algo,
-                            dimension,
-                            max_evals,
-                            function_index,
-                            run_number,
-                        )
-                        futures[future] = dimension
-
+    if len(run_shards) == 1:
+        shard_results = [
+            run_process_shard(
+                algo,
+                dimension,
+                max_evals,
+                FUNCTION_INDICES,
+                run_shards[0],
+                threads,
+            )
+        ]
+    else:
+        shard_results = []
+        with ProcessPoolExecutor(max_workers=len(run_shards)) as executor:
+            futures = {
+                executor.submit(
+                    run_process_shard,
+                    algo,
+                    dimension,
+                    max_evals,
+                    FUNCTION_INDICES,
+                    run_shard,
+                    threads,
+                ): run_shard
+                for run_shard in run_shards
+            }
             for future in as_completed(futures):
-                dimension = futures[future]
-                function_index, run_number, value = future.result()
-                results[dimension][function_index - 1][run_number - 1] = value
-                finished += 1
+                run_shard = futures[future]
+                shard_results.append(future.result())
+                finished += len(run_shard) * len(FUNCTION_INDICES)
                 if finished >= next_report or finished == total:
                     console_write(progress_line(started, finished, total))
                     next_report = finished + PROGRESS_EVERY_JOBS
 
-            for dimension in DIMENSIONS:
-                path = output_path(output_dir, algo, dimension, max_evals)
-                write_matrix(path, results[dimension])
+    if len(run_shards) == 1:
+        finished += len(run_shards[0]) * len(FUNCTION_INDICES)
+        if finished >= next_report or finished == total:
+            console_write(progress_line(started, finished, total))
+
+    for shard in shard_results:
+        for function_index, values in shard:
+            for run_number, value in values:
+                matrix[function_index - 1][run_number - 1] = value
+
+    write_matrix(output_path(output_dir, algo, dimension, max_evals), matrix)
 
     return finished
 
 
+def run_algo(algo: str, output_dir: Path, started: float, total: int, finished: int, console_write) -> int:
+    for dimension in DIMENSIONS:
+        for max_evals in MAX_EVALS:
+            finished = run_block(
+                algo,
+                dimension,
+                max_evals,
+                output_dir,
+                started,
+                total,
+                finished,
+                console_write,
+            )
+    return finished
+
+
 def main(argv: list[str]) -> int:
-    output_dir = Path(argv[0]) if argv else Path.cwd()
+    output_dir = Path(argv[0]) if argv else Path.cwd() / "results"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     workers = thread_workers()
@@ -220,18 +312,17 @@ def main(argv: list[str]) -> int:
         os.write(console_fd, f"{line}\n".encode("utf-8", errors="replace"))
 
     try:
-        console_write(f"threads: {workers}   output: {output_dir}")
+        console_write(
+            f"processes: {process_workers()}   threads/process: {workers}   output: {output_dir}"
+        )
         console_write(progress_line(started, finished, total))
 
-        log_path = output_dir / "logs" / "compare.log"
-        with redirect_process_output(log_path, restore=False):
-            for algo in ALGOS:
-                try:
-                    finished = run_algo(algo, output_dir, started, total, finished, console_write)
-                except Exception as exc:
-                    console_write(f"{algo} failed: {exc}")
-                    console_write(f"details: {log_path}")
-                    raise
+        for algo in ALGOS:
+            try:
+                finished = run_algo(algo, output_dir, started, total, finished, console_write)
+            except Exception as exc:
+                console_write(f"{algo} failed: {exc}")
+                raise
     finally:
         os.close(console_fd)
 

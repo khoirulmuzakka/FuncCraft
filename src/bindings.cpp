@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -63,6 +64,30 @@ void configure_packaged_suite_dir() {
         }
     } catch (const std::exception&) {
     }
+}
+
+std::vector<double> evaluate_unit_domain(
+    const FuncCraft::BenchmarkFunction& function,
+    const std::vector<std::vector<double>>& X) {
+    const FuncCraft::Domain& domain = function.domain();
+    std::vector<std::vector<double>> mapped;
+    mapped.reserve(X.size());
+
+    for (const std::vector<double>& point : X) {
+        if (point.size() != domain.lower.size()) {
+            throw std::invalid_argument("point dimension does not match benchmark function domain");
+        }
+        std::vector<double> mapped_point;
+        mapped_point.reserve(point.size());
+        for (std::size_t i = 0; i < point.size(); ++i) {
+            const double lower = domain.lower[i];
+            const double upper = domain.upper[i];
+            mapped_point.push_back(lower + 0.5 * (point[i] + 1.0) * (upper - lower));
+        }
+        mapped.push_back(std::move(mapped_point));
+    }
+
+    return function(mapped);
 }
 
 } // namespace
@@ -269,6 +294,7 @@ PYBIND11_MODULE(_funccraft, m) {
         .def("evaluate", [](const FuncCraft::BenchmarkFunction& self, const std::vector<std::vector<double>>& X) {
             return self(X);
         }, py::arg("points"), py::call_guard<py::gil_scoped_release>())
+        .def("evaluate_unit", &evaluate_unit_domain, py::arg("points"), py::call_guard<py::gil_scoped_release>())
         .def_property_readonly("domain", &FuncCraft::BenchmarkFunction::domain, py::return_value_policy::reference_internal)
         .def_property_readonly("dimension", &FuncCraft::BenchmarkFunction::dimension)
         .def_property_readonly("scale_factor", &FuncCraft::BenchmarkFunction::scale_factor)

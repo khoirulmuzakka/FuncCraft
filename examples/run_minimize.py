@@ -160,20 +160,12 @@ def is_vector(value) -> bool:
 
 
 def unit_domain_batch_objective(function) -> Callable[[list[list[float]]], list[float]]:
-    lower_upper = function_domain_bounds(function)
-    lower = lower_upper[0] if lower_upper is not None else None
-    upper = lower_upper[1] if lower_upper is not None else None
-
     def objective(xs) -> list[float]:
-        xs = sequence_to_list(xs)
         if len(xs) == 0:
             return []
         if is_vector(xs[0]):
-            unit_points = [sequence_to_list(xs)]
-        else:
-            unit_points = [sequence_to_list(point) for point in xs]
-        points = map_unit_points_to_domain(unit_points, lower, upper)
-        return function.evaluate(points)
+            return function.evaluate_unit([xs])
+        return function.evaluate_unit(xs)
 
     return objective
 
