@@ -92,6 +92,118 @@ def initial_guess_sampler(
     return sample
 
 
+def origin_then_random_sampler(
+    bounds: list[tuple[float, float]],
+    seed: int,
+    index: int,
+) -> Callable[[], list[float]]:
+    sampler = initial_guess_sampler(bounds, seed, index)
+    first_call = True
+
+    def sample() -> list[float]:
+        nonlocal first_call
+        if first_call:
+            first_call = False
+            return [0.0] * len(bounds)
+        return sampler()
+
+    return sample
+
+
+def unit_bounds(dimension: int) -> list[tuple[float, float]]:
+    return [(-1.0, 1.0)] * dimension
+
+
+def function_domain_bounds(function) -> tuple[list[float], list[float]] | None:
+    domain = getattr(function, "domain", None)
+    if domain is None:
+        return None
+    lower = getattr(domain, "lower_bound", getattr(domain, "lower", None))
+    upper = getattr(domain, "upper_bound", getattr(domain, "upper", None))
+    if lower is None or upper is None:
+        return None
+    return list(lower), list(upper)
+
+
+def map_unit_point_to_domain(
+    point: list[float],
+    lower: list[float] | None,
+    upper: list[float] | None,
+) -> list[float]:
+    if lower is None or upper is None:
+        return list(point)
+    mapped: list[float] = []
+    for value, lo, hi in zip(point, lower, upper):
+        if hi == lo:
+            mapped.append(lo)
+        else:
+            mapped.append(lo + 0.5 * (value + 1.0) * (hi - lo))
+    return mapped
+
+
+def map_unit_points_to_domain(
+    points: list[list[float]],
+    lower: list[float] | None,
+    upper: list[float] | None,
+) -> list[list[float]]:
+    return [map_unit_point_to_domain(point, lower, upper) for point in points]
+
+
+def sequence_to_list(value):
+    if hasattr(value, "tolist"):
+        return value.tolist()
+    return list(value)
+
+
+def is_vector(value) -> bool:
+    return not (hasattr(value, "__iter__") and not isinstance(value, (str, bytes)))
+
+
+def unit_domain_batch_objective(function) -> Callable[[list[list[float]]], list[float]]:
+    lower_upper = function_domain_bounds(function)
+    lower = lower_upper[0] if lower_upper is not None else None
+    upper = lower_upper[1] if lower_upper is not None else None
+
+    def objective(xs) -> list[float]:
+        xs = sequence_to_list(xs)
+        if len(xs) == 0:
+            return []
+        if is_vector(xs[0]):
+            unit_points = [sequence_to_list(xs)]
+        else:
+            unit_points = [sequence_to_list(point) for point in xs]
+        points = map_unit_points_to_domain(unit_points, lower, upper)
+        return function.evaluate(points)
+
+    return objective
+
+
+def unit_domain_objective(function) -> Callable[[list[float] | list[list[float]]], float | list[float]]:
+    batch_objective = unit_domain_batch_objective(function)
+
+    def objective(x):
+        x = sequence_to_list(x)
+        if len(x) == 0:
+            return []
+        if is_vector(x[0]):
+            return float(batch_objective([x])[0])
+        return batch_objective(x)
+
+    return objective
+
+
+def single_point_objective(function) -> Callable[[list[float]], float]:
+    lower_upper = function_domain_bounds(function)
+    lower = lower_upper[0] if lower_upper is not None else None
+    upper = lower_upper[1] if lower_upper is not None else None
+
+    def objective(x: list[float]) -> float:
+        point = map_unit_point_to_domain(sequence_to_list(x), lower, upper)
+        return float(function.evaluate([point])[0])
+
+    return objective
+
+
 def parse_cli(argv: list[str]) -> RunConfig:
     algo = "ARRDE"
     arg_index = 0
@@ -151,21 +263,6 @@ def make_result_summary(fun: float, nfev: int) -> ResultSummary:
     return ResultSummary(fun=float(fun), nfev=int(nfev))
 
 
-def single_point_objective(function) -> Callable[[list[float]], float]:
-    def objective(x: list[float]) -> float:
-        return float(function.evaluate([list(x)])[0])
-
-    return objective
-
-
-def batch_objective(function) -> Callable[[list[list[float]]], list[float]]:
-    def objective(xs: list[list[float]]) -> list[float]:
-        points = [list(x) for x in xs]
-        return function.evaluate(points)
-
-    return objective
-
-
 def run_minionpy(
     function,
     bounds: list[tuple[float, float]],
@@ -179,17 +276,18 @@ def run_minionpy(
             "MinionPy is not installed. Install it with: python -m pip install minionpy"
         ) from exc
 
-    x0 = initial_guess(bounds, config.seed, index)
+    bounds = unit_bounds(config.dimension)
+    x0 = [[0.0] * config.dimension]
     optimizer = mpy.Minimizer(
-        func=function.evaluate,
+        func=unit_domain_batch_objective(function),
         bounds=bounds,
-        x0=[x0],
+        x0=x0,
         algo=config.algo,
         maxevals=config.max_evals,
         callback=None,
         seed=config.seed,
         options={
-            "convergence_tol": 0.0,
+            "convergence_tol": 1e-8,
             "population_size": config.population_size,
         },
     )
@@ -200,6 +298,7 @@ def run_pycma(
     function,
     bounds: list[tuple[float, float]],
     config: RunConfig,
+    index: int,
     variant: str,
 ) -> ResultSummary:
     try:
@@ -209,24 +308,22 @@ def run_pycma(
             "pycma is not installed. Install it with: python -m pip install cma"
         ) from exc
 
+    bounds = unit_bounds(config.dimension)
     lower = [low for low, _ in bounds]
     upper = [high for _, high in bounds]
     width = [high - low for low, high in bounds if high > low]
-    sigma0 = max((sum(width) / len(width)) / 4.0 if width else 1.0, 1.0e-12)
-    x0 = [0.0] * len(bounds)
-
+    sigma0 = 0.3
     normalized = normalize_algo_name(variant)
-    active = normalized in {"acmaes", "abipop"}
+    active = normalized in {"acmaes", "abipop", "ipop"}
     use_bipop = normalized == "abipop"
-    restarts = 9 if normalized in {"abipop", "ipop"} else 0
-    parallel_objective = batch_objective(function)
-
+    restarts = math.inf if normalized in {"abipop", "ipop"} else 0
+    x0 = origin_then_random_sampler(bounds, config.seed, index)
+    batch_objective = unit_domain_batch_objective(function)
     options = {
         "bounds": [lower, upper],
         "seed": config.seed,
         "verb_time": 0,
         "verbose": -9,
-        "ftarget": function.get_fopt(),
         "maxfevals": config.max_evals,
         "CMA_active": active,
     }
@@ -240,7 +337,7 @@ def run_pycma(
         options,
         restarts=restarts,
         bipop=use_bipop,
-        parallel_objective=parallel_objective,
+        parallel_objective=batch_objective,
     )
     return make_result_summary(es.result.fbest, es.result.evaluations)
 
@@ -259,15 +356,16 @@ def run_scipy(
             "SciPy is not installed. Install it with: python -m pip install scipy"
         ) from exc
 
+    bounds = unit_bounds(config.dimension)
     normalized = normalize_algo_name(variant)
-    x0 = initial_guess(bounds, config.seed, index)
+    x0 = [0.0] * config.dimension
     objective = single_point_objective(function)
 
     if normalized == "de":
         if config.population_size > 0:
             popsize = max(1, math.ceil(config.population_size / max(1, config.dimension)))
         else:
-            popsize = 5*config.dimension
+            popsize = 5
         maxiter = max(0, config.max_evals // (popsize * max(1, config.dimension)) - 1)
         result = spo.differential_evolution(
             objective,
@@ -328,7 +426,7 @@ def run_algorithm(
         variant = normalized[len("pycma") :]
         if not variant:
             variant = "cmaes"
-        return run_pycma(function, bounds, config, variant)
+        return run_pycma(function, bounds, config, index, variant)
     if normalized.startswith("scipy"):
         variant = normalized[len("scipy") :]
         if not variant:
