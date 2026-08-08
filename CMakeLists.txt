@@ -179,6 +179,7 @@ if(BUILD_EXAMPLES)
     funccraft_add_example(check_optima examples/main_check_optima.cpp)
     funccraft_add_example(run_minimize examples/main_minimize.cpp minion)
     funccraft_add_example(run_experiments examples/main_run_experiments.cpp minion)
+    funccraft_add_example(run_scaling_experiments examples/main_scaling_experiments.cpp minion)
 endif()
 
 if(BUILD_TEST)
